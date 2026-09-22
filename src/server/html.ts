@@ -5,6 +5,8 @@
 import { SITE, THRESHOLDS, SOURCES } from '../config.js';
 import type { ModelRecord, Snapshot, SourceStatus } from '../types.js';
 import type { OfferView, Pick, Recommendation, RecommendationRequest } from '../engine/recommend.js';
+import { accountName, usabilityLabel } from '../engine/usability.js';
+import { modelIdFor } from '../engine/opencode.js';
 import type { Change } from '../engine/changes.js';
 import { SCENARIOS, TASK_IDS, PRIORITIES, type Priority } from '../engine/scenarios.js';
 import type { OpenCodeConfigResult } from '../engine/opencode.js';
@@ -130,43 +132,45 @@ function renderChips(req: RecommendationRequest): string {
   </nav>`;
 }
 
-/** The provider comparison, in full view: this is the answer to "where do I buy". */
+/**
+ * How to buy, and how to switch. Every provider row carries the two things you
+ * need: what it costs you per month, and the exact command to use it.
+ */
 function renderConfronto(pick: Pick, role: string): string {
-  const riga = (o: OfferView, scelto: boolean) => `<tr${scelto ? ' class="scelto"' : ''}>
+  const riga = (o: OfferView, i: number, scelto: boolean) => {
+    const id = `cmd-${role}-${i}`;
+    const comando = `opencode -m ${modelIdFor(o.offer)}`;
+    return `<tr${scelto ? ' class="scelto"' : ''}>
       <td>
-        ${esc(o.offer.providerName)}
-        ${o.offer.access === 'intermediary' ? `<span class="meta">via ${esc(o.offer.broker ?? 'intermediario')}</span>` : '<span class="meta">diretto</span>'}
+        <strong>${esc(o.offer.providerName)}</strong>
+        <span class="meta">${esc(usabilityLabel(o.usability, o.offer))}${o.offer.apiKeyEnv ? ` · ${esc(o.offer.apiKeyEnv)}` : ''}</span>
       </td>
-      <td class="num">${o.offer.prices.inputPerMTok === null ? '—' : esc(nf4.format(o.offer.prices.inputPerMTok))}</td>
-      <td class="num">${o.offer.prices.outputPerMTok === null ? '—' : esc(nf4.format(o.offer.prices.outputPerMTok))}</td>
-      <td class="num"><strong>${esc(usd(o.cost.totalUsd))}</strong></td>
-      <td>${scelto ? '<span class="etichetta etichetta--ok">il più economico</span>' : ''}</td>
+      <td class="num nowrap"><strong>${esc(usd(o.cost.totalUsd))}</strong></td>
+      <td class="azione">
+        <code class="nascosto" id="${esc(id)}">${esc(comando)}</code>
+        <button class="bottone bottone--contorno bottone--piccolo" type="button" data-copia="#${esc(id)}">Copia</button>
+      </td>
     </tr>`;
+  };
 
-  const primi = pick.alternatives.slice(0, 4);
-  const restanti = pick.alternatives.slice(4);
-  const intestazione = `<thead><tr>
-      <th>Provider</th><th class="num">Input<br><span class="meta">USD/1M</span></th>
-      <th class="num">Output<br><span class="meta">USD/1M</span></th>
-      <th class="num">Al mese</th><th></th>
-    </tr></thead>`;
+  const primi = pick.alternatives.slice(0, 3);
+  const restanti = pick.alternatives.slice(3);
 
   return `<div class="acquisto">
-    <h4 class="acquisto__titolo">Dove comprarlo, dal più economico</h4>
+    <h4 class="acquisto__titolo">Dove comprarlo <span class="meta">— prezzo al mese, dal più economico</span></h4>
     <table class="tabella confronto">
-      ${intestazione}
       <tbody>
-        ${riga({ offer: pick.offer, cost: pick.cost }, true)}
-        ${primi.map((o) => riga(o, false)).join('')}
+        ${riga(pick.chosen, 0, true)}
+        ${primi.map((o, i) => riga(o, i + 1, false)).join('')}
       </tbody>
     </table>
     ${restanti.length ? `<details class="dettagli">
-      <summary>Altri ${esc(String(restanti.length))} provider confrontati</summary>
+      <summary>Altri ${esc(String(restanti.length))} provider</summary>
       <div class="dettagli__corpo">
-        <table class="tabella confronto">${intestazione}<tbody>${restanti.map((o) => riga(o, false)).join('')}</tbody></table>
+        <table class="tabella confronto"><tbody>${restanti.slice(0, 16).map((o, i) => riga(o, i + 100, false)).join('')}</tbody></table>
       </div>
     </details>` : ''}
-    <p class="meta acquisto__nota">Confrontati ${esc(String(pick.offersCompared))} provider per questo modello, ciascuno calcolato per intero sui propri prezzi. Il più economico tra i provider monitorati.</p>
+    <p class="meta acquisto__nota">${esc(String(pick.offersCompared))} provider confrontati. Per usarne uno: apri un account con lui, esporta la sua chiave nella shell e lancia il comando copiato.</p>
   </div>`;
 }
 
@@ -203,7 +207,6 @@ function renderPick(
   pick: Pick | null,
   role: 'quotidiano' | 'difficile',
   change: Change | null,
-  configId: string | null,
   empty: string,
 ): string {
   const titolo = role === 'quotidiano' ? '🟢 Ogni giorno' : '🟠 Quando si blocca';
@@ -222,13 +225,17 @@ function renderPick(
     </p>
     ${change ? `<p class="pick__cambio${change.moved ? ' pick__cambio--mosso' : ''}">${esc(change.text)}</p>` : ''}
     ${role === 'difficile' && pick.whenToUse ? `<p class="pick__quando">${esc(pick.whenToUse)}</p>` : ''}
-    ${configId ? `<div class="config">
-      <span class="config__etichetta">Riga da incollare in OpenCode</span>
+    <div class="config">
+      <span class="config__etichetta">Per usarlo subito</span>
       <div class="config__riga">
-        <code id="config-${esc(role)}">${esc(configId)}</code>
+        <code id="config-${esc(role)}">opencode -m ${esc(modelIdFor(pick.offer))}</code>
         <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">Copia</button>
       </div>
-    </div>` : ''}
+      <p class="config__serve">
+        Serve un account <strong>${esc(accountName(pick.offer))}</strong>${pick.offer.apiKeyEnv ? ` e la sua chiave nella shell: <code class="chiave">export ${esc(pick.offer.apiKeyEnv)}="..."</code>` : ''}.
+        ${pick.chosen.usability === 'hub' ? `OpenRouter instrada su ${esc(pick.offer.providerName)}, che oggi ha il prezzo più basso; con un solo account hai quasi tutti i modelli.` : ''}
+      </p>
+    </div>
     ${renderConfronto(pick, role)}
     ${renderDettagli(pick)}
   </article>`;
@@ -321,8 +328,8 @@ export function homePage(opts: {
     ${stale ? '<div class="avviso">Questi dati non sono stati verificati oggi: la data reale è qui sopra.</div>' : ''}
     ${rec?.notes.map((n) => `<div class="avviso">${esc(n)}</div>`).join('') ?? ''}
     <div class="risultati">
-      ${renderPick(rec?.everyday ?? null, 'quotidiano', changes.everyday, config?.everydayId ?? null, 'Nessun modello supera la soglia di qualità con un prezzo verificato. Preferiamo non indicare un vincitore piuttosto che indicarne uno senza prove.')}
-      ${renderPick(rec?.hard ?? null, 'difficile', changes.hard, config?.backupId ?? null, 'Nessun modello risolve abbastanza più problemi da giustificarne un secondo.')}
+      ${renderPick(rec?.everyday ?? null, 'quotidiano', changes.everyday, 'Nessun modello supera la soglia di qualità con un prezzo verificato. Preferiamo non indicare un vincitore piuttosto che indicarne uno senza prove.')}
+      ${renderPick(rec?.hard ?? null, 'difficile', changes.hard, 'Nessun modello risolve abbastanza più problemi da giustificarne un secondo.')}
     </div>
     ${rec?.savings && rec.savings.deltaUsd !== null ? `<p class="risparmio">Rispetto a quello che usi oggi: ${rec.savings.deltaUsd > 0 ? `<strong>risparmi ${esc(usd(rec.savings.deltaUsd))} al mese</strong>` : `<strong>spendi ${esc(usd(Math.abs(rec.savings.deltaUsd)))} in più al mese</strong>`}, sugli stessi consumi. Stima, non misura.</p>` : ''}
     <div class="coda">

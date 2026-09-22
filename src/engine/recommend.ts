@@ -10,6 +10,7 @@ import { THRESHOLDS } from '../config.js';
 import { hoursSince } from '../lib/normalize.js';
 import type { ModelRecord, Offer, QualityEvidence, Snapshot } from '../types.js';
 import { costOf, type CostBreakdown } from './cost.js';
+import { isReadyToUse, usabilityOf, type Usability } from './usability.js';
 import { QUALITY_GATE, SCENARIOS, type Priority, type TaskId, type TokenMix } from './scenarios.js';
 
 
@@ -38,12 +39,16 @@ export interface QualityView {
 export interface OfferView {
   offer: Offer;
   cost: CostBreakdown;
+  /** Whether buying this needs a new account with a third party. */
+  usability: Usability;
 }
 
 export interface Pick {
   model: ModelRecord;
   offer: Offer;
   cost: CostBreakdown;
+  /** The recommended offer as a view, carrying how usable it is. */
+  chosen: OfferView;
   quality: QualityView;
   reason: string;
   whenToUse: string | null;
@@ -149,7 +154,14 @@ function offerBlocker(offer: Offer, req: RecommendationRequest, minContext: numb
   return null;
 }
 
-function rankOffers(offers: Offer[], mix: TokenMix, req: RecommendationRequest, minContext: number, now: number) {
+function rankOffers(
+  offers: Offer[],
+  mix: TokenMix,
+  req: RecommendationRequest,
+  minContext: number,
+  now: number,
+  modelVendor = '',
+) {
   const usable: OfferView[] = [];
   const blocked: string[] = [];
   for (const offer of offers) {
@@ -170,10 +182,13 @@ function rankOffers(offers: Offer[], mix: TokenMix, req: RecommendationRequest, 
       blocked.push('offerta gratuita o inclusa in un piano: nessun prezzo per token pubblicato da confrontare');
       continue;
     }
-    usable.push({ offer, cost });
+    usable.push({ offer, cost, usability: usabilityOf(offer, modelVendor) });
   }
   usable.sort((a, b) => (a.cost.totalUsd! - b.cost.totalUsd!) || a.offer.providerName.localeCompare(b.offer.providerName));
-  return { usable, blocked };
+  // Offers you can use straight away come first; the others stay visible with
+  // their price, clearly marked as requiring a new account.
+  const pronte = usable.filter((o) => isReadyToUse(o.usability));
+  return { usable, pronte, blocked };
 }
 
 export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recommendation {
@@ -205,7 +220,10 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   interface Candidate {
     model: ModelRecord;
     quality: QualityView;
+    /** Every usable offer, cheapest first. */
     offers: OfferView[];
+    /** The subset that needs no new account. */
+    pronte: OfferView[];
   }
   const candidates: Candidate[] = [];
 
@@ -230,16 +248,22 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
       bump('nessun provider monitorato vende questo modello');
       continue;
     }
-    const { usable, blocked } = rankOffers(offers, mix, req, minContext, now);
+    const { usable, pronte, blocked } = rankOffers(offers, mix, req, minContext, now, model.vendor);
     if (!usable.length) {
       bump(blocked[0] ?? 'nessuna offerta utilizzabile');
       continue;
     }
-    candidates.push({ model, quality, offers: usable });
+    candidates.push({ model, quality, offers: usable, pronte });
   }
 
+  /**
+   * The cheapest offer, full stop: that is what the site promises. Needing an
+   * account with the provider is normal - it is stated, not avoided.
+   */
+  const sceltaDi = (c: Candidate): OfferView => c.offers[0]!;
+
   const toPick = (c: Candidate, role: 'everyday' | 'hard', other: Candidate | null): Pick => {
-    const best = c.offers[0]!;
+    const best = sceltaDi(c);
     const provisionalReasons: string[] = [];
     if (!c.quality.comparable) provisionalReasons.push('la prova disponibile viene da un banco di prova diverso da quello di riferimento');
     if (c.quality.stale) provisionalReasons.push(`la misura ha più di ${THRESHOLDS.evidenceStaleDays} giorni`);
@@ -267,10 +291,11 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
       model: c.model,
       offer: best.offer,
       cost: best.cost,
+      chosen: best,
       quality: c.quality,
       reason,
       whenToUse,
-      alternatives: c.offers.slice(1, 20),
+      alternatives: c.offers.filter((o) => o !== best).slice(0, 20),
       offersCompared: c.offers.length,
       provisional: provisionalReasons.length > 0,
       provisionalReasons,
@@ -285,7 +310,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
    *   inside a band where the score difference is not meaningful.
    */
   const everydayPool = candidates.filter((c) => c.quality.value >= gate.everyday);
-  const byPrice = (a: Candidate, b: Candidate) => a.offers[0]!.cost.totalUsd! - b.offers[0]!.cost.totalUsd!;
+  const byPrice = (a: Candidate, b: Candidate) => sceltaDi(a).cost.totalUsd! - sceltaDi(b).cost.totalUsd!;
   let everydayCandidate: Candidate | null;
   if (req.priority === 'qualita') {
     const top = everydayPool.reduce((max, c) => Math.max(max, c.quality.value), 0);
@@ -331,7 +356,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     const currentOffers = (offersByModel.get(req.currentModelKey) ?? []).filter(
       (o) => !req.currentOfferId || o.id === req.currentOfferId,
     );
-    const ranked = rankOffers(currentOffers, mix, req, minContext, now).usable;
+    const ranked = rankOffers(currentOffers, mix, req, minContext, now, snapshot.models[req.currentModelKey]?.vendor ?? '').usable;
     const currentTotal = ranked[0]?.cost.totalUsd ?? null;
     const recommendedTotal = everyday?.cost.totalUsd ?? null;
     savings = {

@@ -294,3 +294,16 @@ pre.codice {
 .coda { margin-top: 24px; display: grid; gap: 4px; }
 .coda .dettagli { background: var(--cs-surface); border: 1px solid var(--cs-border); border-radius: var(--cs-radius-md); padding: 14px 16px; }
 .dettagli--ipotesi summary { color: var(--cs-text); }
+
+/* Comando da eseguire: l'azione principale della scheda */
+.config__serve { font-family: var(--cs-font-ui); font-size: 13px; color: var(--cs-text-muted); margin: 10px 0 0; line-height: 1.6; }
+.config__serve code.chiave {
+  font-size: 12px; padding: 2px 6px; border-radius: var(--cs-radius-sm);
+  background: var(--cs-surface); border: 1px solid var(--cs-border); white-space: nowrap;
+}
+.nascosto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.confronto td.azione { text-align: right; white-space: nowrap; }
+.confronto td .meta { display: block; font-size: 11px; font-weight: 400; }
+.confronto td { vertical-align: middle; }
+.confronto td.nowrap { white-space: nowrap; }
+.acquisto__titolo .meta { font-weight: 400; }

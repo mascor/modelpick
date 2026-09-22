@@ -13,6 +13,9 @@ export interface OpenCodeConfigResult {
   /** Provider/model string for the everyday pick. */
   everydayId: string;
   backupId: string | null;
+  /** One line to paste in a terminal: the fastest way to try the model. */
+  everydayCommand: string;
+  backupCommand: string | null;
   /** Environment variables the user has to export themselves. */
   envVars: string[];
   instructions: string[];
@@ -23,7 +26,7 @@ export interface OpenCodeConfigResult {
  * that source is already the provider id OpenCode expects. OpenRouter offers are
  * addressed through the built-in `openrouter` provider.
  */
-function modelIdFor(offer: Offer): string {
+export function modelIdFor(offer: Offer): string {
   if (offer.sourceId === 'openrouter') return `openrouter/${offer.remoteModelId}`;
   return `${offer.providerId}/${offer.remoteModelId}`;
 }
@@ -45,7 +48,8 @@ export function buildOpenCodeConfig(
   const envVars = [...new Set([everyday.offer.apiKeyEnv, hard?.offer.apiKeyEnv].filter(Boolean) as string[])];
 
   const instructions = [
-    'Salva il file come opencode.json nella cartella del progetto, oppure in ~/.config/opencode/opencode.json per usarlo ovunque.',
+    `Prova subito senza cambiare niente: ${'`'}opencode -m ${everydayId}${'`'}.`,
+    'Per renderlo permanente salva il file come opencode.json nella cartella del progetto, oppure in ~/.config/opencode/opencode.json per usarlo ovunque.',
     envVars.length
       ? `Esporta la chiave del provider nella tua shell: ${envVars.map((v) => `export ${v}="..."`).join(' e ')}. La chiave resta sul tuo computer: questo sito non la chiede e non la riceve mai.`
       : 'Configura la chiave del provider secondo la sua documentazione: questo sito non chiede mai le tue chiavi.',
@@ -58,6 +62,8 @@ export function buildOpenCodeConfig(
     json: JSON.stringify(config, null, 2),
     everydayId,
     backupId,
+    everydayCommand: `opencode -m ${everydayId}`,
+    backupCommand: backupId ? `opencode -m ${backupId}` : null,
     envVars,
     instructions,
   };
