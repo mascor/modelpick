@@ -74,6 +74,10 @@ export interface Offer {
   providerDocUrl: string | null;
   /** Slug the broker uses to route to this provider, when it can be pinned. */
   routingSlug: string | null;
+  /** The provider/model string OpenCode addresses this offer with. */
+  opencodeId?: string | null;
+  /** True when OpenCode actually accepts that id. Unverified offers are never recommended. */
+  opencodeVerified?: boolean;
   /** Who the provider is, from a curated directory. Null when no directory lists it. */
   profile?: { siteUrl: string | null; hqCountry: string | null; gdpr: boolean | null; directoryUrl: string | null } | null;
   sourceId: string;
@@ -171,6 +175,8 @@ export interface Snapshot {
   evidence: QualityEvidence[];
   sources: SourceStatus[];
   warnings: string[];
+  /** Which OpenCode version the commands were verified against. */
+  opencodeVersion?: string | null;
   stats: {
     modelCount: number;
     offerCount: number;

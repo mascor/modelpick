@@ -19,7 +19,8 @@ Sito: <https://modelpick.cloudsalus.com>
 3. **Validazione** — prezzi fuori scala scartati, variazioni anomale messe in quarantena, campi obbligatori verificati. Un prezzo mancante non diventa mai zero.
 4. **Storico** — ogni esecuzione è salvata per intero in `data/runs/` con la provenienza dei dati.
 5. **Raccomandazione** — prima i modelli sulle prove di qualità, poi il provider meno costoso che soddisfa i requisiti, infine il totale con le commissioni.
-6. **Pubblicazione atomica** — `data/current.json` viene sostituito con `rename()`: chi legge non vede mai uno stato intermedio.
+6. **Verifica dei comandi** — ogni coppia modello-provider viene confrontata con l'elenco degli identificativi che OpenCode accetta davvero, estratto da OpenCode stesso durante la build dell'immagine. Un'offerta che OpenCode non sa indirizzare non viene né consigliata né mostrata.
+7. **Pubblicazione atomica** — `data/current.json` viene sostituito con `rename()`: chi legge non vede mai uno stato intermedio.
 
 Le regole complete e le soglie sono su [`/metodo`](https://modelpick.cloudsalus.com/metodo) e in [METHODOLOGY.md](METHODOLOGY.md).
 

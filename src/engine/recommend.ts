@@ -150,6 +150,9 @@ function bestQuality(
 function offerBlocker(offer: Offer, req: RecommendationRequest, minContext: number, now: number): ReasonCode | null {
   void req;
   if (offer.demo) return 'demo';
+  // Pubblichiamo comandi da incollare: se OpenCode non conosce questa coppia
+  // modello-provider, il comando non parte e l'offerta non va nemmeno mostrata.
+  if (offer.opencodeVerified === false) return 'opencode-unknown';
   if (offer.blockedReason) return 'suspended';
   if (offer.quarantine) return 'quarantine';
   const age = hoursSince(offer.observedAt, now);

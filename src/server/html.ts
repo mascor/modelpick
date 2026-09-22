@@ -126,7 +126,11 @@ function renderConfronto(pick: Pick, role: string, lang: Lang): string {
   const c = t(lang);
   const riga = (o: OfferView, i: number, scelto: boolean) => {
     const id = `cmd-${role}-${i}`;
-    const comando = configFor(o.offer, lang).command;
+    const conf = configFor(o.offer, lang);
+    // Righe instradate da OpenRouter condividono lo stesso comando: quello che
+    // cambia e' il provider fissato, quindi si copia la configurazione.
+    const payload = conf.config ?? conf.command;
+    const etichetta = conf.config ? c.home.copyConfig : c.home.copy;
     const link = signupUrl(o.offer);
     return `<tr${scelto ? ' class="scelto"' : ''}>
       <td>
@@ -135,9 +139,9 @@ function renderConfronto(pick: Pick, role: string, lang: Lang): string {
       </td>
       <td class="num nowrap"><strong>${esc(usd(o.cost.totalUsd, lang))}</strong></td>
       <td class="azione">
-        <code class="nascosto" id="${esc(id)}">${esc(comando)}</code>
+        <code class="nascosto" id="${esc(id)}">${esc(payload)}</code>
         ${link ? `<a class="riga-link" href="${esc(link)}" target="_blank" rel="noopener">${esc(c.home.key)}</a>` : ''}
-        <button class="bottone bottone--contorno bottone--piccolo" type="button" data-copia="#${esc(id)}">${esc(c.home.copy)}</button>
+        <button class="bottone bottone--contorno bottone--piccolo" type="button" data-copia="#${esc(id)}">${esc(etichetta)}</button>
       </td>
     </tr>`;
   };
@@ -162,7 +166,7 @@ function renderConfronto(pick: Pick, role: string, lang: Lang): string {
   </div>`;
 }
 
-function renderDettagli(pick: Pick, lang: Lang): string {
+function renderDettagli(pick: Pick, lang: Lang, opencodeVersion: string | null): string {
   const c = t(lang);
   const q = pick.quality;
   const f = fmt(lang);
@@ -194,12 +198,12 @@ function renderDettagli(pick: Pick, lang: Lang): string {
       <p><strong>${esc(c.home.whoIs(pick.offer.providerName))}</strong> ${profilo
         ? `${esc(c.home.profileKnown(profilo.hqCountry ?? c.home.countryUnknown, gdpr))}${profilo.directoryUrl ? `. <a href="${esc(profilo.directoryUrl)}" rel="noopener">${esc(c.home.directoryLink)}</a>` : ''}.`
         : esc(c.home.profileUnknown)} ${esc(c.home.geoNote)}</p>
-      <p class="meta">${esc(c.home.priceChecked(dateLong(pick.offer.observedAt, lang)))} <a href="${esc(pick.offer.sourceUrl)}" rel="noopener">${esc(c.home.priceSource)}</a>${pick.model.officialUrl ? ` · <a href="${esc(pick.model.officialUrl)}" rel="noopener">${esc(c.home.modelPage)}</a>` : ''}. ${esc(f.n.format(pick.offersCompared))} provider.</p>
+      <p class="meta">${esc(c.home.priceChecked(dateLong(pick.offer.observedAt, lang)))} ${opencodeVersion ? esc(c.home.verifiedWith(opencodeVersion)) : ''} <a href="${esc(pick.offer.sourceUrl)}" rel="noopener">${esc(c.home.priceSource)}</a>${pick.model.officialUrl ? ` · <a href="${esc(pick.model.officialUrl)}" rel="noopener">${esc(c.home.modelPage)}</a>` : ''}. ${esc(f.n.format(pick.offersCompared))} provider.</p>
     </div>
   </details>`;
 }
 
-function renderPick(pick: Pick | null, role: 'quotidiano' | 'difficile', change: Change | null, lang: Lang, empty: string): string {
+function renderPick(pick: Pick | null, role: 'quotidiano' | 'difficile', change: Change | null, lang: Lang, empty: string, opencodeVersion: string | null): string {
   const c = t(lang);
   const titolo = role === 'quotidiano' ? c.home.everyday : c.home.hard;
   if (!pick) {
@@ -236,7 +240,7 @@ function renderPick(pick: Pick | null, role: 'quotidiano' | 'difficile', change:
     </ol>
     ${conf.pinNote ? `<p class="passi__nota">${esc(conf.pinNote)}</p>` : ''}
     ${renderConfronto(pick, role, lang)}
-    ${renderDettagli(pick, lang)}
+    ${renderDettagli(pick, lang, opencodeVersion)}
   </article>`;
 }
 
@@ -319,8 +323,8 @@ export function homePage(opts: {
     ${stale ? `<div class="avviso">${esc(c.home.stale)}</div>` : ''}
     ${rec?.notes.map((n) => `<div class="avviso">${esc(n)}</div>`).join('') ?? ''}
     <div class="risultati">
-      ${renderPick(rec?.everyday ?? null, 'quotidiano', changes.everyday, lang, c.home.noEveryday)}
-      ${renderPick(rec?.hard ?? null, 'difficile', changes.hard, lang, c.home.noHard)}
+      ${renderPick(rec?.everyday ?? null, 'quotidiano', changes.everyday, lang, c.home.noEveryday, snapshot?.opencodeVersion ?? null)}
+      ${renderPick(rec?.hard ?? null, 'difficile', changes.hard, lang, c.home.noHard, snapshot?.opencodeVersion ?? null)}
     </div>
     ${rec?.savings && rec.savings.deltaUsd !== null ? `<p class="risparmio">${c.home.comparison(rec.savings.currentProviderName ? esc(rec.savings.currentProviderName) : null, esc(usd(Math.abs(rec.savings.deltaUsd), lang)), rec.savings.deltaUsd > 0)}</p>` : ''}
     <div class="coda">

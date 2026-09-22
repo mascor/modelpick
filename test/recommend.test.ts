@@ -191,3 +191,39 @@ test('un offerta con prezzi incompleti non entra nel confronto', () => {
   const r = recommend(s, req());
   assert.ok(!r.everyday!.alternatives.some((a) => a.offer.providerId === 'incompleto'));
 });
+
+test('un modello che OpenCode non riconosce non viene ne consigliato ne mostrato', () => {
+  const s = base();
+  // L'offerta piu' economica in assoluto, ma con un id che OpenCode rifiuta.
+  s.offers.push(
+    offer({
+      id: 'ignoto',
+      modelKey: 'v/economico',
+      providerId: 'ignoto',
+      opencodeVerified: false,
+      prices: { inputPerMTok: 0.01, outputPerMTok: 0.02, cacheReadPerMTok: 0.001, cacheWritePerMTok: 0.01 },
+    }),
+  );
+  const r = recommend(s, req());
+  assert.notEqual(r.everyday?.offer.providerId, 'ignoto');
+  assert.ok(!r.everyday!.alternatives.some((a) => a.offer.providerId === 'ignoto'));
+});
+
+test('se nessun provider ha un id valido il modello esce dal confronto', () => {
+  const s = snapshot(
+    [model('v/solo')],
+    [offer({ id: 'x', modelKey: 'v/solo', providerId: 'ignoto', opencodeVerified: false })],
+    [evidence('v/solo', 75)],
+  );
+  const r = recommend(s, req());
+  assert.equal(r.everyday, null);
+  assert.ok(r.method.excluded.some((e) => e.reason === 'opencode-unknown'));
+});
+
+test('ogni offerta consigliata porta un id che OpenCode accetta', () => {
+  const r = recommend(base(), req());
+  for (const p of [r.everyday, r.hard]) {
+    if (!p) continue;
+    assert.notEqual(p.offer.opencodeVerified, false, `${p.offer.providerId} deve essere verificato`);
+  }
+});

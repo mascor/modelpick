@@ -14,8 +14,10 @@ import { fetchSweBench } from '../sources/swebench.js';
 import { fetchAider } from '../sources/aider.js';
 import { fetchInfrabase, providerKey } from '../sources/infrabase.js';
 import { pendingStatus } from '../sources/pending.js';
+import { applyRegistry, loadRegistry } from './opencode-registry.js';
 
 export interface Collected {
+  opencodeVersion: string | null;
   models: Map<string, ModelRecord>;
   providers: Map<string, ProviderProfile>;
   offers: Offer[];
@@ -264,5 +266,14 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     // L'elenco e facoltativo.
   }
 
-  return { models, providers, offers, evidence, statuses, warnings };
+  // Ultimo passaggio: quali comandi OpenCode accetta davvero.
+  const registry = await loadRegistry();
+  const esito = applyRegistry(offers, registry);
+  if (!registry) {
+    warnings.push('Elenco dei modelli OpenCode non disponibile: nessuna offerta può essere verificata.');
+  } else if (esito.rejected) {
+    warnings.push(`${esito.rejected} offerte escluse: OpenCode non riconosce quella coppia modello-provider.`);
+  }
+
+  return { opencodeVersion: registry?.version ?? null, models, providers, offers, evidence, statuses, warnings };
 }

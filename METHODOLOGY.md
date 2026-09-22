@@ -47,6 +47,18 @@ Il significato di "il migliore" dipende dalla priorità scelta, ed è l'unica do
 - Non inventiamo consumi, percentuali di cache o tassi di riuscita.
 - Non promettiamo copertura mondiale né sicurezza garantita.
 
+## 4-bis. Comandi verificati
+
+Il sito pubblica comandi che le persone incollano in un terminale, quindi non basta che un identificativo sembri corretto.
+
+Durante la build dell'immagine installiamo OpenCode e gli chiediamo l'elenco dei modelli che accetta (`opencode models`, con chiavi finte che servono solo a fargli elencare i provider: nessuna chiamata a un modello). L'elenco finisce nell'immagine e la raccolta dati lo confronta con ogni offerta.
+
+Un'offerta il cui identificativo non è in quell'elenco **non viene né consigliata né mostrata**: il comando non partirebbe. Nell'ultimo aggiornamento questo esclude circa 6.600 offerte su 7.700.
+
+La versione di OpenCode con cui la verifica è stata fatta è indicata sotto ogni raccomandazione.
+
+Per le offerte instradate da un intermediario il comando da solo non sceglie il provider: si copia la configurazione che lo fissa. Vedi la sezione 1.
+
 ## 5. Calcolo dei costi
 
 Ogni offerta è calcolata **per intero sul singolo provider**: è strutturalmente impossibile combinare il prezzo di input di un provider con quello di output di un altro, perché il calcolo parte da un unico oggetto offerta.

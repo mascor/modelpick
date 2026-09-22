@@ -17,6 +17,8 @@ export const PATHS = {
   curated: join(DATA_DIR, 'curated'),
   current: join(DATA_DIR, 'current.json'),
   status: join(DATA_DIR, 'last-run.json'),
+  /** Model ids OpenCode accepts, extracted from OpenCode at image build time. */
+  registry: env.MODELPICK_REGISTRY_DIR ?? join(ROOT, 'registry'),
 };
 
 export const SERVER = {

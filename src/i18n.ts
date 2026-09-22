@@ -21,7 +21,8 @@ export type ReasonCode =
   | 'offer-context'
   | 'offer-uptime'
   | 'incomplete-prices'
-  | 'plan-based';
+  | 'plan-based'
+  | 'opencode-unknown';
 
 export interface Catalog {
   htmlLang: string;
@@ -69,6 +70,7 @@ export interface Catalog {
     geoNote: string;
     directoryLink: string;
     priceChecked: (when: string) => string;
+    verifiedWith: (version: string) => string;
     priceSource: string;
     modelPage: string;
     monthlyTotal: string;
@@ -196,6 +198,7 @@ const it: Catalog = {
     geoNote: 'La disponibilità per paese non è pubblicata in forma strutturata da nessuna fonte che leggiamo.',
     directoryLink: 'Scheda nella directory Infrabase',
     priceChecked: (w) => `Prezzo verificato il ${w}.`,
+    verifiedWith: (v) => `Comando verificato con OpenCode ${v}.`,
     priceSource: 'Fonte del prezzo',
     modelPage: 'Pagina del modello',
     monthlyTotal: 'Totale stimato al mese',
@@ -234,6 +237,7 @@ const it: Catalog = {
     'offer-uptime': 'disponibilità recente troppo bassa',
     'incomplete-prices': 'prezzi incompleti per questo scenario',
     'plan-based': 'offerta gratuita o inclusa in un piano: nessun prezzo per token pubblicato da confrontare',
+    'opencode-unknown': 'OpenCode non riconosce questo modello presso questo provider',
   },
   engine: {
     everydayCheapest: (v, m, g, p) =>
@@ -390,6 +394,7 @@ const en: Catalog = {
     geoNote: 'No source we read publishes country availability in structured form.',
     directoryLink: 'Entry in the Infrabase directory',
     priceChecked: (w) => `Price checked on ${w}.`,
+    verifiedWith: (v) => `Command verified against OpenCode ${v}.`,
     priceSource: 'Price source',
     modelPage: 'Model page',
     monthlyTotal: 'Estimated monthly total',
@@ -428,6 +433,7 @@ const en: Catalog = {
     'offer-uptime': 'recent availability too low',
     'incomplete-prices': 'prices incomplete for this scenario',
     'plan-based': 'free tier or bundled plan: no per-token price published to compare',
+    'opencode-unknown': 'OpenCode does not recognise this model at this provider',
   },
   engine: {
     everydayCheapest: (v, m, g, p) =>
