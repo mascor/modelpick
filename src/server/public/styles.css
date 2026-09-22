@@ -313,3 +313,56 @@ pre.codice {
 .pick__sintesi .meta { font-size: 13px; }
 .pick__sintesi .nowrap { white-space: nowrap; }
 .passo .bottone { white-space: nowrap; }
+
+/* --- Telefono --- */
+/* Le colonne della griglia non chiedono mai più spazio di quello che c'è. */
+.risultati { grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr)); }
+.risultati > *, .pick, .passi, .passo, .acquisto { min-width: 0; }
+.passo__testo { min-width: 0; }
+
+@media (max-width: 720px) {
+  :root { --margine: 14px; }
+  /* Il monospazio a questa larghezza lascia 35 caratteri per riga: testo in Inter. */
+  body { font-family: var(--cs-font-ui); font-size: 15px; letter-spacing: 0; }
+  .sezione { padding: 24px 0; }
+  .hero { padding: 28px 0 32px; }
+  .scheda { padding: 16px; border-radius: var(--cs-radius-md); }
+  .elenco { padding-left: 18px; }
+
+  /* Menu: sotto il marchio, sempre raggiungibile, scorre se non ci sta. */
+  .intestazione__barra { flex-wrap: wrap; gap: 0 16px; min-height: 0; padding-top: 6px; padding-bottom: 4px; }
+  .menu {
+    display: flex; width: 100%; gap: 18px; font-size: 14px; overflow-x: auto;
+    padding: 2px 0 8px; scrollbar-width: none;
+  }
+  .menu::-webkit-scrollbar { display: none; }
+  .menu a { display: inline-flex; align-items: center; min-height: 32px; white-space: nowrap; }
+  .menu .lingua { margin-left: auto; font-weight: 600; color: var(--cs-color-primary); }
+
+  /* Passi: il bottone va a capo sotto il testo invece di uscire dalla scheda. */
+  .passi { padding: 12px; }
+  .passo { flex-wrap: wrap; }
+  .passo__testo, .passo__codice { flex: 1 1 calc(100% - 30px); }
+  .passo .bottone { margin-left: 30px; }
+
+  /* Confronto provider: niente larghezza minima, il prezzo resta leggibile. */
+  .acquisto { overflow-x: visible; }
+  .confronto { min-width: 0; table-layout: auto; }
+  .confronto td, .confronto th { padding: 7px 4px; }
+  .confronto td:first-child { overflow-wrap: anywhere; }
+  .confronto td.azione { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .riga-link { margin-right: 0; }
+
+  /* Tabelle lunghe: ogni riga diventa una scheda con le etichette in chiaro. */
+  .tabella--pila thead { display: none; }
+  .tabella--pila, .tabella--pila tbody, .tabella--pila tr, .tabella--pila td { display: block; width: 100%; }
+  .tabella--pila tr { padding: 10px 0; border-bottom: 1px solid var(--cs-border); }
+  .tabella--pila td { border: 0; padding: 2px 0; text-align: left; }
+  .tabella--pila td.num { text-align: left; }
+  .tabella--pila td.pila__titolo { font-size: 15px; font-weight: 600; padding-bottom: 4px; }
+  .tabella--pila td[data-etichetta]::before {
+    content: attr(data-etichetta) ": "; color: var(--cs-text-muted); font-weight: 600;
+  }
+
+  .pie__righe { gap: 8px; }
+}

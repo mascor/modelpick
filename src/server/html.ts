@@ -397,12 +397,13 @@ export function sourcesPage(snapshot: Snapshot | null, lang: Lang): string {
         : st
           ? `<span class="etichetta etichetta--attenzione">${esc(c.sources.failed)}</span>`
           : `<span class="etichetta etichetta--info">${esc(c.sources.never)}</span>`;
+    const [, colState, colLicence, colNote, colCount] = c.sources.cols;
     return `<tr>
-      <td><a href="${esc(cfg.url)}" rel="noopener">${esc(cfg.name)}</a></td>
-      <td>${state}</td>
-      <td>${esc(cfg.licence)}</td>
-      <td>${esc(cfg.note ?? cfg.attribution)}</td>
-      <td class="num">${esc(st ? f.n.format(st.itemCount) : '—')}</td>
+      <td class="pila__titolo"><a href="${esc(cfg.url)}" rel="noopener">${esc(cfg.name)}</a></td>
+      <td data-etichetta="${esc(colState)}">${state}</td>
+      <td data-etichetta="${esc(colLicence)}">${esc(cfg.licence)}</td>
+      <td data-etichetta="${esc(colNote)}">${esc(cfg.note ?? cfg.attribution)}</td>
+      <td class="num" data-etichetta="${esc(colCount)}">${esc(st ? f.n.format(st.itemCount) : '—')}</td>
     </tr>`;
   }).join('');
 
@@ -410,7 +411,7 @@ export function sourcesPage(snapshot: Snapshot | null, lang: Lang): string {
   <div class="contenitore">
     <h1>${esc(c.sources.title)}</h1>
     <div class="scheda">
-      <table class="tabella">
+      <table class="tabella tabella--pila">
         <thead><tr>${c.sources.cols.map((h, i) => `<th${i === 4 ? ' class="num"' : ''}>${esc(h)}</th>`).join('')}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -425,11 +426,11 @@ export function statusPage(snapshot: Snapshot | null, status: RunStatus | null, 
   const f = fmt(lang);
   const sources = (snapshot?.sources ?? [])
     .map((s) => `<tr>
-        <td>${esc(s.name)}</td>
-        <td>${esc(s.outcome)}</td>
-        <td class="num">${esc(f.n.format(s.itemCount))}</td>
-        <td>${s.error ? esc(s.error) : s.servedFromCache ? esc(c.status.reused(s.dataAgeHours !== null ? f.n2.format(s.dataAgeHours) + ' h' : '—')) : '—'}</td>
-        <td class="num">${s.durationMs !== null ? esc(c.status.duration(f.n.format(s.durationMs))) : '—'}</td>
+        <td class="pila__titolo">${esc(s.name)}</td>
+        <td data-etichetta="${esc(c.status.cols[1])}">${esc(s.outcome)}</td>
+        <td class="num" data-etichetta="${esc(c.status.cols[2])}">${esc(f.n.format(s.itemCount))}</td>
+        <td data-etichetta="${esc(c.status.cols[3])}">${s.error ? esc(s.error) : s.servedFromCache ? esc(c.status.reused(s.dataAgeHours !== null ? f.n2.format(s.dataAgeHours) + ' h' : '—')) : '—'}</td>
+        <td class="num" data-etichetta="${esc(c.status.cols[4])}">${s.durationMs !== null ? esc(c.status.duration(f.n.format(s.durationMs))) : '—'}</td>
       </tr>`)
     .join('');
 
@@ -445,7 +446,7 @@ export function statusPage(snapshot: Snapshot | null, status: RunStatus | null, 
     ${snapshot ? `<div class="scheda">
       <h2>${esc(c.status.dataTitle)}</h2>
       <p class="meta">${esc(dateLong(snapshot.generatedAt, lang))}</p>
-      <table class="tabella">
+      <table class="tabella tabella--pila">
         <thead><tr>${c.status.cols.map((h, i) => `<th${i === 2 || i === 4 ? ' class="num"' : ''}>${esc(h)}</th>`).join('')}</tr></thead>
         <tbody>${sources}</tbody>
       </table>
