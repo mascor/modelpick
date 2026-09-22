@@ -102,6 +102,7 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
     </a>
     <nav class="menu">
       ${nav.map(([id, label]) => `<a href="${esc(pagePath(opts.lang, id))}"${opts.active === id ? ' aria-current="page"' : ''}>${esc(label)}</a>`).join('')}
+      <a href="${esc(SITE.repo)}" rel="noopener">${esc(c.nav.code)}</a>
       <a class="lingua" href="${esc(pagePath(other, opts.active))}" hreflang="${esc(other)}">${esc(c.nav.otherLang)}</a>
     </nav>
   </div>

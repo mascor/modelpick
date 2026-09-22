@@ -26,7 +26,7 @@ export type ReasonCode =
 export interface Catalog {
   htmlLang: string;
   siteDescription: string;
-  nav: { choice: string; method: string; sources: string; status: string; otherLang: string; otherLangCode: string };
+  nav: { choice: string; method: string; sources: string; status: string; code: string; otherLang: string; otherLangCode: string };
   home: {
     title: string;
     pricesVerified: (when: string) => string;
@@ -148,7 +148,7 @@ const it: Catalog = {
   htmlLang: 'it',
   siteDescription:
     'Quale modello AI usare oggi per programmare, quale tenere per i problemi difficili e da quale provider conviene comprarlo. Prezzi verificati ogni giorno.',
-  nav: { choice: 'Scelta', method: 'Metodo', sources: 'Fonti', status: 'Stato', otherLang: 'EN', otherLangCode: 'en' },
+  nav: { choice: 'Scelta', method: 'Metodo', sources: 'Fonti', status: 'Stato', code: 'Codice', otherLang: 'EN', otherLangCode: 'en' },
   home: {
     title: 'Che modello usi oggi',
     pricesVerified: (w) => `Prezzi verificati il ${w}`,
@@ -342,7 +342,7 @@ const en: Catalog = {
   htmlLang: 'en',
   siteDescription:
     'Which AI model to use for coding today, which one to keep for hard problems, and the cheapest provider selling it. Prices checked every day.',
-  nav: { choice: 'Pick', method: 'Method', sources: 'Sources', status: 'Status', otherLang: 'IT', otherLangCode: 'it' },
+  nav: { choice: 'Pick', method: 'Method', sources: 'Sources', status: 'Status', code: 'Code', otherLang: 'IT', otherLangCode: 'it' },
   home: {
     title: 'Which model to use today',
     pricesVerified: (w) => `Prices checked on ${w}`,
