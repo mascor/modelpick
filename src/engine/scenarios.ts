@@ -2,8 +2,8 @@
  * Usage scenarios. These are explicit, documented assumptions - never presented
  * as measured usage. The user can replace every number from the UI.
  */
-export type TaskId = 'piccole-modifiche' | 'bug' | 'nuove-funzionalita' | 'refactoring' | 'analisi';
-export type Priority = 'risparmio' | 'equilibrio' | 'qualita';
+export type TaskId = 'small-changes' | 'bug' | 'new-features' | 'refactoring' | 'analysis';
+export type Priority = 'cheap' | 'balanced' | 'quality';
 
 export interface TokenMix {
   /** Fresh input tokens read by the model in a month. */
@@ -24,8 +24,8 @@ export interface Scenario {
 }
 
 export const SCENARIOS: Record<TaskId, Scenario> = {
-  'piccole-modifiche': {
-    id: 'piccole-modifiche',
+  'small-changes': {
+    id: 'small-changes',
     label: 'Piccole modifiche',
     description: 'Ritocchi mirati, rinomine, piccoli aggiustamenti su file già noti.',
     monthly: { input: 4_000_000, output: 400_000, cacheRead: 20_000_000, cacheWrite: 2_000_000 },
@@ -38,8 +38,8 @@ export const SCENARIOS: Record<TaskId, Scenario> = {
     monthly: { input: 8_000_000, output: 900_000, cacheRead: 40_000_000, cacheWrite: 4_000_000 },
     minContextTokens: 128_000,
   },
-  'nuove-funzionalita': {
-    id: 'nuove-funzionalita',
+  'new-features': {
+    id: 'new-features',
     label: 'Nuove funzionalità',
     description: 'Scrivere codice nuovo su più file, con test e integrazione.',
     monthly: { input: 12_000_000, output: 1_800_000, cacheRead: 55_000_000, cacheWrite: 6_000_000 },
@@ -52,8 +52,8 @@ export const SCENARIOS: Record<TaskId, Scenario> = {
     monthly: { input: 15_000_000, output: 2_200_000, cacheRead: 70_000_000, cacheWrite: 7_000_000 },
     minContextTokens: 200_000,
   },
-  analisi: {
-    id: 'analisi',
+  analysis: {
+    id: 'analysis',
     label: 'Analisi di un progetto',
     description: 'Leggere e spiegare un repository, poco codice prodotto, molta lettura.',
     monthly: { input: 20_000_000, output: 600_000, cacheRead: 90_000_000, cacheWrite: 9_000_000 },
@@ -62,7 +62,7 @@ export const SCENARIOS: Record<TaskId, Scenario> = {
 };
 
 export const TASK_IDS = Object.keys(SCENARIOS) as TaskId[];
-export const PRIORITIES: Priority[] = ['risparmio', 'equilibrio', 'qualita'];
+export const PRIORITIES: Priority[] = ['cheap', 'balanced', 'quality'];
 
 /**
  * Quality gate per priority, on the scale of the reference metric: the
@@ -73,14 +73,14 @@ export const PRIORITIES: Priority[] = ['risparmio', 'equilibrio', 'qualita'];
  */
 export type Gate = { everyday: number; hard: number };
 export const QUALITY_GATE: Record<Priority, Gate> = {
-  risparmio: { everyday: 45, hard: 62 },
-  equilibrio: { everyday: 55, hard: 68 },
-  qualita: { everyday: 64, hard: 72 },
+  cheap: { everyday: 45, hard: 62 },
+  balanced: { everyday: 55, hard: 68 },
+  quality: { everyday: 64, hard: 72 },
 };
 export const AA_QUALITY_GATE: Record<Priority, Gate> = {
-  risparmio: { everyday: 45, hard: 68 },
-  equilibrio: { everyday: 55, hard: 72 },
-  qualita: { everyday: 65, hard: 75 },
+  cheap: { everyday: 45, hard: 68 },
+  balanced: { everyday: 55, hard: 72 },
+  quality: { everyday: 65, hard: 75 },
 };
 export const gateFor = (metric: string | null, priority: Priority): Gate =>
   (metric === 'aa_coding_index' ? AA_QUALITY_GATE : QUALITY_GATE)[priority];

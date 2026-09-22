@@ -9,7 +9,7 @@ import { matchForm } from '../src/lib/normalize.js';
 import { evidence, model, offer, snapshot } from './fixtures.js';
 
 const req = (over: Partial<RecommendationRequest> = {}): RecommendationRequest => ({
-  task: 'bug', priority: 'equilibrio', lang: 'it', usage: null, currentModelKey: null, currentOfferId: null, ...over,
+  task: 'bug', priority: 'balanced', lang: 'it', usage: null, currentModelKey: null, currentOfferId: null, ...over,
 });
 const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
 const aa = (modelKey: string, value: number, over = {}) =>
@@ -140,7 +140,7 @@ test('a score for a dated build goes to the dated model we sell, not the older o
 
 test('the model the user declared always gets an answer', () => {
   const s = two([aa('v/a', 70), aa('v/b', 60)]);
-  const consigliato = recommend(s, req({ currentModelKey: 'v/a', priority: 'qualita' }));
+  const consigliato = recommend(s, req({ currentModelKey: 'v/a', priority: 'quality' }));
   assert.equal(consigliato.savings?.outcome, 'already-recommended');
 
   const ignoto = recommend(s, req({ currentModelKey: 'v/ignoto' }));

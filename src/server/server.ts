@@ -20,9 +20,22 @@ const positive = (v: string | undefined): number | undefined => {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 };
 
+/** The first links used Italian values; they keep landing on the same choice. */
+const LEGACY_VALUES: Record<string, string> = {
+  risparmio: 'cheap',
+  equilibrio: 'balanced',
+  qualita: 'quality',
+  'piccole-modifiche': 'small-changes',
+  'nuove-funzionalita': 'new-features',
+  analisi: 'analysis',
+};
+const current = (v: string | undefined): string => (v && LEGACY_VALUES[v]) || v || '';
+
 export function parseRequest(q: Query, lang: Lang = DEFAULT_LANG): RecommendationRequest {
-  const task = (TASK_IDS as string[]).includes(q['task'] ?? '') ? (q['task'] as TaskId) : 'bug';
-  const priority = (PRIORITIES as string[]).includes(q['priority'] ?? '') ? (q['priority'] as Priority) : 'equilibrio';
+  const t = current(q['task']);
+  const p = current(q['priority']);
+  const task = (TASK_IDS as string[]).includes(t) ? (t as TaskId) : 'bug';
+  const priority = (PRIORITIES as string[]).includes(p) ? (p as Priority) : 'balanced';
   const usage = {
     input: positive(q['input']),
     output: positive(q['output']),

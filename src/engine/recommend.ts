@@ -349,7 +349,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
 
     const reason =
       role === 'everyday'
-        ? req.priority === 'qualita'
+        ? req.priority === 'quality'
           ? c.engine.everydayBest(score, label, price)
           : c.engine.everydayCheapest(score, label, unit(gate.everyday), price)
         : c.engine.hardReason(score, label, gap);
@@ -381,7 +381,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   const everydayPool = candidates.filter((c) => c.quality.value >= gate.everyday);
   const byPrice = (a: Candidate, b: Candidate) => sceltaDi(a).cost.totalUsd! - sceltaDi(b).cost.totalUsd!;
   let everydayCandidate: Candidate | null;
-  if (req.priority === 'qualita') {
+  if (req.priority === 'quality') {
     const top = everydayPool.reduce((max, c) => Math.max(max, c.quality.value), 0);
     const band = everydayPool.filter((c) => c.quality.value >= top - 2).sort(byPrice);
     everydayCandidate = band[0] ?? null;
@@ -409,7 +409,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   if (!everyday) notes.push(c.engine.noWinner(unit(gate.everyday)));
   if (everyday && !hard) {
     notes.push(
-      req.priority === 'qualita'
+      req.priority === 'quality'
         ? c.engine.noBackupBest
         : c.engine.noBackup(String(THRESHOLDS.backupQualityGapPoints)),
     );

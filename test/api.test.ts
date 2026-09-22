@@ -39,3 +39,14 @@ test('the API answers in English and the legacy Italian paths still work', async
     await app.close();
   }
 });
+
+test('old links with Italian values land on the same choice', async () => {
+  const { parseRequest } = await import('../src/server/server.js');
+  const old = parseRequest({ task: 'analisi', priority: 'qualita' });
+  assert.equal(old.task, 'analysis');
+  assert.equal(old.priority, 'quality');
+  assert.equal(parseRequest({ task: 'piccole-modifiche', priority: 'risparmio' }).task, 'small-changes');
+  assert.equal(parseRequest({ priority: 'risparmio' }).priority, 'cheap');
+  assert.equal(parseRequest({ task: 'new-features', priority: 'balanced' }).task, 'new-features');
+  assert.equal(parseRequest({ task: 'nonsense' }).task, 'bug');
+});

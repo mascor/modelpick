@@ -5,7 +5,7 @@ import { evidence, model, now, offer, snapshot } from './fixtures.js';
 
 const req = (over: Partial<RecommendationRequest> = {}): RecommendationRequest => ({
   task: 'bug',
-  priority: 'equilibrio',
+  priority: 'balanced',
   lang: 'it',
   usage: null,
   currentModelKey: null,
@@ -44,8 +44,8 @@ test('a model below the gate does not win even if it costs very little', () => {
 });
 
 test('"work well" picks the highest score, not the cheapest above the gate', () => {
-  const economico = recommend(base(), req({ priority: 'risparmio' }));
-  const qualita = recommend(base(), req({ priority: 'qualita' }));
+  const economico = recommend(base(), req({ priority: 'cheap' }));
+  const qualita = recommend(base(), req({ priority: 'quality' }));
   assert.equal(economico.everyday?.model.key, 'v/economico');
   assert.equal(qualita.everyday?.model.key, 'v/bravo');
   // the three choices cannot all give the same answer
@@ -61,7 +61,7 @@ test('on equal scores "work well" still prefers the cheaper one', () => {
     ],
     [evidence('v/caro', 80), evidence('v/conveniente', 79)],
   );
-  assert.equal(recommend(s, req({ priority: 'qualita' })).everyday?.model.key, 'v/conveniente');
+  assert.equal(recommend(s, req({ priority: 'quality' })).everyday?.model.key, 'v/conveniente');
 });
 
 test('demo data never enters public recommendations', () => {
@@ -238,6 +238,6 @@ test('on equal price the offer with a pinnable provider wins', () => {
     ],
     [evidence('v/a', 70, { metric: 'aa_coding_index', harnessKey: 'aa-coding-index|v4.3' })],
   );
-  const r = recommend(s, req({ priority: 'equilibrio' }));
+  const r = recommend(s, req({ priority: 'balanced' }));
   assert.equal(r.everyday?.offer.id, 'fissato');
 });
