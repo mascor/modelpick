@@ -1,6 +1,7 @@
 import type { ModelRecord, Offer, QualityEvidence, Snapshot } from '../src/types.js';
 
-export const now = new Date('2026-09-22T06:30:00.000Z');
+// Relative to the real clock: the engine judges freshness against Date.now().
+export const now = new Date(Date.now() - 3_600_000);
 
 export const offer = (over: Partial<Offer> & Pick<Offer, 'id' | 'modelKey' | 'providerId'>): Offer => ({
   providerName: over.providerId,
@@ -57,7 +58,7 @@ export const evidence = (modelKey: string, value: number, over: Partial<QualityE
   attempts: 1,
   instanceCalls: 30,
   reasoningEffort: 'medium',
-  measuredAt: '2026-09-01',
+  measuredAt: now.toISOString(),
   sourceId: 'swebench',
   sourceUrl: 'https://example.test/run',
   observedAt: now.toISOString(),

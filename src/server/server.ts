@@ -1,12 +1,12 @@
 /** HTTP server: server-rendered pages plus a small JSON API. */
-import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { SERVER, SITE, SOURCES } from '../config.js';
 import { recommend, type RecommendationRequest } from '../engine/recommend.js';
 import { buildOpenCodeConfig } from '../engine/opencode.js';
 import { SCENARIOS, TASK_IDS, PRIORITIES, type Priority, type TaskId } from '../engine/scenarios.js';
-import { DEFAULT_LANG, isLang, type Lang } from '../i18n.js';
+import { browserLang, DEFAULT_LANG, isLang, LANG_COOKIE, pagePath, type Lang } from '../i18n.js';
 import { priceHistory, listRuns, previousRun } from '../pipeline/store.js';
 import { describeChange, type Change } from '../engine/changes.js';
 import { homePage, methodPage, sourcesPage, statusPage } from './html.js';
@@ -44,7 +44,7 @@ export async function buildServer() {
   const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, trustProxy: true });
 
   await app.register(fastifyStatic, {
-    root: join(import.meta.dirname, 'public'),
+    root: fileURLToPath(new URL('./public', import.meta.url)),
     prefix: '/static/',
     maxAge: '1h',
   });
@@ -81,21 +81,48 @@ export async function buildServer() {
   };
 
   /** The same four pages in two languages: Italian at the root, English under /en. */
+  /** The language this visitor gets: a choice made from the menu first, then the browser's first language. */
+  const cookieLang = (header: string | undefined): Lang | null => {
+    const m = new RegExp(`(?:^|;\\s*)${LANG_COOKIE}=(it|en)(?:;|$)`).exec(header ?? '');
+    return m && isLang(m[1]) ? m[1] : null;
+  };
+
+  /**
+   * Before every page: remember a language picked from the menu (?lang=), and
+   * send anyone who has not asked for Italian from the Italian pages to the
+   * English ones.
+   */
+  const negotiate = (lang: Lang, page: 'home' | 'method' | 'sources' | 'status') =>
+    async (req: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => {
+      const query = { ...(req.query as Query) };
+      const picked = isLang(query['lang']) ? query['lang'] : null;
+      if (picked) {
+        reply.header('set-cookie', `${LANG_COOKIE}=${picked}; Path=/; Max-Age=31536000; SameSite=Lax`);
+        delete query['lang'];
+      }
+      const wanted = picked ?? cookieLang(req.headers.cookie) ?? browserLang(req.headers['accept-language']);
+      reply.header('vary', 'Accept-Language, Cookie');
+      if (lang === 'it' && wanted !== 'it') {
+        const qs = new URLSearchParams(query as Record<string, string>).toString();
+        return reply.redirect(pagePath('en', page) + (qs ? `?${qs}` : ''), 302);
+      }
+    };
+
   const registra = (lang: Lang, paths: { home: string; method: string; sources: string; status: string }) => {
-    app.get(paths.home, async (req, reply) => {
+    app.get(paths.home, { onRequest: negotiate(lang, 'home') }, async (req, reply) => {
       const { snapshot, request, rec, models, changes } = await compute(req.query as Query, lang);
       reply.type('text/html; charset=utf-8');
       return homePage({ lang, rec, snapshot, models, request, changes });
     });
-    app.get(paths.method, async (_req, reply) => {
+    app.get(paths.method, { onRequest: negotiate(lang, 'method') }, async (_req, reply) => {
       reply.type('text/html; charset=utf-8');
       return methodPage(lang);
     });
-    app.get(paths.sources, async (_req, reply) => {
+    app.get(paths.sources, { onRequest: negotiate(lang, 'sources') }, async (_req, reply) => {
       reply.type('text/html; charset=utf-8');
       return sourcesPage(await currentSnapshot(), lang);
     });
-    app.get(paths.status, async (_req, reply) => {
+    app.get(paths.status, { onRequest: negotiate(lang, 'status') }, async (_req, reply) => {
       reply.type('text/html; charset=utf-8');
       return statusPage(await currentSnapshot(), await currentStatus(), lang);
     });

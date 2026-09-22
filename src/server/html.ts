@@ -6,6 +6,7 @@
 import { SITE, THRESHOLDS, SOURCES } from '../config.js';
 import type { ModelRecord, Snapshot, SourceStatus } from '../types.js';
 import type { OfferView, Pick, Recommendation, RecommendationRequest } from '../engine/recommend.js';
+import { formatScore, metricLabel } from '../engine/recommend.js';
 import type { Change } from '../engine/changes.js';
 import { SCENARIOS, TASK_IDS, PRIORITIES } from '../engine/scenarios.js';
 import { accountName, usabilityLabel } from '../engine/usability.js';
@@ -52,12 +53,19 @@ const dateDay = (iso: string | null | undefined, lang: Lang): string => {
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleDateString(locale(lang), { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Europe/Rome' });
 };
+/** Day and month: every date shown is recent, so the day is what matters. */
 const dateShort = (iso: string | null | undefined, lang: Lang): string => {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString(locale(lang), { month: 'short', year: 'numeric', timeZone: 'Europe/Rome' });
+  return d.toLocaleDateString(locale(lang), { day: 'numeric', month: 'short', timeZone: 'Europe/Rome' });
 };
+
+/** "Artificial Analysis Coding Index v4.3" from the comparability key, or the plain metric name. */
+const evidenceLabel = (q: { metric: Pick['quality']['metric']; harnessKey: string }): string =>
+  q.metric === 'aa_coding_index'
+    ? q.harnessKey.replace(/^aa-coding-index\|/, 'Artificial Analysis Coding Index ')
+    : metricLabel(q.metric);
 
 /** "DeepSeek: DeepSeek V3.2" -> "DeepSeek V3.2": the vendor is written beside it. */
 const modelName = (raw: string): string => {
@@ -87,7 +95,7 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
 <link rel="canonical" href="${esc(canonical)}">
 <link rel="alternate" hreflang="it" href="https://${esc(SITE.domain)}${esc(pagePath('it', opts.active))}">
 <link rel="alternate" hreflang="en" href="https://${esc(SITE.domain)}${esc(pagePath('en', opts.active))}">
-<link rel="alternate" hreflang="x-default" href="https://${esc(SITE.domain)}${esc(pagePath('it', opts.active))}">
+<link rel="alternate" hreflang="x-default" href="https://${esc(SITE.domain)}${esc(pagePath('en', opts.active))}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Courier+Prime:wght@400;700&display=swap">
@@ -103,13 +111,14 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
     <nav class="menu">
       ${nav.map(([id, label]) => `<a href="${esc(pagePath(opts.lang, id))}"${opts.active === id ? ' aria-current="page"' : ''}>${esc(label)}</a>`).join('')}
       <a href="${esc(SITE.repo)}" rel="noopener">${esc(c.nav.code)}</a>
-      <a class="lingua" href="${esc(pagePath(other, opts.active))}" hreflang="${esc(other)}">${esc(c.nav.otherLang)}</a>
+      <a class="lingua" href="${esc(pagePath(other, opts.active))}?lang=${esc(other)}" hreflang="${esc(other)}">${esc(c.nav.otherLang)}</a>
     </nav>
   </div>
 </header>
 <main>${opts.body}</main>
 <footer class="pie">
   <div class="contenitore pie__righe">
+    <p class="meta">${esc(c.home.aaDisclaimer)} <a href="https://artificialanalysis.ai/" rel="noopener">artificialanalysis.ai</a></p>
     <p class="meta"><strong>${esc(SITE.name)}</strong> by CloudSalus · <a href="${esc(pagePath(opts.lang, 'method'))}">${esc(c.nav.method)}</a> · <a href="${esc(pagePath(opts.lang, 'sources'))}">${esc(c.nav.sources)}</a> · <a href="${esc(pagePath(opts.lang, 'status'))}">${esc(c.nav.status)}</a> · MIT</p>
   </div>
 </footer>
@@ -189,7 +198,9 @@ function renderDettagli(pick: Pick, lang: Lang, opencodeVersion: string | null):
     <summary>${esc(c.home.whyThis)}</summary>
     <div class="dettagli__corpo">
       <p>${esc(pick.reason)}</p>
-      <p>${c.home.theEvidence(esc(q.value.toFixed(1)) + '%', q.metric === 'swebench_verified' ? 'SWE-bench Verified' : 'Aider polyglot', esc(q.harness), esc(dateDay(q.measuredAt, lang)))} <a href="${esc(q.sourceUrl)}" rel="noopener">${esc(c.home.priceSource)}</a>.</p>
+      <p>${c.home.theEvidence(esc(formatScore(q.value, q.metric)), esc(evidenceLabel(q)), esc(q.harness), esc(dateDay(q.measuredAt, lang)))} ${q.metric === 'aa_coding_index'
+        ? `<a href="${esc(q.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>.`
+        : `<a href="${esc(q.sourceUrl)}" rel="noopener">${esc(c.home.priceSource)}</a>.`}</p>
       <div class="prezzi">${righe}${commissioni}
         <div class="prezzi__riga prezzi__riga--totale"><span>${esc(c.home.monthlyTotal)}</span><span>${esc(usd(pick.cost.totalUsd, lang))}</span></div>
       </div>
@@ -217,7 +228,7 @@ function renderPick(pick: Pick | null, role: 'quotidiano' | 'difficile', change:
   return `<article class="scheda pick pick--${role}">
     <p class="pick__ruolo">${esc(titolo)}</p>
     <h3 class="pick__modello">${esc(modelName(pick.model.displayName))}</h3>
-    <p class="pick__sintesi">${esc(c.home.perMonth(usd(pick.cost.totalUsd, lang)))} · ${esc(c.home.benchmark(pick.quality.value.toFixed(0) + '%', ''))} <span class="meta nowrap">SWE-bench ${esc(dateShort(pick.quality.measuredAt, lang))}</span></p>
+    <p class="pick__sintesi">${esc(c.home.perMonth(usd(pick.cost.totalUsd, lang)))} · ${esc(c.home.benchmark(formatScore(pick.quality.value, pick.quality.metric), pick.quality.metric === 'aa_coding_index' ? 'Coding Index' : metricLabel(pick.quality.metric), dateShort(pick.quality.measuredAt, lang)))}${pick.quality.metric === 'aa_coding_index' ? ` <a class="meta nowrap" href="${esc(pick.quality.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>` : ''}</p>
     ${pick.cost.unquantifiedFees.length ? `<p class="allerta">${esc(c.home.incompleteEstimate)}</p>` : ''}
     ${change?.moved ? `<p class="pick__cambio pick__cambio--mosso">${esc(change.text)}</p>` : ''}
     <ol class="passi">
@@ -348,7 +359,8 @@ export function methodPage(lang: Lang): string {
   const soglie: [string, string][] = [
     [String(THRESHOLDS.offerStaleHours), lang === 'en' ? 'hours: a price older than this cannot win' : 'ore: un prezzo più vecchio non può vincere'],
     [String(THRESHOLDS.snapshotStaleHours), lang === 'en' ? 'hours: the data is flagged as out of date' : 'ore: i dati vengono segnalati come obsoleti'],
-    [String(THRESHOLDS.evidenceStaleDays), lang === 'en' ? 'days: an older measurement makes the pick provisional' : 'giorni: una misura più vecchia rende la scelta provvisoria'],
+    [String(THRESHOLDS.evidenceMaxAgeDays), lang === 'en' ? 'days: an older quality measurement is not used' : 'giorni: una misura di qualità più vecchia non viene usata'],
+    [String(THRESHOLDS.evidenceFreshDays), lang === 'en' ? 'days: an older measurement makes the pick provisional' : 'giorni: una misura più vecchia rende la scelta provvisoria'],
     [`${THRESHOLDS.priceJumpFactor}×`, lang === 'en' ? 'price change: the offer is quarantined' : 'variazione di prezzo: offerta in quarantena'],
     [`${THRESHOLDS.maxPricePerMTok} USD/1M`, lang === 'en' ? 'above this a price is discarded as a unit error' : 'oltre questo il prezzo è scartato come errore di unità'],
     [`${THRESHOLDS.minUptime30m}%`, lang === 'en' ? 'minimum recent availability' : 'disponibilità recente minima'],

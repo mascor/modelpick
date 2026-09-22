@@ -6,7 +6,7 @@ Questo documento descrive le regole con cui ModelPick sceglie due modelli e un p
 
 **Prima i modelli, poi i provider, infine la convenienza complessiva.**
 
-1. Un modello entra nel confronto solo se esiste una **misura pubblicata di qualità sul codice** che lo riguarda. Un modello senza prove non può vincere.
+1. Un modello entra nel confronto solo se esiste una **misura di qualità sul codice degli ultimi 7 giorni** che lo riguarda. Un modello senza una misura recente non può vincere.
 2. Per ogni modello ammesso si raccolgono tutte le offerte monitorate e si tengono quelle che soddisfano i requisiti dell'utente.
 3. Ogni offerta viene calcolata per intero sullo stesso scenario di consumo, commissioni incluse.
 
@@ -16,25 +16,29 @@ Il problema principale dei benchmark pubblici non è trovarli: è non confrontar
 
 Ogni misura porta con sé un **gruppo di confronto** (`harnessKey`) composto da: nome dell'agente, sua versione, numero di tentativi consentiti, livello di sforzo di ragionamento. Due misure appartengono allo stesso gruppo solo se questi quattro elementi coincidono.
 
-Il **gruppo di riferimento** di ogni esecuzione è quello che ha misurato il maggior numero di modelli distinti. Solo i modelli presenti in quel gruppo entrano nel confronto: un modello misurato altrove viene escluso con motivazione esplicita, non convertito né riscalato.
+**Fonte principale: Artificial Analysis Coding Index.** Viene scaricato dall'API di Artificial Analysis a ogni aggiornamento (una sola volta: lo scaricamento resta in cache per 20 ore, così rieseguire l'aggiornamento non consuma chiamate). Tutti i modelli sono misurati dalla stessa organizzazione con lo stesso metodo, quindi formano un unico gruppo di confronto (`aa-coding-index|<versione dell'indice>`). Quando lo stesso modello è pubblicato in più varianti di sforzo di ragionamento, teniamo la variante con il punteggio più alto e la indichiamo in pagina. I valori sono riportati come pubblicati, con l'attribuzione "Source: Artificial Analysis (artificialanalysis.ai)" e la dichiarazione che le scelte sono di ModelPick e non di Artificial Analysis.
 
-Conseguenza voluta: un modello uscito ieri, non ancora misurato nel gruppo di riferimento, **non viene raccomandato**. Preferiamo una raccomandazione difendibile a una aggiornata.
+**Solo dati recenti.** Una misura di qualità più vecchia di **7 giorni** non viene usata, in nessun caso. Per Artificial Analysis la data è quella dello scaricamento; se l'API non risponde si riusano i valori dell'ultimo scaricamento riuscito finché hanno meno di 7 giorni, poi il modello esce dal confronto. SWE-bench e Aider sono spenti per questo motivo: le loro misure hanno spesso mesi.
+
+Il **gruppo di riferimento** è Artificial Analysis quando presente; in sua assenza, il gruppo SWE-bench che ha misurato più modelli. Solo i modelli presenti nel gruppo di riferimento entrano nel confronto: un modello misurato altrove viene escluso con motivazione esplicita, non convertito né riscalato.
 
 ## 3. Soglie di qualità
 
-La priorità scelta dall'utente determina la percentuale minima di problemi risolti:
+La priorità scelta dall'utente determina il punteggio minimo sul Coding Index di Artificial Analysis. Le soglie mantengono all'incirca la selettività che avevano su SWE-bench: il quotidiano deve stare nella metà, nel 35% o nel 25% migliore dei modelli misurati.
 
 | Priorità | Quotidiano | Problemi difficili |
 |---|---|---|
-| Risparmio | 45% | 62% |
-| Equilibrio | 55% | 68% |
-| Qualità | 64% | 72% |
+| Risparmio | 45 | 68 |
+| Equilibrio | 55 | 72 |
+| Qualità | 65 | 75 |
+
+Se il riferimento torna a essere SWE-bench (Artificial Analysis non disponibile), valgono le soglie in percentuale di problemi risolti: 45/62, 55/68, 64/72.
 
 Il significato di "il migliore" dipende dalla priorità scelta, ed è l'unica domanda che il sito pone:
 
 - con **spendere poco** ed **equilibrio**, il modello quotidiano è la combinazione modello-provider **meno costosa fra quelle che superano la soglia**: una scelta economica che raggiunge una qualità adeguata, non la più economica in assoluto;
 - con **lavorare bene**, è il **punteggio più alto** disponibile; il prezzo interviene solo come spareggio fra modelli che stanno entro 2 punti dal massimo, dove la differenza non è significativa.
-- Il **modello per i problemi difficili** deve superare il quotidiano di almeno **3 punti percentuali** misurati nello stesso gruppo di confronto. All'interno di una fascia di 2 punti dal punteggio massimo si preferisce il più economico: sotto quella soglia la differenza non è significativa e non vale il costo.
+- Il **modello per i problemi difficili** deve superare il quotidiano di almeno **3 punti** misurati nello stesso gruppo di confronto. All'interno di una fascia di 2 punti dal punteggio massimo si preferisce il più economico: sotto quella soglia la differenza non è significativa e non vale il costo.
 - Se nessun modello soddisfa queste condizioni, **non si assegna un vincitore** e il sito lo dichiara.
 
 ## 4. Che cosa non facciamo
@@ -85,7 +89,8 @@ Il risparmio viene calcolato solo rispetto a una configurazione che l'utente ha 
 |---|---|---|
 | Prezzo non verificato da più di | 48 ore | non può vincere il confronto |
 | Snapshot più vecchio di | 36 ore | segnalato come obsoleto in pagina |
-| Misura di qualità più vecchia di | 270 giorni | rende la raccomandazione provvisoria |
+| Misura di qualità più vecchia di | 7 giorni | non viene usata |
+| Misura di qualità più vecchia di | 2 giorni | rende la raccomandazione provvisoria |
 | Variazione di prezzo oltre un fattore | 5× | offerta in quarantena, esclusa dalla vittoria |
 | Prezzo superiore a | 2000 USD/1M token | scartato come probabile errore di unità |
 | Disponibilità recente sotto | 90% | offerta esclusa |
@@ -97,7 +102,7 @@ Tutti i valori sono configurabili via variabili d'ambiente (vedi `.env.example`)
 
 Una raccomandazione è marcata **provvisoria** quando almeno una di queste condizioni è vera:
 
-- la misura di qualità è più vecchia della soglia di obsolescenza;
+- la misura di qualità ha più di 2 giorni (per esempio perché Artificial Analysis non ha risposto);
 - una commissione applicabile non è quantificabile automaticamente;
 - il costo usa l'ipotesi prudenziale sui prezzi di cache non pubblicati;
 - un solo provider monitorato soddisfa i requisiti.

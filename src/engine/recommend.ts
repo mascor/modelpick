@@ -11,7 +11,7 @@ import { hoursSince } from '../lib/normalize.js';
 import type { ModelRecord, Offer, QualityEvidence, Snapshot } from '../types.js';
 import { costOf, type CostBreakdown } from './cost.js';
 import { isIdentified, providerKey, usabilityOf, type Usability } from './usability.js';
-import { QUALITY_GATE, SCENARIOS, type Priority, type TaskId, type TokenMix } from './scenarios.js';
+import { gateFor, SCENARIOS, type Priority, type TaskId, type TokenMix } from './scenarios.js';
 import { t, type Lang, type ReasonCode } from '../i18n.js';
 
 
@@ -91,14 +91,44 @@ export interface Recommendation {
 
 const fmtUsd = (v: number) => `${v < 10 ? v.toFixed(2) : v.toFixed(0)} USD`;
 
+/** How a metric is named on the page. */
+export const metricLabel = (metric: QualityEvidence['metric']): string =>
+  metric === 'aa_coding_index' ? 'Artificial Analysis Coding Index' : metric === 'swebench_verified' ? 'SWE-bench Verified' : 'Aider polyglot';
+
+/** A score in its own unit: index points for Artificial Analysis, a percentage for the others. */
+export const formatScore = (value: number, metric: QualityEvidence['metric'], digits = 1): string =>
+  metric === 'aa_coding_index' ? value.toFixed(digits) : `${value.toFixed(digits)}%`;
+
+/** Days since a measurement; null when it carries no date. */
+const ageDays = (e: QualityEvidence, now: number): number | null => {
+  const h = hoursSince(e.measuredAt, now);
+  return h === null ? null : h / 24;
+};
+
+/** Only recent measurements count: older ones describe a model that may no longer exist as measured. */
+export const isFresh = (e: QualityEvidence, now = Date.now()): boolean => {
+  const d = ageDays(e, now);
+  return d !== null && d <= THRESHOLDS.evidenceMaxAgeDays;
+};
+
+/** Metrics in order of preference for the reference group. */
+const METRIC_PRIORITY: QualityEvidence['metric'][] = ['aa_coding_index', 'swebench_verified'];
+
 /**
- * The reference comparability group is the harness that measured the most
- * models. Comparing inside it is fair; anything else is provisional evidence.
+ * The reference comparability group: Artificial Analysis when present (one
+ * method across hundreds of models), otherwise the SWE-bench harness that
+ * measured the most models. Comparing inside it is fair; nothing else is used.
  */
-function referenceGroup(evidence: QualityEvidence[]): { key: string | null; label: string | null; size: number } {
+function referenceGroup(evidence: QualityEvidence[]): {
+  key: string | null;
+  label: string | null;
+  size: number;
+  metric: QualityEvidence['metric'] | null;
+} {
+  const metric = METRIC_PRIORITY.find((m) => evidence.some((e) => e.metric === m)) ?? null;
   const byHarness = new Map<string, Set<string>>();
   for (const e of evidence) {
-    if (e.metric !== 'swebench_verified') continue;
+    if (e.metric !== metric) continue;
     const set = byHarness.get(e.harnessKey) ?? new Set<string>();
     set.add(e.modelKey);
     byHarness.set(e.harnessKey, set);
@@ -107,9 +137,11 @@ function referenceGroup(evidence: QualityEvidence[]): { key: string | null; labe
   for (const [key, set] of byHarness) {
     if (!best || set.size > best.size) best = { key, size: set.size };
   }
-  if (!best) return { key: null, label: null, size: 0 };
-  const label = evidence.find((e) => e.harnessKey === best!.key)?.harness ?? best.key;
-  return { key: best.key, label, size: best.size };
+  if (!best) return { key: null, label: null, size: 0, metric: null };
+  const label = metric === 'aa_coding_index'
+    ? best.key.replace(/^aa-coding-index\|/, 'Artificial Analysis Coding Index ')
+    : evidence.find((e) => e.harnessKey === best!.key)?.harness ?? best.key;
+  return { key: best.key, label, size: best.size, metric };
 }
 
 /**
@@ -125,7 +157,7 @@ function bestQuality(
 ): QualityView | null {
   const mine = evidence.filter((e) => e.modelKey === modelKey);
   if (!mine.length) return null;
-  const staleMs = THRESHOLDS.evidenceStaleDays * 86_400_000;
+  const staleMs = THRESHOLDS.evidenceFreshDays * 86_400_000;
   const pickFrom = (rows: QualityEvidence[]) =>
     rows.reduce((a, b) => (b.value > a.value ? b : a));
 
@@ -218,8 +250,11 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     req.usage && (req.usage.input || req.usage.output || req.usage.cacheRead || req.usage.cacheWrite),
   );
   const minContext = Math.max(scenario.minContextTokens, THRESHOLDS.minContextTokens);
-  const gate = QUALITY_GATE[req.priority];
-  const ref = referenceGroup(snapshot.evidence);
+  // Only recent evidence exists as far as the engine is concerned.
+  const evidence = snapshot.evidence.filter((e) => isFresh(e, now));
+  const ref = referenceGroup(evidence);
+  const gate = gateFor(ref.metric, req.priority);
+  const unit = (v: number) => (ref.metric === 'aa_coding_index' ? String(v) : `${v}%`);
 
   const offersByModel = new Map<string, Offer[]>();
   for (const o of snapshot.offers) {
@@ -242,10 +277,12 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   const candidates: Candidate[] = [];
 
   for (const model of Object.values(snapshot.models)) {
-    const quality = bestQuality(model.key, snapshot.evidence, ref.key, now);
+    const quality = bestQuality(model.key, evidence, ref.key, now);
     if (!quality) {
-      if (snapshot.evidence.some((e) => e.modelKey === model.key)) {
+      if (evidence.some((e) => e.modelKey === model.key)) {
         bump('not-comparable');
+      } else if (snapshot.evidence.some((e) => e.modelKey === model.key)) {
+        bump('stale-evidence');
       }
       continue; // no comparable coding evidence: cannot be recommended
     }
@@ -280,23 +317,23 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     const best = sceltaDi(cand);
     const provisionalReasons: string[] = [];
     if (!cand.quality.comparable) provisionalReasons.push(c.engine.provisionalCrossHarness);
-    if (cand.quality.stale) provisionalReasons.push(c.engine.provisionalStale(String(THRESHOLDS.evidenceStaleDays)));
+    if (cand.quality.stale) provisionalReasons.push(c.engine.provisionalStale(String(THRESHOLDS.evidenceFreshDays)));
     if (best.cost.unquantifiedFees.length) provisionalReasons.push(c.engine.provisionalFee);
     if (best.cost.assumptions.length) provisionalReasons.push(c.engine.provisionalCacheAssumption);
     if (cand.offers.length === 1) provisionalReasons.push(c.engine.provisionalSingle);
     if (!cand.pronte.length) provisionalReasons.push(c.engine.provisionalUnidentified);
 
     const price = fmtUsd(best.cost.totalUsd!);
-    const metricLabel = cand.quality.metric === 'swebench_verified' ? 'SWE-bench Verified' : 'Aider polyglot';
-    const score = `${cand.quality.value.toFixed(1)}%`;
+    const label = metricLabel(cand.quality.metric);
+    const score = formatScore(cand.quality.value, cand.quality.metric);
     const gap = other ? (cand.quality.value - other.quality.value).toFixed(1) : null;
 
     const reason =
       role === 'everyday'
         ? req.priority === 'qualita'
-          ? c.engine.everydayBest(score, metricLabel, price)
-          : c.engine.everydayCheapest(score, metricLabel, `${gate.everyday}%`, price)
-        : c.engine.hardReason(score, metricLabel, gap);
+          ? c.engine.everydayBest(score, label, price)
+          : c.engine.everydayCheapest(score, label, unit(gate.everyday), price)
+        : c.engine.hardReason(score, label, gap);
 
     const whenToUse = role === 'hard' ? c.engine.hardWhen : null;
 
@@ -350,7 +387,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   const hard = hardCandidate ? toPick(hardCandidate, 'hard', everydayCandidate) : null;
 
   const notes: string[] = [];
-  if (!everyday) notes.push(c.engine.noWinner(`${gate.everyday}%`));
+  if (!everyday) notes.push(c.engine.noWinner(unit(gate.everyday)));
   if (everyday && !hard) {
     notes.push(
       req.priority === 'qualita'

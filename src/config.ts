@@ -50,8 +50,13 @@ export const THRESHOLDS = {
   offerStaleHours: num(env.MODELPICK_OFFER_STALE_HOURS, 48),
   /** Beyond this the whole snapshot is flagged as out of date in the UI. */
   snapshotStaleHours: num(env.MODELPICK_SNAPSHOT_STALE_HOURS, 36),
-  /** Quality evidence older than this counts as weak (recommendation stays provisional). */
-  evidenceStaleDays: num(env.MODELPICK_EVIDENCE_STALE_DAYS, 270),
+  /**
+   * Quality evidence older than this is not used at all: a measurement from
+   * months ago says little about a model that has been updated since.
+   */
+  evidenceMaxAgeDays: num(env.MODELPICK_EVIDENCE_MAX_DAYS, 7),
+  /** Evidence older than this, but within the maximum, makes the pick provisional. */
+  evidenceFreshDays: num(env.MODELPICK_EVIDENCE_FRESH_DAYS, 2),
   /** Reject a price that moved more than this factor vs the previous run. */
   priceJumpFactor: num(env.MODELPICK_PRICE_JUMP_FACTOR, 5),
   /** Upper sanity bound, USD per 1M tokens. Above this we assume a unit error. */
@@ -62,6 +67,16 @@ export const THRESHOLDS = {
   minContextTokens: num(env.MODELPICK_MIN_CONTEXT, 100_000),
   /** A backup must beat the everyday pick by at least this many points. */
   backupQualityGapPoints: num(env.MODELPICK_BACKUP_GAP, 3),
+};
+
+/** Artificial Analysis API: private key, and a download at most once per update. */
+export const AA = {
+  apiKey: env.AA_API_KEY ?? '',
+  baseUrl: 'https://artificialanalysis.ai/api/v2/language/models/free',
+  /** A download younger than this is reused, so rerunning the update costs no calls. */
+  cacheHours: num(env.MODELPICK_AA_CACHE_HOURS, 20),
+  /** Safety cap on pagination (free quota: 100 calls per 24 hours). */
+  maxPages: 20,
 };
 
 export interface SourceConfig {
@@ -102,20 +117,20 @@ export const SOURCES: SourceConfig[] = [
     id: 'swebench',
     name: 'SWE-bench Verified (leaderboard experiments)',
     url: 'https://github.com/SWE-bench/experiments',
-    enabled: bool(env.SOURCE_SWEBENCH, true),
+    enabled: bool(env.SOURCE_SWEBENCH, false),
     licence: 'Licenza non dichiarata dal repository',
     attribution: 'Risultati SWE-bench Verified, repository SWE-bench/experiments',
     note:
-      'Il repository non dichiara una licenza. Usiamo solo i valori numerici pubblicati, con attribuzione e link alla submission originale.',
+      'Disattivata: le misure pubblicate hanno spesso mesi e usiamo solo prove di qualità di al massimo 7 giorni.',
   },
   {
     id: 'aider',
     name: 'Aider polyglot benchmark',
     url: 'https://aider.chat/docs/leaderboards/',
-    enabled: bool(env.SOURCE_AIDER, true),
+    enabled: bool(env.SOURCE_AIDER, false),
     licence: 'Apache-2.0',
     attribution: 'Aider polyglot leaderboard, repository Aider-AI/aider (Apache-2.0)',
-    note: null,
+    note: 'Disattivata: la classifica non viene aggiornata ogni settimana e usiamo solo prove di qualità di al massimo 7 giorni.',
   },
   {
     id: 'infrabase',
@@ -130,11 +145,11 @@ export const SOURCES: SourceConfig[] = [
     id: 'artificialanalysis',
     name: 'Artificial Analysis',
     url: 'https://artificialanalysis.ai/',
-    enabled: bool(env.SOURCE_ARTIFICIALANALYSIS, false),
-    licence: 'Data Platform Terms: uso vietato per questo sito senza consenso scritto',
-    attribution: 'Artificial Analysis',
+    enabled: bool(env.SOURCE_ARTIFICIALANALYSIS, false) && Boolean(env.AA_API_KEY),
+    licence: 'Artificial Analysis Terms of Use e Data Platform Terms',
+    attribution: 'Source: Artificial Analysis (artificialanalysis.ai)',
     note:
-      "Disattivata: la sezione 2.5 dei Data Platform Terms (che valgono anche per l'API gratuita) vieta di usare i dati in un servizio pubblico di confronto o di scelta di modelli e provider senza consenso scritto di Artificial Analysis. Riattivabile solo con quel consenso.",
+      "Fonte principale della qualità: Coding Index scaricato dall'API a ogni aggiornamento. Richiede una chiave (AA_API_KEY). I valori sono riportati come pubblicati; Artificial Analysis non ha verificato né approvato le scelte di ModelPick.",
   },
   {
     id: 'pricepertoken',

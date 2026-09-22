@@ -4,7 +4,28 @@
  */
 export type Lang = 'it' | 'en';
 export const LANGS: Lang[] = ['it', 'en'];
-export const DEFAULT_LANG: Lang = 'it';
+export const DEFAULT_LANG: Lang = 'en';
+
+/**
+ * Italian only for browsers whose first language is Italian; everyone else,
+ * crawlers without the header included, gets English.
+ */
+export function browserLang(acceptLanguage: string | undefined): Lang {
+  if (!acceptLanguage) return 'en';
+  const ranked = acceptLanguage
+    .split(',')
+    .map((part, i) => {
+      const [tag = '', ...params] = part.trim().split(';');
+      const q = params.map((p) => p.trim()).find((p) => p.startsWith('q='));
+      return { tag: tag.toLowerCase(), q: q ? Number(q.slice(2)) : 1, i };
+    })
+    .filter((x) => x.tag && x.tag !== '*' && Number.isFinite(x.q) && x.q > 0)
+    .sort((a, b) => b.q - a.q || a.i - b.i);
+  return ranked[0]?.tag.split('-')[0] === 'it' ? 'it' : 'en';
+}
+
+/** Cookie that remembers a language picked by hand from the menu. */
+export const LANG_COOKIE = 'mp_lang';
 
 /** Reason codes the engine emits instead of prose. */
 export type ReasonCode =
@@ -12,6 +33,7 @@ export type ReasonCode =
   | 'model-context'
   | 'no-seller'
   | 'not-comparable'
+  | 'stale-evidence'
   | 'no-usable-offer'
   | 'demo'
   | 'quarantine'
@@ -36,7 +58,7 @@ export interface Catalog {
     everyday: string;
     hard: string;
     perMonth: (amount: string) => string;
-    benchmark: (value: string, when: string) => string;
+    benchmark: (value: string, metric: string, when: string) => string;
     incompleteEstimate: string;
     getKey: (account: string) => string;
     open: string;
@@ -64,6 +86,8 @@ export interface Catalog {
     comparison: (provider: string | null, delta: string, cheaper: boolean) => string;
     whyThis: string;
     theEvidence: (value: string, metric: string, harness: string, when: string) => string;
+    aaSource: string;
+    aaDisclaimer: string;
     whoIs: (provider: string) => string;
     profileKnown: (country: string, gdpr: string) => string;
     profileUnknown: string;
@@ -159,7 +183,7 @@ const it: Catalog = {
     everyday: '🟢 Ogni giorno',
     hard: '🟠 Per i problemi difficili',
     perMonth: (a) => `${a} stimati al mese a consumo`,
-    benchmark: (v, w) => `benchmark ${v}`,
+    benchmark: (v, m, w) => `${m} ${v} · dato del ${w}`,
     incompleteEstimate:
       'Stima incompleta: una commissione applicabile non è quantificabile, il confronto fra provider vicini può ribaltarsi.',
     getKey: (a) => `Prendi la chiave su ${a}`,
@@ -190,7 +214,11 @@ const it: Catalog = {
     comparison: (p, d, cheaper) =>
       `Confronto con il <strong>prezzo più basso monitorato</strong> per il modello che hai indicato${p ? ` (${p})` : ''}, non con quello che paghi tu: <strong>${d} al mese in ${cheaper ? 'meno' : 'più'}</strong> sugli stessi consumi.`,
     whyThis: 'Perché proprio questo',
-    theEvidence: (v, m, h, w) => `<strong>La prova.</strong> ${v} di problemi risolti su ${m}, misurato con ${h} il ${w}.`,
+    theEvidence: (v, m, h, w) => `<strong>La prova.</strong> ${v} su ${m} (${h}), dato del ${w}.`,
+    // Wording required verbatim by the Artificial Analysis terms (section 5.1).
+    aaSource: 'Source: Artificial Analysis (artificialanalysis.ai)',
+    aaDisclaimer:
+      'Punteggi di qualità: Source: Artificial Analysis (artificialanalysis.ai). La scelta di modello e provider è di ModelPick e non rappresenta il punto di vista di Artificial Analysis, che non l\'ha verificata né approvata.',
     whoIs: (p) => `Chi è ${p}.`,
     profileKnown: (c, g) => `Sede ${c}, GDPR ${g}`,
     profileUnknown:
@@ -227,6 +255,7 @@ const it: Catalog = {
     'model-context': 'contesto del modello insufficiente per questa attività',
     'no-seller': 'nessun provider monitorato vende questo modello',
     'not-comparable': 'misurato solo con banchi di prova non confrontabili con quello di riferimento',
+    'stale-evidence': 'nessuna misura di qualità degli ultimi 7 giorni',
     'no-usable-offer': 'nessuna offerta utilizzabile',
     demo: 'dato dimostrativo',
     quarantine: 'prezzo in quarantena per variazione anomala',
@@ -241,11 +270,11 @@ const it: Catalog = {
   },
   engine: {
     everydayCheapest: (v, m, g, p) =>
-      `Risolve il ${v} dei problemi su ${m}, sopra la soglia di ${g} richiesta per questa priorità, ed è la combinazione modello-provider meno costosa fra quelle che ci riescono (${p} al mese sullo scenario scelto).`,
+      `Ottiene ${v} su ${m}, sopra la soglia di ${g} richiesta per questa priorità, ed è la combinazione modello-provider meno costosa fra quelle che ci riescono (${p} al mese sullo scenario scelto).`,
     everydayBest: (v, m, p) =>
       `È il punteggio più alto fra i modelli misurati nelle stesse condizioni (${v} su ${m}), e fra quelli che stanno in questa fascia è il meno costoso: ${p} al mese sullo scenario scelto.`,
     hardReason: (v, m, gap) =>
-      `Risolve il ${v} dei problemi su ${m}${gap ? `, ${gap} punti percentuali sopra il modello quotidiano, misurati nelle stesse condizioni` : ''}: la capacità superiore è documentata, non dedotta dal prezzo.`,
+      `Ottiene ${v} su ${m}${gap ? `, ${gap} punti sopra il modello quotidiano, misurati nelle stesse condizioni` : ''}: la capacità superiore è documentata, non dedotta dal prezzo.`,
     hardWhen:
       'Tienilo per i bug che non si riproducono, i refactoring su molti file e il codice che il modello di ogni giorno continua a sbagliare.',
     noWinner: (g) =>
@@ -255,7 +284,7 @@ const it: Catalog = {
     noBackupBest:
       'Fra i modelli con prove confrontabili, quello di ogni giorno è già il più capace: non abbiamo prove sufficienti per consigliarne un secondo.',
     provisionalCrossHarness: 'la prova disponibile viene da un banco di prova diverso da quello di riferimento',
-    provisionalStale: (d) => `la misura ha più di ${d} giorni`,
+    provisionalStale: (d) => `la misura di qualità ha più di ${d} giorni`,
     provisionalFee: 'una commissione applicabile non è quantificabile automaticamente',
     provisionalCacheAssumption: "il costo usa un'ipotesi prudenziale sui prezzi di cache non pubblicati",
     provisionalSingle: 'un solo provider monitorato soddisfa i requisiti',
@@ -288,7 +317,7 @@ const it: Catalog = {
       'Questa pagina descrive come si arriva alle due raccomandazioni. Se qualcosa qui non ti convince, la scelta giusta è non fidarti del risultato: per questo pubblichiamo tutto.',
     orderTitle: 'Ordine delle decisioni',
     order: [
-      '<strong>Prima i modelli.</strong> Consideriamo solo modelli con una misura pubblicata di qualità sul codice, ottenuta nelle stesse condizioni degli altri. Un modello senza prove confrontabili non può vincere.',
+      '<strong>Prima i modelli.</strong> Consideriamo solo modelli con una misura di qualità sul codice degli ultimi 7 giorni: il Coding Index di Artificial Analysis, scaricato a ogni aggiornamento e misurato con lo stesso metodo per tutti. Le misure più vecchie non vengono usate. Un modello senza una misura recente non può vincere.',
       '<strong>La tua scelta cambia che cosa significa "il migliore".</strong> Con "spendere poco" ed "equilibrio" prendiamo il modello meno costoso che supera la soglia di qualità. Con "lavorare bene" prendiamo il punteggio più alto, e il prezzo decide solo fra modelli praticamente pari.',
       '<strong>Poi i provider.</strong> Per ogni modello ammesso cerchiamo tutte le offerte monitorate e teniamo quelle di provider che sappiamo identificare.',
       '<strong>Infine la convenienza.</strong> Ogni offerta viene calcolata per intero, commissioni incluse, sullo stesso scenario di consumo.',
@@ -314,6 +343,7 @@ const it: Catalog = {
       'Un provider che nessuna directory curata elenca non viene consigliato: resta visibile nel confronto, marcato come non identificato.',
       'Gli scenari di consumo sono ipotesi dichiarate e modificabili, non misure dei tuoi consumi.',
       'I banchi di prova pubblici misurano un agente su compiti standard: sono un indizio serio, non una garanzia sul tuo repository.',
+      'Per ogni modello usiamo la variante con il Coding Index più alto, spesso quella con lo sforzo di ragionamento massimo: la variante è indicata accanto al punteggio. Con impostazioni più leggere il modello può rendere meno.',
       'OpenCode non passa automaticamente a un modello di riserva: il secondo modello va selezionato a mano.',
     ],
   },
@@ -355,7 +385,7 @@ const en: Catalog = {
     everyday: '🟢 Every day',
     hard: '🟠 For hard problems',
     perMonth: (a) => `${a} estimated per month, pay as you go`,
-    benchmark: (v, w) => `benchmark ${v}`,
+    benchmark: (v, m, w) => `${m} ${v} · data from ${w}`,
     incompleteEstimate:
       'Incomplete estimate: one applicable fee cannot be quantified, so a close call between providers could flip.',
     getKey: (a) => `Get your key from ${a}`,
@@ -386,7 +416,10 @@ const en: Catalog = {
     comparison: (p, d, cheaper) =>
       `Compared with the <strong>lowest price we track</strong> for the model you named${p ? ` (${p})` : ''}, not with what you actually pay: <strong>${d} per month ${cheaper ? 'less' : 'more'}</strong> on the same usage.`,
     whyThis: 'Why this one',
-    theEvidence: (v, m, h, w) => `<strong>The evidence.</strong> ${v} of problems solved on ${m}, measured with ${h} on ${w}.`,
+    theEvidence: (v, m, h, w) => `<strong>The evidence.</strong> ${v} on ${m} (${h}), data from ${w}.`,
+    aaSource: 'Source: Artificial Analysis (artificialanalysis.ai)',
+    aaDisclaimer:
+      'Quality scores: Source: Artificial Analysis (artificialanalysis.ai). The model and provider picks are made by ModelPick and do not represent the views of Artificial Analysis, which has not reviewed or endorsed them.',
     whoIs: (p) => `Who ${p} is.`,
     profileKnown: (c, g) => `Headquarters ${c}, GDPR ${g}`,
     profileUnknown:
@@ -423,6 +456,7 @@ const en: Catalog = {
     'model-context': 'the model context is too small for this kind of work',
     'no-seller': 'no monitored provider sells this model',
     'not-comparable': 'only measured on benchmarks not comparable with the reference one',
+    'stale-evidence': 'no quality measurement from the last 7 days',
     'no-usable-offer': 'no usable offer',
     demo: 'demo data',
     quarantine: 'price quarantined after an implausible change',
@@ -437,11 +471,11 @@ const en: Catalog = {
   },
   engine: {
     everydayCheapest: (v, m, g, p) =>
-      `Solves ${v} of problems on ${m}, above the ${g} bar set by this priority, and it is the cheapest model-provider pair that clears it (${p} per month on the chosen scenario).`,
+      `Scores ${v} on ${m}, above the ${g} bar set by this priority, and it is the cheapest model-provider pair that clears it (${p} per month on the chosen scenario).`,
     everydayBest: (v, m, p) =>
       `It has the highest score among models measured under identical conditions (${v} on ${m}), and it is the cheapest of those in that band: ${p} per month on the chosen scenario.`,
     hardReason: (v, m, gap) =>
-      `Solves ${v} of problems on ${m}${gap ? `, ${gap} percentage points above the everyday model, measured under identical conditions` : ''}: the extra capability is documented, not inferred from the price.`,
+      `Scores ${v} on ${m}${gap ? `, ${gap} points above the everyday model, measured under identical conditions` : ''}: the extra capability is documented, not inferred from the price.`,
     hardWhen:
       'Keep it for bugs that will not reproduce, refactors spanning many files, and code the everyday model keeps getting wrong.',
     noWinner: (g) => `No model clears the ${g} quality bar with an identifiable provider: we name no winner.`,
@@ -450,7 +484,7 @@ const en: Catalog = {
     noBackupBest:
       'Among models with comparable evidence, the everyday pick is already the most capable: we have no grounds to recommend a second one.',
     provisionalCrossHarness: 'the available measurement comes from a different harness than the reference one',
-    provisionalStale: (d) => `the measurement is more than ${d} days old`,
+    provisionalStale: (d) => `the quality measurement is more than ${d} days old`,
     provisionalFee: 'one applicable fee cannot be quantified automatically',
     provisionalCacheAssumption: 'the cost relies on a conservative assumption about unpublished cache prices',
     provisionalSingle: 'only one monitored provider meets the requirements',
@@ -482,7 +516,7 @@ const en: Catalog = {
       'This page describes how the two recommendations are reached. If something here does not convince you, the right response is not to trust the result: that is why we publish all of it.',
     orderTitle: 'Order of decisions',
     order: [
-      '<strong>Models first.</strong> We only consider models with a published coding-quality measurement obtained under the same conditions as the others. A model without comparable evidence cannot win.',
+      '<strong>Models first.</strong> We only consider models with a coding-quality measurement from the last 7 days: the Artificial Analysis Coding Index, downloaded at every update and measured with the same method for every model. Older measurements are not used. A model without a recent measurement cannot win.',
       '<strong>Your choice changes what "best" means.</strong> With "spend less" and "balanced" we take the cheapest model that clears the quality bar. With "best results" we take the highest score, and price only decides between models that are practically tied.',
       '<strong>Providers second.</strong> For every eligible model we collect all monitored offers and keep those from providers we can identify.',
       '<strong>Total cost last.</strong> Each offer is priced in full, fees included, on the same usage scenario.',
@@ -508,6 +542,7 @@ const en: Catalog = {
       'A provider no curated directory lists is not recommended: it stays visible in the comparison, marked as unidentified.',
       'Usage scenarios are stated, editable assumptions, not measurements of your usage.',
       'Public benchmarks measure an agent on standard tasks: a serious signal, not a guarantee about your repository.',
+      'For each model we use the variant with the highest Coding Index, often the one with maximum reasoning effort: the variant is named next to the score. With lighter settings the model may perform worse.',
       'OpenCode does not switch to a backup model on its own: the second model must be selected by hand.',
     ],
   },

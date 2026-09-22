@@ -2,7 +2,7 @@
 
 **Il modello giusto. Il provider più conveniente.**
 
-> **In English.** ModelPick answers three questions, without signing up: which AI model to use for everyday coding, which one to keep for hard problems, and the cheapest monitored provider selling each. Prices are collected daily from public APIs; coding quality comes from published benchmarks, compared only within identical harness conditions. The site is bilingual — [modelpick.cloudsalus.com](https://modelpick.cloudsalus.com) in Italian, [/en](https://modelpick.cloudsalus.com/en) in English. The documentation below is in Italian; the [method](METHODOLOGY.md) is also summarised in English at [/en/method](https://modelpick.cloudsalus.com/en/method).
+> **In English.** ModelPick answers three questions, without signing up: which AI model to use for everyday coding, which one to keep for hard problems, and the cheapest monitored provider selling each. Prices are collected daily from public APIs; coding quality comes from the Artificial Analysis Coding Index, downloaded at every update; no quality measurement older than 7 days is ever used. The site is bilingual: [/en](https://modelpick.cloudsalus.com/en) in English for everyone, Italian at [modelpick.cloudsalus.com](https://modelpick.cloudsalus.com) for browsers whose first language is Italian. The documentation below is in Italian; the [method](METHODOLOGY.md) is also summarised in English at [/en/method](https://modelpick.cloudsalus.com/en/method).
 
 Applicazione web open source che risponde a tre domande, senza registrazione:
 
@@ -30,9 +30,9 @@ Le regole complete e le soglie sono su [`/metodo`](https://modelpick.cloudsalus.
 |---|---|---|
 | [OpenRouter API](https://openrouter.ai/models) | attiva | API pubblica non autenticata, un'offerta per provider con prezzi, quantizzazione e disponibilità |
 | [Models.dev](https://models.dev) | attiva | listini diretti dei provider e capacità dichiarate; è anche il registro che usa OpenCode |
-| [SWE-bench Verified](https://github.com/SWE-bench/experiments) | attiva | misure di qualità sul codice in condizioni confrontabili |
-| [Aider polyglot](https://aider.chat/docs/leaderboards/) | attiva | seconda misura sul codice, licenza Apache-2.0 |
-| Artificial Analysis | **spenta** | i [Data Platform Terms](https://artificialanalysiscdn.com/legal/ProDataPlatformTerms.pdf) (§2.5, validi anche per l'API gratuita) vietano l'uso in un servizio di scelta di modelli e provider senza consenso scritto |
+| [Artificial Analysis](https://artificialanalysis.ai/) | attiva, **fonte principale della qualità** | Coding Index dall'API (tier gratuito, chiave in `AA_API_KEY`), scaricato una volta per aggiornamento; attribuzione e dichiarazione di non approvazione in ogni pagina |
+| [SWE-bench Verified](https://github.com/SWE-bench/experiments) | **spenta** | le misure pubblicate hanno spesso mesi: usiamo solo prove di qualità degli ultimi 7 giorni |
+| [Aider polyglot](https://aider.chat/docs/leaderboards/) | **spenta** | classifica non aggiornata ogni settimana |
 | pricepertoken.com | **spenta** | nessun termine di riuso pubblicato, nessuna API |
 | cheaperinference.com | **spenta** | `robots.txt` blocca `/api/`, termini non ancora letti integralmente |
 | llmprice.gitlab.io | non integrata | dichiara di aggregare models.dev, che leggiamo già alla fonte |

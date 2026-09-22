@@ -12,6 +12,7 @@ import { fetchCatalogue, fetchOffers } from '../sources/openrouter.js';
 import { fetchModelsDev } from '../sources/modelsdev.js';
 import { fetchSweBench } from '../sources/swebench.js';
 import { fetchAider } from '../sources/aider.js';
+import { aaEvidence, downloadAa } from '../sources/artificialanalysis.js';
 import { fetchInfrabase, providerKey } from '../sources/infrabase.js';
 import { pendingStatus } from '../sources/pending.js';
 import { applyRegistry, loadRegistry } from './opencode-registry.js';
@@ -195,6 +196,27 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
       evidence.push(...rows);
       statuses.push(fallback(st, err, rows.length, ageOf(rows)));
       warnings.push('Aider non raggiungibile: prove di qualità dall\'ultimo aggiornamento riuscito.');
+    }
+  }
+
+  // Artificial Analysis: the primary quality evidence, downloaded once per update.
+  if (enabled.has('artificialanalysis')) {
+    const st = baseStatus('artificialanalysis');
+    try {
+      const dl = await downloadAa();
+      const res = aaEvidence(dl, knownKeys, observedAt);
+      evidence.push(...res.evidence);
+      statuses.push({ ...finish(st, res.evidence.length), servedFromCache: dl.fromCache, dataAgeHours: hoursSince(dl.fetchedAt) });
+      if (!dl.fromCache) warnings.push(`Artificial Analysis: ${dl.models.length} modelli scaricati con ${dl.calls} chiamate.`);
+      if (res.unmatched.length) {
+        warnings.push(`Artificial Analysis: ${res.unmatched.length} modelli non associati a un modello noto (es. ${res.unmatched.slice(0, 3).join(', ')}).`);
+      }
+    } catch (err) {
+      // Yesterday's values are still usable: the engine drops them once they pass the age limit.
+      const rows = prevEvidenceBySource('artificialanalysis');
+      evidence.push(...rows);
+      statuses.push(fallback(st, err, rows.length, ageOf(rows)));
+      warnings.push('Artificial Analysis non raggiungibile: prove di qualità dall\'ultimo aggiornamento riuscito.');
     }
   }
 

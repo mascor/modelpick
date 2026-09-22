@@ -109,7 +109,7 @@ export interface ModelRecord {
   officialUrl: string | null;
 }
 
-export type QualityMetric = 'swebench_verified' | 'aider_polyglot';
+export type QualityMetric = 'aa_coding_index' | 'swebench_verified' | 'aider_polyglot';
 
 /**
  * A measured coding result. `harnessKey` groups runs that are comparable with
@@ -118,7 +118,7 @@ export type QualityMetric = 'swebench_verified' | 'aider_polyglot';
 export interface QualityEvidence {
   modelKey: string;
   metric: QualityMetric;
-  /** Percentage of tasks solved (0-100). */
+  /** Score as published: percentage of tasks solved, or index points for Artificial Analysis. */
   value: number;
   harness: string;
   harnessKey: string;
