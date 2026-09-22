@@ -18,6 +18,10 @@ Every measurement carries a **comparability group** (`harnessKey`) made of: agen
 
 **Primary source: the Artificial Analysis Coding Index.** It is downloaded from the Artificial Analysis API at every update (once only: the download is cached for 20 hours, so rerunning the update spends no calls). Every model is measured by the same organisation with the same method, so they form a single comparability group (`aa-coding-index|<index version>`). When the same model is published in several reasoning-effort variants, we keep the highest-scoring variant and name it on the page. Values are reported as published, with the attribution "Source: Artificial Analysis (artificialanalysis.ai)" and a statement that the picks are ModelPick's and not Artificial Analysis'.
 
+**One model, one build.** A dated snapshot is part of a model's identity: "V4 Flash 0423" and "V4 Flash 0731" are different products. When the name on the source and the name in our catalogue both carry a date and the dates disagree, the score is dropped rather than attached to the build on sale, and the run says how many scores that cost.
+
+**The date we can prove.** Artificial Analysis does not publish when it ran a measurement, so what we show is the date we read the index, worded as such. Where a source does publish a measurement date, such as SWE-bench, that date is shown instead.
+
 **Recent data only.** A quality measurement older than **7 days** is never used, under any circumstances. For Artificial Analysis the date is the date of the download; if the API does not respond we reuse the values from the last successful download while they are less than 7 days old, after which the model leaves the comparison. SWE-bench and Aider are off for this reason: their measurements are often months old.
 
 The **reference group** is Artificial Analysis when present; failing that, the SWE-bench group that measured the most models. Only models in the reference group enter the comparison: a model measured elsewhere is excluded with an explicit reason, never converted or rescaled.
@@ -77,6 +81,7 @@ Handling of missing data:
 | Cache price not published | cache tokens are billed **at the input price**, which is an upper bound, and the assumption is stated on the page |
 | No per-token price (flat plan or free tier) | the offer does not take part in the price comparison: its real cost is not published per token |
 | Fee certain but its amount not verifiable | declared as "not quantified" and shown, never estimated |
+| OpenRouter credit purchase fee | 5.5% by card, 0.80 USD minimum per top-up, 5% by crypto, as declared in their FAQ; the percentage is applied to the total, the minimum is stated as a condition |
 | Minimum top-up or mandatory subscription | shown as a constraint of the offer |
 
 The default usage scenarios are **stated, editable assumptions**, not measurements. Users can replace them with their own usage.
@@ -109,6 +114,7 @@ A recommendation is marked **provisional** when at least one of these is true:
 
 ## 8. Stated limits
 
+- **Who has to be identifiable.** When buying direct, we only recommend a provider a curated directory describes: sending someone to open an account with a company we cannot name is not a recommendation. When the offer is routed through OpenRouter, the account and the invoice are OpenRouter's, and the provider behind it only supplies the machines, so no directory entry is required; the page always states who runs the model and who bills you.
 - We cover the providers monitored by the enabled sources, not the whole market. The wording used on the site is always: *"the cheapest among the monitored providers that meet your requirements"*.
 - **We do not ask for your country or data-handling requirements.** No source we read publishes geographic availability or data policy in structured form: those questions did not change the result, and a question with no effect is worse than no question. Anyone with constraints of that kind has to check them on the provider's site before buying.
 - Public benchmarks measure an agent on standard tasks: a serious signal, not a guarantee about your repository.

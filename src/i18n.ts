@@ -61,6 +61,7 @@ export interface Catalog {
     hard: string;
     perMonth: (amount: string) => string;
     benchmark: (value: string, metric: string, when: string) => string;
+    evidenceNoDate: string;
     incompleteEstimate: string;
     getKey: (account: string) => string;
     open: string;
@@ -88,6 +89,18 @@ export interface Catalog {
     defaultValue: string;
     recompute: string;
     comparison: (provider: string | null, delta: string, cheaper: boolean) => string;
+    currentTitle: string;
+    currentSame: (model: string) => string;
+    currentSamePrice: (price: string) => string;
+    currentNoSeller: (model: string) => string;
+    currentNoEvidence: (model: string) => string;
+    currentNoPrice: (model: string) => string;
+    currentUnknown: string;
+    showConfig: string;
+    bothTitle: string;
+    bothIntro: (everyday: string, hard: string) => string;
+    bothSwitch: (hard: string) => string;
+    download: string;
     whyThis: string;
     theEvidence: (value: string, metric: string, harness: string, when: string) => string;
     aaSource: string;
@@ -110,7 +123,7 @@ export interface Catalog {
   };
   priorities: Record<string, string>;
   tasks: Record<string, string>;
-  usability: { hub: string; direct: string; reseller: (p: string) => string; unknown: string };
+  usability: { hub: string; hubNote: string; direct: string; reseller: (p: string) => string; unknown: string };
   reasons: Record<ReasonCode, string>;
   engine: {
     everydayCheapest: (value: string, metric: string, gate: string, price: string) => string;
@@ -193,7 +206,7 @@ const it: Catalog = {
     everyday: '🟢 Ogni giorno',
     hard: '🟠 Per i problemi difficili',
     perMonth: (a) => `${a} stimati al mese a consumo`,
-    benchmark: (v, m, w) => `${m} ${v} · dato del ${w}`,
+    benchmark: (v, m, w) => `${m} ${v} · letto il ${w}`,
     incompleteEstimate:
       'Stima incompleta: una commissione applicabile non è quantificabile, il confronto fra provider vicini può ribaltarsi.',
     getKey: (a) => `Prendi la chiave su ${a}`,
@@ -225,8 +238,22 @@ const it: Catalog = {
     recompute: 'Ricalcola',
     comparison: (p, d, cheaper) =>
       `Confronto con il <strong>prezzo più basso monitorato</strong> per il modello che hai indicato${p ? ` (${p})` : ''}, non con quello che paghi tu: <strong>${d} al mese in ${cheaper ? 'meno' : 'più'}</strong> sugli stessi consumi.`,
+    currentTitle: 'Il modello che usi oggi',
+    currentSame: (m) => `Stai già usando il modello che consigliamo: ${m}.`,
+    currentSamePrice: (p) => `Qui sotto trovi il provider più economico che lo vende: ${p} al mese sugli stessi consumi.`,
+    currentNoSeller: (m) => `Nessun provider monitorato vende ${m} in questo momento, quindi non possiamo confrontarne il prezzo.`,
+    currentNoEvidence: (m) => `Di ${m} non abbiamo una misura di qualità degli ultimi 7 giorni: possiamo mostrarne il prezzo, ma non metterlo a confronto con i modelli consigliati.`,
+    currentNoPrice: (m) => `Per ${m} nessuna offerta monitorata ha un prezzo completo per questo scenario: un prezzo mancante non lo trattiamo come zero, quindi non calcoliamo il confronto.`,
+    currentUnknown: 'Il modello indicato non è fra quelli che monitoriamo.',
+    showConfig: 'Mostra quello che copi',
+    bothTitle: 'Configura entrambi in OpenCode',
+    bothIntro: (e, h) => `Un unico opencode.json: ${e} come predefinito e ${h} già pronto, ciascuno con il suo provider fissato.`,
+    bothSwitch: (h) => `Per passare al modello dei problemi difficili usa /models dentro OpenCode e scegli ${h}. OpenCode non cambia modello da solo.`,
+    download: 'Scarica opencode.json',
     whyThis: 'Perché proprio questo',
-    theEvidence: (v, m, h, w) => `<strong>La prova.</strong> ${v} su ${m} (${h}), dato del ${w}.`,
+    theEvidence: (v, m, h, w) => `<strong>La prova.</strong> ${v} su ${m} (${h}), indice letto il ${w}.`,
+    evidenceNoDate:
+      'Artificial Analysis non pubblica la data in cui esegue la misura: quella indicata è la data in cui abbiamo letto il suo indice.',
     // Wording required verbatim by the Artificial Analysis terms (section 5.1).
     aaSource: 'Source: Artificial Analysis (artificialanalysis.ai)',
     aaDisclaimer:
@@ -258,6 +285,7 @@ const it: Catalog = {
   },
   usability: {
     hub: 'via OpenRouter',
+    hubNote: 'Compri da OpenRouter con la sua chiave: basta quella, non serve un account con il provider che esegue il modello.',
     direct: 'diretto',
     reseller: (p) => `account ${p}`,
     unknown: 'provider non identificato',
@@ -309,7 +337,7 @@ const it: Catalog = {
     cacheWriteAssumption:
       'Questo provider non pubblica un prezzo per la scrittura della cache: quei token sono conteggiati al prezzo di input.',
     feeOpenRouter:
-      'OpenRouter applica una commissione sull’acquisto dei crediti (i prezzi per token sono invece passanti)',
+      'Commissione OpenRouter sull\'acquisto dei crediti: 5,5% con carta (minimo 0,80 USD per ricarica), 5% con cripto. I prezzi per token passano invariati',
     pinNote: () =>
       'Senza questa configurazione OpenRouter può instradare la richiesta su un altro provider, a un prezzo diverso da quello indicato.',
     cannotPin: (p) =>
@@ -403,7 +431,7 @@ const en: Catalog = {
     everyday: '🟢 Every day',
     hard: '🟠 For hard problems',
     perMonth: (a) => `${a} estimated per month, pay as you go`,
-    benchmark: (v, m, w) => `${m} ${v} · data from ${w}`,
+    benchmark: (v, m, w) => `${m} ${v} · read on ${w}`,
     incompleteEstimate:
       'Incomplete estimate: one applicable fee cannot be quantified, so a close call between providers could flip.',
     getKey: (a) => `Get your key from ${a}`,
@@ -435,8 +463,22 @@ const en: Catalog = {
     recompute: 'Recalculate',
     comparison: (p, d, cheaper) =>
       `Compared with the <strong>lowest price we track</strong> for the model you named${p ? ` (${p})` : ''}, not with what you actually pay: <strong>${d} per month ${cheaper ? 'less' : 'more'}</strong> on the same usage.`,
+    currentTitle: 'The model you use today',
+    currentSame: (m) => `You are already using the model we recommend: ${m}.`,
+    currentSamePrice: (p) => `Below is the cheapest provider selling it: ${p} per month on the same usage.`,
+    currentNoSeller: (m) => `No monitored provider sells ${m} right now, so we cannot compare its price.`,
+    currentNoEvidence: (m) => `We have no quality measurement from the last 7 days for ${m}: we can show its price, but not compare it with the recommended models.`,
+    currentNoPrice: (m) => `No monitored offer for ${m} has a complete price for this scenario: we never treat a missing price as zero, so we do not compute the comparison.`,
+    currentUnknown: 'The model you named is not one we monitor.',
+    showConfig: 'Show what you are copying',
+    bothTitle: 'Configure both in OpenCode',
+    bothIntro: (e, h) => `One opencode.json: ${e} as the default and ${h} ready to use, each with its provider pinned.`,
+    bothSwitch: (h) => `To switch to the model for hard problems use /models inside OpenCode and choose ${h}. OpenCode does not switch models on its own.`,
+    download: 'Download opencode.json',
     whyThis: 'Why this one',
-    theEvidence: (v, m, h, w) => `<strong>The evidence.</strong> ${v} on ${m} (${h}), data from ${w}.`,
+    theEvidence: (v, m, h, w) => `<strong>The evidence.</strong> ${v} on ${m} (${h}), index read on ${w}.`,
+    evidenceNoDate:
+      'Artificial Analysis does not publish when it runs the measurement: the date shown is the date we read its index.',
     aaSource: 'Source: Artificial Analysis (artificialanalysis.ai)',
     aaDisclaimer:
       'Quality scores: Source: Artificial Analysis (artificialanalysis.ai). The model and provider picks are made by ModelPick and do not represent the views of Artificial Analysis, which has not reviewed or endorsed them.',
@@ -467,6 +509,7 @@ const en: Catalog = {
   },
   usability: {
     hub: 'via OpenRouter',
+    hubNote: 'You buy from OpenRouter with its key: that is all you need, no account with the provider running the model.',
     direct: 'direct',
     reseller: (p) => `${p} account`,
     unknown: 'unidentified provider',
@@ -516,7 +559,8 @@ const en: Catalog = {
       'This provider publishes no cache read price: those tokens are billed at the input price.',
     cacheWriteAssumption:
       'This provider publishes no cache write price: those tokens are billed at the input price.',
-    feeOpenRouter: 'OpenRouter charges a fee when you buy credits (per-token prices are passed through unchanged)',
+    feeOpenRouter:
+      "OpenRouter's fee on buying credits: 5.5% by card (0.80 USD minimum per top-up), 5% by crypto. Per-token prices are passed through unchanged",
     pinNote: () =>
       'Without this config OpenRouter may route the request to a different provider, at a different price.',
     cannotPin: (p) =>
@@ -559,7 +603,8 @@ const en: Catalog = {
     limitsTitle: 'Stated limits',
     limits: [
       'We cover the providers reached by the enabled sources, not the whole market.',
-      'A provider no curated directory lists is not recommended: it stays visible in the comparison, marked as unidentified.',
+      'For direct purchases we only recommend providers a curated directory describes: if we are sending you to open an account with someone, that someone must have a name and an address. The others stay visible in the comparison, marked as unidentified.',
+      'For offers routed through OpenRouter the account is with OpenRouter: the provider running the model only supplies the machines, so no directory entry is required there. The page always says who runs the model and who bills you.',
       'Usage scenarios are stated, editable assumptions, not measurements of your usage.',
       'Public benchmarks measure an agent on standard tasks: a serious signal, not a guarantee about your repository.',
       'For each model we use the variant with the highest Coding Index, often the one with maximum reasoning effort: the variant is named next to the score. With lighter settings the model may perform worse.',

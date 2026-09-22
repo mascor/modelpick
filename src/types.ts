@@ -36,11 +36,6 @@ export interface DataPolicy {
   note: string | null;
 }
 
-export interface Promo {
-  description: string;
-  endsAt: Iso | null;
-  sourceUrl: string;
-}
 
 /** One buyable combination of model + provider + route. */
 export interface Offer {
@@ -65,7 +60,6 @@ export interface Offer {
   /** ISO-3166 alpha-2 codes, or 'global', or null when unknown. */
   regions: string[] | 'global' | null;
   dataPolicy: DataPolicy;
-  promo: Promo | null;
   /** Model id as this provider spells it, needed to write a working config. */
   remoteModelId: string | null;
   /** Environment variable the provider's SDK reads its key from. */

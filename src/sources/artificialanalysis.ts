@@ -91,6 +91,28 @@ export async function downloadAa(now = Date.now(), cacheFile = CACHE_FILE()): Pr
   return { ...download, fromCache: false };
 }
 
+/**
+ * Dated snapshots of a model: "V4 Flash 0423" and "V4 Flash 0731" are not the
+ * same product. Four-digit month-day tags and full dates both count; a bare
+ * year does not, and neither does a parameter count like "80B" or "2.4T".
+ */
+const DATE_TAGS = (text: string): string[] =>
+  [...text.matchAll(/(?<![\d.])(\d{8}|\d{4})(?![\d.])/g)]
+    .map((m) => m[1]!)
+    .filter((tag) => (tag.length === 8 ? /^20\d{6}$/.test(tag) : !/^(19|20)\d\d$/.test(tag)))
+    .map((tag) => (tag.length === 8 ? tag.slice(4) : tag));
+
+/**
+ * True when both names carry a dated snapshot and the dates disagree: the
+ * score belongs to a different build of the model than the one on sale.
+ */
+export function differentSnapshot(aaName: string, ourName: string): boolean {
+  const theirs = DATE_TAGS(aaName);
+  const ours = DATE_TAGS(ourName);
+  if (!theirs.length || !ours.length) return false;
+  return !theirs.some((tag) => ours.includes(tag));
+}
+
 /** Reasoning-effort variants are published as suffixed slugs of the same model. */
 const VARIANT = /-(max|xhigh|high|medium|low|minimal|non-reasoning|reasoning|thinking|adaptive)$/;
 
@@ -119,16 +141,23 @@ export function aaEvidence(
   download: AaDownload,
   knownKeys: Map<string, string>,
   observedAt: string,
-): { evidence: QualityEvidence[]; unmatched: string[] } {
+  displayNameOf: (modelKey: string) => string = () => '',
+): { evidence: QualityEvidence[]; unmatched: string[]; wrongSnapshot: string[] } {
   const version = download.indexVersion !== null ? `v${download.indexVersion}` : 'versione non dichiarata';
   const best = new Map<string, { m: AaModel; value: number }>();
   const unmatched: string[] = [];
+  const wrongSnapshot: string[] = [];
   for (const m of download.models) {
     const value = m.evaluations?.artificial_analysis_coding_index;
     if (typeof value !== 'number') continue;
     const key = aaModelKey(m, knownKeys);
     if (!key) {
       unmatched.push(m.slug);
+      continue;
+    }
+    // Better no score than the score of another build of the model.
+    if (differentSnapshot(`${m.name} ${m.slug}`, displayNameOf(key))) {
+      wrongSnapshot.push(`${m.slug} \u2260 ${displayNameOf(key)}`);
       continue;
     }
     const prev = best.get(key);
@@ -150,5 +179,5 @@ export function aaEvidence(
     sourceUrl: `https://artificialanalysis.ai/models/${encodeURIComponent(m.slug)}`,
     observedAt,
   }));
-  return { evidence, unmatched };
+  return { evidence, unmatched, wrongSnapshot };
 }

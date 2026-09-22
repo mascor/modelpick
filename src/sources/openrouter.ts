@@ -158,7 +158,6 @@ export async function fetchOffers(
         latencyS: ep.latency_last_30m ?? null,
         regions: null,
         dataPolicy: { trainsOnData: null, zeroRetention: null, note: null },
-        promo: null,
         remoteModelId: r.value.path,
         apiKeyEnv: 'OPENROUTER_API_KEY',
         providerDocUrl: null,

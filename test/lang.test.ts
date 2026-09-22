@@ -48,3 +48,32 @@ test('le pagine italiane rimandano all inglese chi non ha chiesto l italiano', a
     await app.close();
   }
 });
+
+test('i bot ricevono la pagina nella lingua dell indirizzo, robots e sitemap esistono', async () => {
+  process.env.MODELPICK_DATA_DIR = await mkdtemp(join(tmpdir(), 'mp-bot-'));
+  const { buildServer } = await import('../src/server/server.js');
+  const app = await buildServer();
+  try {
+    const bot = await app.inject({ url: '/', headers: { 'user-agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' } });
+    assert.equal(bot.statusCode, 200);
+    assert.match(bot.body, /<html lang="it"/);
+
+    const whatsapp = await app.inject({ url: '/metodo', headers: { 'user-agent': 'WhatsApp/2.23' } });
+    assert.equal(whatsapp.statusCode, 200);
+
+    // Una persona con browser inglese continua a essere portata sull'inglese.
+    const persona = await app.inject({ url: '/', headers: { 'user-agent': 'Mozilla/5.0 (Macintosh) Safari/605', 'accept-language': 'en-GB' } });
+    assert.equal(persona.statusCode, 302);
+
+    const robots = await app.inject({ url: '/robots.txt' });
+    assert.equal(robots.statusCode, 200);
+    assert.match(robots.body, /Sitemap: https:\/\/[^\s]+\/sitemap\.xml/);
+
+    const sitemap = await app.inject({ url: '/sitemap.xml' });
+    assert.equal(sitemap.statusCode, 200);
+    assert.match(sitemap.body, /hreflang="it"/);
+    assert.match(sitemap.body, /hreflang="x-default"/);
+  } finally {
+    await app.close();
+  }
+});

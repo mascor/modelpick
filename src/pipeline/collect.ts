@@ -204,10 +204,13 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     const st = baseStatus('artificialanalysis');
     try {
       const dl = await downloadAa();
-      const res = aaEvidence(dl, knownKeys, observedAt);
+      const res = aaEvidence(dl, knownKeys, observedAt, (key) => models.get(key)?.displayName ?? '');
       evidence.push(...res.evidence);
       statuses.push({ ...finish(st, res.evidence.length), servedFromCache: dl.fromCache, dataAgeHours: hoursSince(dl.fetchedAt) });
       if (!dl.fromCache) warnings.push(`Artificial Analysis: ${dl.models.length} modelli scaricati con ${dl.calls} chiamate.`);
+      if (res.wrongSnapshot.length) {
+        warnings.push(`Artificial Analysis: ${res.wrongSnapshot.length} punteggi scartati perché misurati su un'altra versione datata del modello (es. ${res.wrongSnapshot.slice(0, 2).join('; ')}).`);
+      }
       if (res.unmatched.length) {
         warnings.push(`Artificial Analysis: ${res.unmatched.length} modelli non associati a un modello noto (es. ${res.unmatched.slice(0, 3).join(', ')}).`);
       }

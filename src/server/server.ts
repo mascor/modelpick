@@ -6,7 +6,7 @@ import { SERVER, SITE, SOURCES } from '../config.js';
 import { recommend, type RecommendationRequest } from '../engine/recommend.js';
 import { buildOpenCodeConfig } from '../engine/opencode.js';
 import { SCENARIOS, TASK_IDS, PRIORITIES, type Priority, type TaskId } from '../engine/scenarios.js';
-import { browserLang, DEFAULT_LANG, isLang, LANG_COOKIE, pagePath, type Lang } from '../i18n.js';
+import { browserLang, DEFAULT_LANG, isLang, LANG_COOKIE, LANGS, pagePath, type Lang, type Page } from '../i18n.js';
 import { priceHistory, listRuns, previousRun } from '../pipeline/store.js';
 import { describeChange, type Change } from '../engine/changes.js';
 import { homePage, methodPage, notFoundPage, sourcesPage, statusPage } from './html.js';
@@ -88,6 +88,14 @@ export async function buildServer() {
   };
 
   /**
+   * Crawlers and link-preview fetchers get the page in the language of the URL
+   * they asked for. Redirecting them would leave the Italian pages unindexable
+   * and would show an English preview for an Italian link.
+   */
+  const isBot = (ua: string | undefined): boolean =>
+    /bot|crawler|spider|slurp|facebookexternalhit|whatsapp|slack|twitterbot|discord|telegram|linkedin|embedly|preview|pinterest|applebot|bingpreview|google-inspectiontool|duckduckbot|yandex|baiduspider|semrush|ahrefs|petal|headlesschrome|lighthouse/i.test(ua ?? '');
+
+  /**
    * Before every page: remember a language picked from the menu (?lang=), and
    * send anyone who has not asked for Italian from the Italian pages to the
    * English ones.
@@ -101,8 +109,8 @@ export async function buildServer() {
         delete query['lang'];
       }
       const wanted = picked ?? cookieLang(req.headers.cookie) ?? browserLang(req.headers['accept-language']);
-      reply.header('vary', 'Accept-Language, Cookie');
-      if (lang === 'it' && wanted !== 'it') {
+      reply.header('vary', 'Accept-Language, Cookie, User-Agent');
+      if (lang === 'it' && wanted !== 'it' && !isBot(req.headers['user-agent'])) {
         const qs = new URLSearchParams(query as Record<string, string>).toString();
         return reply.redirect(pagePath('en', page) + (qs ? `?${qs}` : ''), 302);
       }
@@ -183,6 +191,32 @@ export async function buildServer() {
 
   // Browsers ask for /favicon.ico on their own: same CloudSalus icon as the <link> tags.
   app.get('/favicon.ico', async (_req, reply) => reply.redirect('/static/favicon-32.png', 301));
+
+  app.get('/robots.txt', async (_req, reply) => {
+    reply.type('text/plain; charset=utf-8').header('cache-control', 'public, max-age=3600');
+    return `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /opencode.json\n\nSitemap: https://${SITE.domain}/sitemap.xml\n`;
+  });
+
+  /** Both languages, each page declared as the alternate of the other. */
+  app.get('/sitemap.xml', async (_req, reply) => {
+    const pages: Page[] = ['home', 'method', 'sources', 'status'];
+    const updated = ((await currentSnapshot())?.generatedAt ?? new Date().toISOString()).slice(0, 10);
+    const url = (lang: Lang, page: Page) => `https://${SITE.domain}${pagePath(lang, page)}`;
+    const entries = pages
+      .flatMap((page) =>
+        LANGS.map(
+          (lang) => `  <url>
+    <loc>${url(lang, page)}</loc>
+    <lastmod>${updated}</lastmod>
+${LANGS.map((alt) => `    <xhtml:link rel="alternate" hreflang="${alt}" href="${url(alt, page)}"/>`).join('\n')}
+    <xhtml:link rel="alternate" hreflang="x-default" href="${url('en', page)}"/>
+  </url>`,
+        ),
+      )
+      .join('\n');
+    reply.type('application/xml; charset=utf-8').header('cache-control', 'public, max-age=3600');
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${entries}\n</urlset>\n`;
+  });
 
   // A wrong address is a person who got lost, not a JSON client: the API keeps JSON.
   app.setNotFoundHandler(async (req, reply) => {

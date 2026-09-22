@@ -405,3 +405,25 @@ pre.codice {
 
   .pie__righe { gap: 8px; }
 }
+
+/* --- Quello che stai per copiare, in chiaro --- */
+.dettagli--copia { border-top: 0; padding-top: 0; margin: 4px 0 0; }
+.dettagli--copia summary { font-size: 13px; font-weight: 400; }
+.dettagli--copia pre.codice { margin: 8px 0 0; max-height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+.passo--config { counter-increment: none; display: block; }
+.passo--config::before { content: none; }
+.confronto tr.riga-config td { padding-top: 0; }
+.entrambi { margin-top: 24px; }
+.entrambi pre.codice { max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+.risparmio__titolo { font-family: var(--cs-font-ui); font-weight: 700; margin: 0 0 4px; }
+.risparmio { margin: 0 0 20px; }
+.risparmio--no-seller, .risparmio--no-evidence, .risparmio--no-price, .risparmio--unknown-model {
+  background: var(--cs-surface-alt);
+}
+
+@media (max-width: 720px) {
+  /* La riga con la configurazione occupa tutta la larghezza sotto l'offerta. */
+  .confronto tr.riga-config { display: block; padding: 0 10px 10px; border-bottom: 1px solid var(--cs-border); }
+  .confronto tr.riga-config td { display: block; }
+  .entrambi pre.codice, .dettagli--copia pre.codice { font-size: 12px; }
+}

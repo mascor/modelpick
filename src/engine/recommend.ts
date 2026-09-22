@@ -79,6 +79,9 @@ export interface Recommendation {
     snapshotStale: boolean;
   };
   savings: {
+    /** Why we cannot compare, when we cannot: the user always gets an answer. */
+    outcome: 'compared' | 'already-recommended' | 'no-price' | 'no-evidence' | 'no-seller' | 'unknown-model';
+    currentModelName: string | null;
     currentTotalUsd: number | null;
     /** Which provider that price belongs to: it is a reference, not your bill. */
     currentProviderName: string | null;
@@ -397,15 +400,31 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   }
 
   // Savings are only claimed against a configuration the user actually declared.
+  // Whatever the user picked, they get an answer: silence looks like a bug.
   let savings: Recommendation['savings'] = null;
   if (req.currentModelKey) {
+    const current = snapshot.models[req.currentModelKey] ?? null;
     const currentOffers = (offersByModel.get(req.currentModelKey) ?? []).filter(
       (o) => !req.currentOfferId || o.id === req.currentOfferId,
     );
-    const ranked = rankOffers(currentOffers, mix, req, minContext, now, snapshot.models[req.currentModelKey]?.vendor ?? '', known).usable;
+    const ranked = rankOffers(currentOffers, mix, req, minContext, now, current?.vendor ?? '', known).usable;
     const currentTotal = ranked[0]?.cost.totalUsd ?? null;
     const recommendedTotal = everyday?.cost.totalUsd ?? null;
+    const outcome: Recommendation['savings'] extends null ? never : NonNullable<Recommendation['savings']>['outcome'] =
+      !current
+        ? 'unknown-model'
+        : req.currentModelKey === everyday?.model.key
+          ? 'already-recommended'
+          : currentTotal !== null && recommendedTotal !== null
+            ? 'compared'
+            : !currentOffers.length
+              ? 'no-seller'
+              : !evidence.some((e) => e.modelKey === req.currentModelKey)
+                ? 'no-evidence'
+                : 'no-price';
     savings = {
+      outcome,
+      currentModelName: current?.displayName ?? null,
       currentTotalUsd: currentTotal,
       currentProviderName: ranked[0]?.offer.providerName ?? null,
       recommendedTotalUsd: recommendedTotal,

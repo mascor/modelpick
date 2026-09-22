@@ -55,6 +55,8 @@ npm start          # server
 npm run scheduler  # daily update
 ```
 
+`robots.txt` and `sitemap.xml` are served by the app itself, in both languages.
+
 One secret is needed: `AA_API_KEY`, a free Artificial Analysis API key, which is the primary quality source. The other active sources are public unauthenticated APIs. Without that key the site still runs, on whichever other quality source is enabled.
 
 ## Daily update

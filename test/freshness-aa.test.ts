@@ -85,3 +85,55 @@ test('uno scaricamento AA recente viene riusato senza chiamare l API', async () 
     globalThis.fetch = realFetch;
   }
 });
+
+test('un punteggio misurato su un altra versione datata non viene usato', () => {
+  const known = new Map([[matchForm('deepseek-v4-flash'), 'deepseek/deepseek-v4-flash']]);
+  const nostri = new Map([['deepseek/deepseek-v4-flash', 'DeepSeek: DeepSeek V4 Flash 0423']]);
+  const m = (slug: string, name: string): AaModel => ({
+    id: slug, name, slug, release_date: null, model_creator: null,
+    evaluations: { artificial_analysis_intelligence_index: null, artificial_analysis_coding_index: 69.1, artificial_analysis_agentic_index: null },
+  });
+  const run = (name: string) =>
+    aaEvidence(
+      { fetchedAt: new Date().toISOString(), indexVersion: 4.3, calls: 1, models: [m('deepseek-v4-flash', name)] },
+      known,
+      new Date().toISOString(),
+      (k) => nostri.get(k) ?? '',
+    );
+
+  const diversa = run('DeepSeek V4 Flash 0731 (Reasoning, Max Effort)');
+  assert.equal(diversa.evidence.length, 0);
+  assert.equal(diversa.wrongSnapshot.length, 1);
+
+  const stessa = run('DeepSeek V4 Flash 0423 (Reasoning, Max Effort)');
+  assert.equal(stessa.evidence.length, 1);
+
+  // Un numero di parametri non e una data: non deve bloccare l'associazione.
+  const known2 = new Map([[matchForm('qwen3-8-2-4t-a95b'), 'qwen/qwen3-8-2-4t-a95b']]);
+  const nostri2 = new Map([['qwen/qwen3-8-2-4t-a95b', 'Qwen3.8 2.4T A95B']]);
+  const params = aaEvidence(
+    { fetchedAt: new Date().toISOString(), indexVersion: 4.3, calls: 1, models: [m('qwen3-8-2-4t-a95b', 'Qwen3.8 2.4T A95B')] },
+    known2, new Date().toISOString(), (k) => nostri2.get(k) ?? '',
+  );
+  assert.equal(params.evidence.length, 1);
+});
+
+test('il modello indicato dall utente riceve sempre una risposta', () => {
+  const s = two([aa('v/a', 70), aa('v/b', 60)]);
+  const consigliato = recommend(s, req({ currentModelKey: 'v/a', priority: 'qualita' }));
+  assert.equal(consigliato.savings?.outcome, 'already-recommended');
+
+  const ignoto = recommend(s, req({ currentModelKey: 'v/ignoto' }));
+  assert.equal(ignoto.savings?.outcome, 'unknown-model');
+
+  const senzaProva = snapshot(
+    [model('v/a'), model('v/b'), model('v/c')],
+    [
+      offer({ id: 'a', modelKey: 'v/a', providerId: 'alfa', prices: { inputPerMTok: 1, outputPerMTok: 3, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1 } }),
+      offer({ id: 'c', modelKey: 'v/c', providerId: 'gamma', prices: { inputPerMTok: 1, outputPerMTok: 3, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1 } }),
+    ],
+    [aa('v/a', 70)],
+  );
+  assert.equal(recommend(senzaProva, req({ currentModelKey: 'v/c' })).savings?.outcome, 'compared');
+  assert.equal(recommend(senzaProva, req({ currentModelKey: 'v/b' })).savings?.outcome, 'no-seller');
+});

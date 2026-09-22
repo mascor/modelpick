@@ -98,10 +98,21 @@ export function buildOpenCodeConfig(
   const eConf = configFor(everyday.offer);
   const hConf = hard ? configFor(hard.offer) : null;
 
-  // The downloadable file pins the everyday provider when that is possible.
+  // One file for both picks: each provider is pinned under its own model id,
+  // so choosing the backup with /models keeps the provider we quoted a price for.
   const config: Record<string, unknown> = eConf.config
     ? (JSON.parse(eConf.config) as Record<string, unknown>)
     : { $schema: 'https://opencode.ai/config.json', model: eConf.modelId };
+  if (hConf?.config) {
+    const hard = JSON.parse(hConf.config) as { provider?: Record<string, { models?: Record<string, unknown> }> };
+    const into = (config.provider ??= {}) as Record<string, { models?: Record<string, unknown> }>;
+    for (const [providerId, block] of Object.entries(hard.provider ?? {})) {
+      const existing = (into[providerId] ??= {});
+      existing.models = { ...(existing.models ?? {}), ...(block.models ?? {}) };
+    }
+  }
+  // The everyday pick stays the default model whatever the backup pinned.
+  config.model = eConf.modelId;
 
   const envVars = [...new Set([everyday.offer.apiKeyEnv, hard?.offer.apiKeyEnv].filter(Boolean) as string[])];
 

@@ -11,7 +11,7 @@ import type { Change } from '../engine/changes.js';
 import { SCENARIOS, TASK_IDS, PRIORITIES } from '../engine/scenarios.js';
 import { accountName, usabilityLabel } from '../engine/usability.js';
 import { signupUrl } from '../engine/signup.js';
-import { configFor } from '../engine/opencode.js';
+import { buildOpenCodeConfig, configFor } from '../engine/opencode.js';
 import { t, pagePath, otherLang, type Lang } from '../i18n.js';
 import type { RunStatus } from '../pipeline/store.js';
 import { readFileSync } from 'node:fs';
@@ -179,9 +179,16 @@ function renderConfronto(pick: Pick, role: string, lang: Lang): string {
       </td>
       <td class="num nowrap"><strong>${esc(usd(o.cost.totalUsd, lang))}</strong></td>
       <td class="azione">
-        <code class="nascosto" id="${esc(id)}">${esc(payload)}</code>
         ${link ? `<a class="riga-link" href="${esc(link)}" target="_blank" rel="noopener">${esc(c.home.key)}</a>` : ''}
         <button class="bottone bottone--contorno bottone--piccolo" type="button" data-copia="#${esc(id)}">${esc(etichetta)}</button>
+      </td>
+    </tr>
+    <tr class="riga-config">
+      <td colspan="3">
+        <details class="dettagli dettagli--copia">
+          <summary>${esc(c.home.showConfig)}</summary>
+          <pre class="codice"><code id="${esc(id)}">${esc(payload)}</code></pre>
+        </details>
       </td>
     </tr>`;
   };
@@ -232,6 +239,7 @@ function renderDettagli(pick: Pick, lang: Lang, opencodeVersion: string | null):
       <p>${c.home.theEvidence(esc(formatScore(q.value, q.metric)), esc(evidenceLabel(q)), esc(q.harness), esc(dateDay(q.measuredAt, lang)))} ${q.metric === 'aa_coding_index'
         ? `<a href="${esc(q.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>.`
         : `<a href="${esc(q.sourceUrl)}" rel="noopener">${esc(c.home.priceSource)}</a>.`}</p>
+      ${q.metric === 'aa_coding_index' ? `<p class="meta">${esc(c.home.evidenceNoDate)}</p>` : ''}
       <div class="prezzi">${righe}${commissioni}
         <div class="prezzi__riga prezzi__riga--totale"><span>${esc(c.home.monthlyTotal)}</span><span>${esc(usd(pick.cost.totalUsd, lang))}</span></div>
       </div>
@@ -274,8 +282,13 @@ function renderPick(pick: Pick | null, role: 'quotidiano' | 'difficile', change:
       </li>` : ''}
       ${conf.config ? `<li class="passo">
         <span class="passo__testo">${esc(c.home.saveConfig(pick.offer.providerName))}</span>
-        <code class="nascosto" id="config-${esc(role)}">${esc(conf.config)}</code>
         <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">${esc(c.home.copyConfig)}</button>
+      </li>
+      <li class="passo passo--config">
+        <details class="dettagli dettagli--copia">
+          <summary>${esc(c.home.showConfig)}</summary>
+          <pre class="codice"><code id="config-${esc(role)}">${esc(conf.config)}</code></pre>
+        </details>
       </li>` : `<li class="passo">
         <code class="passo__codice" id="config-${esc(role)}">${esc(conf.command)}</code>
         <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">${esc(c.home.copyCommand)}</button>
@@ -311,19 +324,19 @@ function renderIpotesi(req: RecommendationRequest, rec: Recommendation | null, m
           </div>
           <div class="campo">
             <label for="input">${esc(c.home.tokensIn)}</label>
-            <input id="input" name="input" type="number" min="0" step="100000" value="${req.usage?.input ?? ''}" placeholder="${esc(c.home.defaultValue)}">
+            <input id="input" name="input" type="number" min="0" step="1" value="${req.usage?.input ?? ''}" placeholder="${esc(c.home.defaultValue)}">
           </div>
           <div class="campo">
             <label for="output">${esc(c.home.tokensOut)}</label>
-            <input id="output" name="output" type="number" min="0" step="10000" value="${req.usage?.output ?? ''}" placeholder="${esc(c.home.defaultValue)}">
+            <input id="output" name="output" type="number" min="0" step="1" value="${req.usage?.output ?? ''}" placeholder="${esc(c.home.defaultValue)}">
           </div>
           <div class="campo">
             <label for="cacheRead">${esc(c.home.cacheRead)}</label>
-            <input id="cacheRead" name="cacheRead" type="number" min="0" step="100000" value="${req.usage?.cacheRead ?? ''}" placeholder="${esc(c.home.defaultValue)}">
+            <input id="cacheRead" name="cacheRead" type="number" min="0" step="1" value="${req.usage?.cacheRead ?? ''}" placeholder="${esc(c.home.defaultValue)}">
           </div>
           <div class="campo">
             <label for="cacheWrite">${esc(c.home.cacheWrite)}</label>
-            <input id="cacheWrite" name="cacheWrite" type="number" min="0" step="100000" value="${req.usage?.cacheWrite ?? ''}" placeholder="${esc(c.home.defaultValue)}">
+            <input id="cacheWrite" name="cacheWrite" type="number" min="0" step="1" value="${req.usage?.cacheWrite ?? ''}" placeholder="${esc(c.home.defaultValue)}">
           </div>
           <div class="campo">
             <label for="currentModel">${esc(c.home.currentModel)}</label>
@@ -338,6 +351,52 @@ function renderIpotesi(req: RecommendationRequest, rec: Recommendation | null, m
       </form>
     </div>
   </details>`;
+}
+
+/** One file that sets up both picks: no more copying one over the other. */
+function renderEntrambi(rec: Recommendation | null, lang: Lang): string {
+  const c = t(lang);
+  if (!rec?.everyday || !rec.hard) return '';
+  const config = buildOpenCodeConfig(
+    { model: rec.everyday.model, offer: rec.everyday.offer },
+    { model: rec.hard.model, offer: rec.hard.offer },
+  );
+  if (!config) return '';
+  const query = new URLSearchParams({ task: rec.request.task, priority: rec.request.priority, lang }).toString();
+  return `<div class="scheda entrambi">
+    <h3>${esc(c.home.bothTitle)}</h3>
+    <p>${esc(c.home.bothIntro(config.everydayId, config.backupId ?? ''))}</p>
+    <pre class="codice"><code id="config-entrambi">${esc(config.json)}</code></pre>
+    <p class="modulo__azioni">
+      <button class="bottone" type="button" data-copia="#config-entrambi">${esc(c.home.copyConfig)}</button>
+      <a class="bottone bottone--contorno" href="/opencode.json?${esc(query)}">${esc(c.home.download)}</a>
+    </p>
+    <p class="meta">${esc(c.home.bothSwitch(config.backupId ?? ''))}</p>
+  </div>`;
+}
+
+/** Whatever model the user declared, they get an answer about it. */
+function renderAttuale(rec: Recommendation | null, lang: Lang): string {
+  const c = t(lang);
+  const s = rec?.savings;
+  if (!s) return '';
+  const nome = s.currentModelName ? modelName(s.currentModelName) : '';
+  const corpo =
+    s.outcome === 'compared' && s.deltaUsd !== null
+      ? c.home.comparison(s.currentProviderName ? esc(s.currentProviderName) : null, esc(usd(Math.abs(s.deltaUsd), lang)), s.deltaUsd > 0)
+      : s.outcome === 'already-recommended'
+        ? `${esc(c.home.currentSame(nome))}${s.currentTotalUsd !== null ? ` ${esc(c.home.currentSamePrice(usd(s.currentTotalUsd, lang)))}` : ''}`
+        : s.outcome === 'no-seller'
+          ? esc(c.home.currentNoSeller(nome))
+          : s.outcome === 'no-evidence'
+            ? esc(c.home.currentNoEvidence(nome))
+            : s.outcome === 'no-price'
+              ? esc(c.home.currentNoPrice(nome))
+              : esc(c.home.currentUnknown);
+  return `<div class="risparmio risparmio--${s.outcome}">
+    <p class="risparmio__titolo">${esc(c.home.currentTitle)}</p>
+    <p>${corpo}</p>
+  </div>`;
 }
 
 export function homePage(opts: {
@@ -365,11 +424,12 @@ export function homePage(opts: {
     ${!snapshot ? `<div class="avviso avviso--errore">${esc(c.home.noData)}</div>` : ''}
     ${stale ? `<div class="avviso">${esc(c.home.stale)}</div>` : ''}
     ${rec?.notes.map((n) => `<div class="avviso">${esc(n)}</div>`).join('') ?? ''}
+    ${renderAttuale(rec, lang)}
     <div class="risultati">
       ${renderPick(rec?.everyday ?? null, 'quotidiano', changes.everyday, lang, c.home.noEveryday, snapshot?.opencodeVersion ?? null)}
       ${renderPick(rec?.hard ?? null, 'difficile', changes.hard, lang, c.home.noHard, snapshot?.opencodeVersion ?? null)}
     </div>
-    ${rec?.savings && rec.savings.deltaUsd !== null ? `<p class="risparmio">${c.home.comparison(rec.savings.currentProviderName ? esc(rec.savings.currentProviderName) : null, esc(usd(Math.abs(rec.savings.deltaUsd), lang)), rec.savings.deltaUsd > 0)}</p>` : ''}
+    ${renderEntrambi(rec, lang)}
     <div class="coda">
       ${renderIpotesi(request, rec, models, lang)}
     </div>
