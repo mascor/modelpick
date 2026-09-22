@@ -47,8 +47,10 @@ export type ReasonCode =
   | 'opencode-unknown';
 
 export interface Catalog {
+  notFound: { title: string; message: string; back: string };
   htmlLang: string;
   siteDescription: string;
+  siteTagline: string;
   nav: { choice: string; method: string; sources: string; status: string; code: string; otherLang: string; otherLangCode: string };
   home: {
     title: string;
@@ -64,6 +66,8 @@ export interface Catalog {
     open: string;
     copy: string;
     copyCommand: string;
+    copied: string;
+    copyBlocked: string;
     copyConfig: string;
     saveConfig: (provider: string) => string;
     whereToBuy: string;
@@ -172,6 +176,12 @@ export interface Catalog {
 
 const it: Catalog = {
   htmlLang: 'it',
+  notFound: {
+    title: 'Pagina non trovata',
+    message: 'Questo indirizzo non esiste. Forse il link è vecchio o contiene un errore di battitura.',
+    back: 'Vai alla scelta di oggi',
+  },
+  siteTagline: 'Il modello giusto. Il provider più conveniente.',
   siteDescription:
     'Quale modello AI usare oggi per programmare, quale tenere per i problemi difficili e da quale provider conviene comprarlo. Prezzi verificati ogni giorno.',
   nav: { choice: 'Scelta', method: 'Metodo', sources: 'Fonti', status: 'Stato', code: 'Codice', otherLang: 'EN', otherLangCode: 'en' },
@@ -190,6 +200,8 @@ const it: Catalog = {
     open: 'Apri',
     copy: 'Copia',
     copyCommand: 'Copia comando',
+    copied: 'Copiato',
+    copyBlocked: 'Non è stato possibile copiare: il testo è selezionato, copialo a mano.',
     copyConfig: 'Copia configurazione',
     saveConfig: (p) => `Salva opencode.json con ${p} fissato`,
     whereToBuy: 'Dove comprarlo',
@@ -374,6 +386,12 @@ const it: Catalog = {
 
 const en: Catalog = {
   htmlLang: 'en',
+  notFound: {
+    title: 'Page not found',
+    message: 'This address does not exist. The link may be old or contain a typo.',
+    back: "Go to today's pick",
+  },
+  siteTagline: 'The right model. The cheapest provider.',
   siteDescription:
     'Which AI model to use for coding today, which one to keep for hard problems, and the cheapest provider selling it. Prices checked every day.',
   nav: { choice: 'Pick', method: 'Method', sources: 'Sources', status: 'Status', code: 'Code', otherLang: 'IT', otherLangCode: 'it' },
@@ -392,6 +410,8 @@ const en: Catalog = {
     open: 'Open',
     copy: 'Copy',
     copyCommand: 'Copy command',
+    copied: 'Copied',
+    copyBlocked: 'Could not copy: the text is selected, copy it by hand.',
     copyConfig: 'Copy config',
     saveConfig: (p) => `Save opencode.json pinning ${p}`,
     whereToBuy: 'Where to buy it',

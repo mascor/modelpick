@@ -10,6 +10,9 @@
   --cs-border-strong: #cdc9d3;
   --cs-color-primary: #602888;
   --cs-color-primary-hover: #4e2170;
+  /* Colore dei link nel testo: in tema scuro serve più chiaro del primario,
+     che su superficie scura resta sotto il 4.5:1 richiesto da WCAG. */
+  --cs-link: #602888;
   --cs-color-primary-soft: #f7f0fb;
   --cs-color-accent: #e03080;
   --cs-color-accent-soft: #fdeef5;
@@ -50,6 +53,7 @@
     --cs-border-strong: #4e4a56;
     --cs-color-primary: #9d5cc0;
     --cs-color-primary-hover: #bd8dda;
+    --cs-link: #c9a0e4;
     --cs-color-primary-soft: #2f2040;
     --cs-color-accent: #e64f95;
     --cs-color-accent-soft: #3c1f30;
@@ -93,7 +97,7 @@ h1 { font-size: clamp(30px, 7vw, 46px); }
 h2 { font-size: clamp(26px, 6vw, 36px); }
 h3 { font-size: clamp(19px, 4vw, 22px); }
 p { margin: 0 0 16px; }
-a { color: var(--cs-color-primary); }
+a { color: var(--cs-link); }
 
 .contenitore { width: 100%; max-width: var(--larghezza); padding: 0 var(--margine); margin: 0 auto; }
 .visivamente-nascosto {
@@ -117,7 +121,7 @@ a { color: var(--cs-color-primary); }
 .marchio__di:hover { color: var(--cs-color-primary); text-decoration: underline; }
 .menu { display: flex; gap: 20px; font-size: 15px; }
 .menu a { color: var(--cs-text-muted); text-decoration: none; }
-.menu a:hover { color: var(--cs-color-primary); }
+.menu a:hover { color: var(--cs-link); }
 @media (max-width: 720px) { .menu { display: none; } }
 
 /* Hero */
@@ -157,7 +161,17 @@ a { color: var(--cs-color-primary); }
 .bottone--contorno:hover { background: var(--cs-color-primary-soft); }
 .bottone--piccolo { min-height: 38px; padding: 6px 14px; font-size: 14px; }
 .bottone:focus-visible, .campo select:focus-visible, .campo input:focus-visible, summary:focus-visible {
-  outline: none; box-shadow: var(--cs-focus-ring);
+  /* L'outline pieno è il contorno che si vede sempre; l'alone colorato lo
+     accompagna dove color-mix() è supportato. Mai solo l'alone. */
+  outline: 2px solid var(--cs-color-accent);
+  outline-offset: 2px;
+  box-shadow: var(--cs-focus-ring);
+}
+a:focus-visible { outline: 2px solid var(--cs-color-accent); outline-offset: 2px; border-radius: 2px; }
+
+/* Conferma della copia: il testo cambia, e il colore lo conferma a colpo d'occhio. */
+.bottone--copiato, .bottone--copiato:hover {
+  background: var(--cs-success); border-color: var(--cs-success); color: #fff;
 }
 
 /* Modulo */

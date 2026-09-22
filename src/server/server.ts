@@ -9,7 +9,7 @@ import { SCENARIOS, TASK_IDS, PRIORITIES, type Priority, type TaskId } from '../
 import { browserLang, DEFAULT_LANG, isLang, LANG_COOKIE, pagePath, type Lang } from '../i18n.js';
 import { priceHistory, listRuns, previousRun } from '../pipeline/store.js';
 import { describeChange, type Change } from '../engine/changes.js';
-import { homePage, methodPage, sourcesPage, statusPage } from './html.js';
+import { homePage, methodPage, notFoundPage, sourcesPage, statusPage } from './html.js';
 import { currentSnapshot, currentStatus } from './snapshot.js';
 
 type Query = Record<string, string | undefined>;
@@ -183,6 +183,17 @@ export async function buildServer() {
 
   // Browsers ask for /favicon.ico on their own: same CloudSalus icon as the <link> tags.
   app.get('/favicon.ico', async (_req, reply) => reply.redirect('/static/favicon-32.png', 301));
+
+  // A wrong address is a person who got lost, not a JSON client: the API keeps JSON.
+  app.setNotFoundHandler(async (req, reply) => {
+    const url = req.raw.url ?? '';
+    if (url.startsWith('/api/') || url.startsWith('/static/') || url === '/salute') {
+      return reply.code(404).send({ errore: 'Risorsa non trovata.', url });
+    }
+    const lang = cookieLang(req.headers.cookie) ?? browserLang(req.headers['accept-language']);
+    reply.code(404).type('text/html; charset=utf-8').header('vary', 'Accept-Language, Cookie');
+    return notFoundPage(lang);
+  });
 
   app.get('/salute', async () => {
     const snapshot = await currentSnapshot();

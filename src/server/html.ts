@@ -26,7 +26,7 @@ const version = (file: string): string => {
   }
 };
 const CLOUDSALUS_URL = 'https://cloudsalus.com/';
-const ASSET_VERSION = { css: version('styles.css'), js: version('app.js') };
+const ASSET_VERSION = { css: version('styles.css'), js: version('app.js'), og: version('og.png') };
 
 export const esc = (v: unknown): string =>
   String(v ?? '')
@@ -106,6 +106,21 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
 <title>${esc(opts.title)}</title>
 <meta name="description" content="${esc(opts.description)}">
 <link rel="canonical" href="${esc(canonical)}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="${esc(SITE.name)}">
+<meta property="og:title" content="${esc(opts.title)}">
+<meta property="og:description" content="${esc(opts.description)}">
+<meta property="og:url" content="${esc(canonical)}">
+<meta property="og:image" content="https://${esc(SITE.domain)}/static/og.png?v=${ASSET_VERSION.og}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="${esc(SITE.name)} — ${esc(c.siteTagline)}">
+<meta property="og:locale" content="${opts.lang === 'it' ? 'it_IT' : 'en_GB'}">
+<meta property="og:locale:alternate" content="${opts.lang === 'it' ? 'en_GB' : 'it_IT'}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(opts.title)}">
+<meta name="twitter:description" content="${esc(opts.description)}">
+<meta name="twitter:image" content="https://${esc(SITE.domain)}/static/og.png?v=${ASSET_VERSION.og}">
 <link rel="alternate" hreflang="it" href="https://${esc(SITE.domain)}${esc(pagePath('it', opts.active))}">
 <link rel="alternate" hreflang="en" href="https://${esc(SITE.domain)}${esc(pagePath('en', opts.active))}">
 <link rel="alternate" hreflang="x-default" href="https://${esc(SITE.domain)}${esc(pagePath('en', opts.active))}">
@@ -117,7 +132,7 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
 <link rel="icon" href="/static/favicon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 </head>
-<body>
+<body data-copiato="${esc(c.home.copied)}" data-copia-bloccata="${esc(c.home.copyBlocked)}">
 <header class="intestazione">
   <div class="intestazione__barra">
     <div class="marchio">
@@ -368,6 +383,21 @@ export function homePage(opts: {
     body,
     active: 'home',
   });
+}
+
+/** A wrong address still gets the site: header, menu and a way back. */
+export function notFoundPage(lang: Lang): string {
+  const c = t(lang);
+  const body = `<section class="sezione">
+  <div class="contenitore">
+    <h1>${esc(c.notFound.title)}</h1>
+    <div class="scheda">
+      <p>${esc(c.notFound.message)}</p>
+      <p><a class="bottone" href="${esc(pagePath(lang, 'home'))}">${esc(c.notFound.back)}</a></p>
+    </div>
+  </div>
+</section>`;
+  return layout({ lang, title: `${c.notFound.title} — ${SITE.name}`, description: c.siteDescription, body, active: 'home' });
 }
 
 export function methodPage(lang: Lang): string {
