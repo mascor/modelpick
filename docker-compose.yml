@@ -18,4 +18,6 @@ services:
     restart: unless-stopped
     env_file: [.env]
     command: ["node", "dist/scheduler.js"]
+    # Lo scheduler non espone HTTP: l'health check dell'immagine non lo riguarda.
+    healthcheck: { disable: true }
     volumes: ["./data:/app/data"]
