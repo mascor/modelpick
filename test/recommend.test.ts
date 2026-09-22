@@ -13,7 +13,7 @@ const req = (over: Partial<RecommendationRequest> = {}): RecommendationRequest =
   ...over,
 });
 
-/** Un modello economico sopra soglia, uno costoso e piu bravo, uno scarso. */
+/** A cheap model above the gate, an expensive and better one, a weak one. */
 const base = () =>
   snapshot(
     [model('v/economico'), model('v/bravo'), model('v/scarso')],
@@ -26,33 +26,33 @@ const base = () =>
     [evidence('v/economico', 60), evidence('v/bravo', 78), evidence('v/scarso', 30)],
   );
 
-test('il quotidiano e il piu economico che supera la soglia, non il piu bravo', () => {
+test('the everyday pick is the cheapest that clears the gate, not the best', () => {
   const r = recommend(base(), req());
   assert.equal(r.everyday?.model.key, 'v/economico');
-  assert.equal(r.everyday?.offer.providerId, 'alfa'); // il provider piu economico per quel modello
+  assert.equal(r.everyday?.offer.providerId, 'alfa'); // the cheapest provider for that model
 });
 
-test('il backup ha una qualita superiore documentata', () => {
+test('the backup has documented superior quality', () => {
   const r = recommend(base(), req());
   assert.equal(r.hard?.model.key, 'v/bravo');
   assert.ok(r.hard!.quality.value - r.everyday!.quality.value >= 3);
 });
 
-test('un modello sotto soglia non vince nemmeno se costa pochissimo', () => {
+test('a model below the gate does not win even if it costs very little', () => {
   const r = recommend(base(), req());
   assert.notEqual(r.everyday?.model.key, 'v/scarso');
 });
 
-test('"lavorare bene" sceglie il punteggio piu alto, non il piu economico sopra soglia', () => {
+test('"work well" picks the highest score, not the cheapest above the gate', () => {
   const economico = recommend(base(), req({ priority: 'risparmio' }));
   const qualita = recommend(base(), req({ priority: 'qualita' }));
   assert.equal(economico.everyday?.model.key, 'v/economico');
   assert.equal(qualita.everyday?.model.key, 'v/bravo');
-  // le tre scelte non possono dare tutte la stessa risposta
+  // the three choices cannot all give the same answer
   assert.notEqual(economico.everyday?.model.key, qualita.everyday?.model.key);
 });
 
-test('a parita di punteggio "lavorare bene" preferisce comunque il meno costoso', () => {
+test('on equal scores "work well" still prefers the cheaper one', () => {
   const s = snapshot(
     [model('v/caro'), model('v/conveniente')],
     [
@@ -64,14 +64,14 @@ test('a parita di punteggio "lavorare bene" preferisce comunque il meno costoso'
   assert.equal(recommend(s, req({ priority: 'qualita' })).everyday?.model.key, 'v/conveniente');
 });
 
-test('i dati dimostrativi non entrano mai nelle raccomandazioni pubbliche', () => {
+test('demo data never enters public recommendations', () => {
   const s = base();
   s.offers.push(offer({ id: 'demo', modelKey: 'v/economico', providerId: 'omega', demo: true, prices: { inputPerMTok: 0.01, outputPerMTok: 0.01, cacheReadPerMTok: 0.01, cacheWritePerMTok: 0.01 } }));
   const r = recommend(s, req());
   assert.notEqual(r.everyday?.offer.providerId, 'omega');
 });
 
-test('un prezzo non verificato di recente non puo vincere', () => {
+test('a price not recently verified cannot win', () => {
   const s = base();
   const stale = offer({
     id: 'eco-vecchio',
@@ -85,14 +85,14 @@ test('un prezzo non verificato di recente non puo vincere', () => {
   assert.notEqual(r.everyday?.offer.providerId, 'vecchio');
 });
 
-test('un prezzo in quarantena non puo vincere', () => {
+test('a quarantined price cannot win', () => {
   const s = base();
-  s.offers.push(offer({ id: 'q', modelKey: 'v/economico', providerId: 'quarantena', quarantine: 'variazione anomala', prices: { inputPerMTok: 0.01, outputPerMTok: 0.01, cacheReadPerMTok: 0.01, cacheWritePerMTok: 0.01 } }));
+  s.offers.push(offer({ id: 'q', modelKey: 'v/economico', providerId: 'quarantena', quarantine: 'abnormal change', prices: { inputPerMTok: 0.01, outputPerMTok: 0.01, cacheReadPerMTok: 0.01, cacheWritePerMTok: 0.01 } }));
   const r = recommend(s, req());
   assert.notEqual(r.everyday?.offer.providerId, 'quarantena');
 });
 
-test('senza un modello sufficientemente migliore non indichiamo un backup', () => {
+test('without a sufficiently better model we name no backup', () => {
   const s = snapshot(
     [model('v/a'), model('v/b')],
     [offer({ id: 'a', modelKey: 'v/a', providerId: 'p1' }), offer({ id: 'b', modelKey: 'v/b', providerId: 'p2' })],
@@ -103,29 +103,29 @@ test('senza un modello sufficientemente migliore non indichiamo un backup', () =
   assert.match(r.notes.join(" "), /capacità superiore/);
 });
 
-test('senza prove di qualita non si assegna alcun vincitore', () => {
+test('without quality evidence no winner is assigned', () => {
   const s = snapshot([model('v/a')], [offer({ id: 'a', modelKey: 'v/a', providerId: 'p1' })], []);
   const r = recommend(s, req());
   assert.equal(r.everyday, null);
   assert.match(r.notes.join(' '), /non assegniamo un vincitore/);
 });
 
-test('un modello misurato con un altro banco di prova non entra nel confronto', () => {
+test('a model measured with another benchmark does not enter the comparison', () => {
   const s = base();
-  // "ref" misura due modelli, "altro-banco" uno solo: il gruppo di riferimento e "ref".
+  // "ref" measures two models, "altro-banco" only one: the reference group is "ref".
   s.evidence = [
-    evidence('v/economico', 60, { harnessKey: 'altro-banco', harness: 'un altro agente' }),
+    evidence('v/economico', 60, { harnessKey: 'altro-banco', harness: 'another agent' }),
     evidence('v/bravo', 78),
     evidence('v/scarso', 30),
   ];
   const r = recommend(s, req());
-  // v/economico costerebbe meno ma il suo punteggio non e confrontabile: vince v/bravo.
+  // v/economico would cost less but its score is not comparable: v/bravo wins.
   assert.equal(r.everyday?.model.key, 'v/bravo');
   assert.equal(r.everyday?.quality.comparable, true);
   assert.ok(r.method.excluded.some((e) => e.reason === 'not-comparable'));
 });
 
-test('un offerta gratuita o a piano non vince il confronto sul prezzo', () => {
+test('a free or plan-based offer does not win the price comparison', () => {
   const s = base();
   s.offers.push(
     offer({
@@ -139,7 +139,7 @@ test('un offerta gratuita o a piano non vince il confronto sul prezzo', () => {
   assert.notEqual(r.everyday?.offer.providerId, 'piano-forfait');
 });
 
-test('un prezzo di cache non pubblicato viene conteggiato al prezzo di input, mai gratis', () => {
+test('an unpublished cache price is charged at the input price, never free', () => {
   const s = base();
   const senzaCache = offer({
     id: 'senza-cache',
@@ -149,14 +149,14 @@ test('un prezzo di cache non pubblicato viene conteggiato al prezzo di input, ma
   });
   s.offers.push(senzaCache);
   const r = recommend(s, req());
-  // alfa pubblica prezzi di cache bassi: resta piu conveniente di chi non li pubblica.
+  // alfa publishes low cache prices: it stays cheaper than those that do not publish them.
   assert.equal(r.everyday?.offer.providerId, 'alfa');
   const alt = r.everyday!.alternatives.find((a) => a.offer.providerId === 'senza-cache');
-  assert.ok(alt, 'l offerta senza prezzi di cache resta confrontabile');
-  assert.ok(alt!.cost.assumptions.length > 0, 'l ipotesi prudenziale viene dichiarata');
+  assert.ok(alt, 'the offer without cache prices stays comparable');
+  assert.ok(alt!.cost.assumptions.length > 0, 'the conservative assumption is declared');
 });
 
-test('un intermediario e un provider diretto competono sullo stesso prezzo totale', () => {
+test('a broker and a direct provider compete on the same total price', () => {
   const s = snapshot(
     [model('v/a')],
     [
@@ -168,14 +168,14 @@ test('un intermediario e un provider diretto competono sullo stesso prezzo total
   assert.equal(recommend(s, req()).everyday?.offer.providerId, 'broker');
 });
 
-test('i consumi indicati dall utente sostituiscono lo scenario', () => {
+test('usage supplied by the user replaces the scenario', () => {
   const r = recommend(base(), req({ usage: { input: 1_000_000, output: 0, cacheRead: 0, cacheWrite: 0 } }));
   assert.equal(r.usingCustomUsage, true);
   assert.equal(r.mix.input, 1_000_000);
   assert.equal(r.everyday?.cost.totalUsd, 1); // 1 USD/1M × 1M token
 });
 
-test('il risparmio si calcola solo su una configurazione dichiarata', () => {
+test('savings are computed only against a declared configuration', () => {
   const senza = recommend(base(), req());
   assert.equal(senza.savings, null);
   const con = recommend(base(), req({ currentModelKey: 'v/bravo' }));
@@ -183,7 +183,7 @@ test('il risparmio si calcola solo su una configurazione dichiarata', () => {
   assert.ok(con.savings!.deltaUsd! > 0);
 });
 
-test('un offerta con prezzi incompleti non entra nel confronto', () => {
+test('an offer with incomplete prices does not enter the comparison', () => {
   const s = base();
   const incompleta = offer({ id: 'inc', modelKey: 'v/economico', providerId: 'incompleto' });
   incompleta.prices.outputPerMTok = null;
@@ -192,9 +192,9 @@ test('un offerta con prezzi incompleti non entra nel confronto', () => {
   assert.ok(!r.everyday!.alternatives.some((a) => a.offer.providerId === 'incompleto'));
 });
 
-test('un modello che OpenCode non riconosce non viene ne consigliato ne mostrato', () => {
+test('a model OpenCode does not recognise is neither recommended nor shown', () => {
   const s = base();
-  // L'offerta piu' economica in assoluto, ma con un id che OpenCode rifiuta.
+  // The cheapest offer of all, but with an id OpenCode rejects.
   s.offers.push(
     offer({
       id: 'ignoto',
@@ -209,7 +209,7 @@ test('un modello che OpenCode non riconosce non viene ne consigliato ne mostrato
   assert.ok(!r.everyday!.alternatives.some((a) => a.offer.providerId === 'ignoto'));
 });
 
-test('se nessun provider ha un id valido il modello esce dal confronto', () => {
+test('if no provider has a valid id the model leaves the comparison', () => {
   const s = snapshot(
     [model('v/solo')],
     [offer({ id: 'x', modelKey: 'v/solo', providerId: 'ignoto', opencodeVerified: false })],
@@ -220,19 +220,19 @@ test('se nessun provider ha un id valido il modello esce dal confronto', () => {
   assert.ok(r.method.excluded.some((e) => e.reason === 'opencode-unknown'));
 });
 
-test('ogni offerta consigliata porta un id che OpenCode accetta', () => {
+test('every recommended offer carries an id OpenCode accepts', () => {
   const r = recommend(base(), req());
   for (const p of [r.everyday, r.hard]) {
     if (!p) continue;
-    assert.notEqual(p.offer.opencodeVerified, false, `${p.offer.providerId} deve essere verificato`);
+    assert.notEqual(p.offer.opencodeVerified, false, `${p.offer.providerId} must be verified`);
   }
 });
 
-test('a parita di prezzo vince l offerta con il provider fissabile', () => {
+test('on equal price the offer with a pinnable provider wins', () => {
   const s = snapshot(
     [model('v/a')],
     [
-      // Stessa spesa: una passa dall'instradamento automatico, l'altra fissa il provider.
+      // Same spend: one goes through automatic routing, the other pins the provider.
       offer({ id: 'libero', modelKey: 'v/a', providerId: 'openrouter', providerName: 'OpenRouter', sourceId: 'modelsdev', prices: { inputPerMTok: 1, outputPerMTok: 3, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1 } }),
       offer({ id: 'fissato', modelKey: 'v/a', providerId: 'deepinfra', providerName: 'DeepInfra', sourceId: 'openrouter', routingSlug: 'deepinfra', prices: { inputPerMTok: 1, outputPerMTok: 3, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1 } }),
     ],

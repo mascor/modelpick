@@ -116,7 +116,7 @@ export async function buildServer() {
       }
     };
 
-  const registra = (lang: Lang, paths: { home: string; method: string; sources: string; status: string }) => {
+  const register = (lang: Lang, paths: { home: string; method: string; sources: string; status: string }) => {
     app.get(paths.home, { onRequest: negotiate(lang, 'home') }, async (req, reply) => {
       const { snapshot, request, rec, models, changes } = await compute(req.query as Query, lang);
       reply.type('text/html; charset=utf-8');
@@ -136,8 +136,8 @@ export async function buildServer() {
     });
   };
 
-  registra('it', { home: '/', method: '/metodo', sources: '/fonti', status: '/stato' });
-  registra('en', { home: '/en', method: '/en/method', sources: '/en/sources', status: '/en/status' });
+  register('it', { home: '/', method: '/metodo', sources: '/fonti', status: '/stato' });
+  register('en', { home: '/en', method: '/en/method', sources: '/en/sources', status: '/en/status' });
   // Trailing slash on the English home, so /en/ works like /en.
   app.get('/en/', async (req, reply) => reply.redirect('/en' + (req.raw.url?.includes('?') ? req.raw.url.slice(req.raw.url.indexOf('?')) : ''), 301));
 
@@ -145,44 +145,68 @@ export async function buildServer() {
 
   app.get('/opencode.json', async (req, reply) => {
     const { config } = await compute(req.query as Query, langOf(req.query as Query));
-    if (!config) return reply.code(404).send({ errore: 'Nessuna raccomandazione disponibile.' });
+    if (!config) return reply.code(404).send({ error: 'No recommendation available.' });
     reply.header('content-disposition', 'attachment; filename="opencode.json"');
     reply.type('application/json; charset=utf-8');
     return config.json;
   });
 
-  app.get('/api/raccomandazione', async (req) => {
-    const { snapshot, request, rec, config } = await compute(req.query as Query, langOf(req.query as Query));
-    if (!snapshot) return { errore: 'Nessuno snapshot pubblicato.' };
-    return { richiesta: request, raccomandazione: rec, opencode: config, aggiornatoIl: snapshot.generatedAt };
-  });
-
-  app.get('/api/stato', async () => ({
-    snapshot: (await currentSnapshot())?.stats ?? null,
-    aggiornatoIl: (await currentSnapshot())?.generatedAt ?? null,
-    ultimaEsecuzione: await currentStatus(),
-    esecuzioniStoriche: (await listRuns(30)).length,
-  }));
-
-  app.get('/api/fonti', async () => {
+  // The API speaks English. The Italian paths it had first stay, unchanged in
+  // shape, so nobody who already calls them breaks.
+  const recommendationData = async (q: Query) => {
+    const { snapshot, request, rec, config } = await compute(q, langOf(q));
+    return { snapshot, request, rec, config };
+  };
+  const statusData = async () => {
     const snapshot = await currentSnapshot();
-    return SOURCES.map((s) => ({
-      ...s,
-      stato: snapshot?.sources.find((x) => x.id === s.id)?.outcome ?? 'mai eseguita',
-    }));
-  });
-
-  app.get('/api/modelli', async () => {
+    return { stats: snapshot?.stats ?? null, updatedAt: snapshot?.generatedAt ?? null, lastRun: await currentStatus(), runs: (await listRuns(30)).length };
+  };
+  const sourcesData = async () => {
+    const snapshot = await currentSnapshot();
+    return SOURCES.map((s) => ({ s, outcome: snapshot?.sources.find((x) => x.id === s.id)?.outcome ?? null }));
+  };
+  const modelsData = async () => {
     const snapshot = await currentSnapshot();
     if (!snapshot) return [];
     const evidence = new Set(snapshot.evidence.map((e) => e.modelKey));
-    return Object.values(snapshot.models)
-      .filter((m) => evidence.has(m.key))
-      .map((m) => ({ chiave: m.key, nome: m.displayName, contesto: m.contextTokens, strumenti: m.toolCall }));
+    return Object.values(snapshot.models).filter((m) => evidence.has(m.key));
+  };
+
+  app.get('/api/recommendation', async (req) => {
+    const { snapshot, request, rec, config } = await recommendationData(req.query as Query);
+    if (!snapshot) return { error: 'No snapshot published yet.' };
+    return { request, recommendation: rec, opencode: config, updatedAt: snapshot.generatedAt };
+  });
+  app.get('/api/status', async () => {
+    const d = await statusData();
+    return { snapshot: d.stats, updatedAt: d.updatedAt, lastRun: d.lastRun, storedRuns: d.runs };
+  });
+  app.get('/api/sources', async () => (await sourcesData()).map(({ s, outcome }) => ({ ...s, state: outcome ?? 'never-run' })));
+  app.get('/api/models', async () =>
+    (await modelsData()).map((m) => ({ key: m.key, name: m.displayName, contextTokens: m.contextTokens, tools: m.toolCall })),
+  );
+  app.get('/api/scenarios', async () => SCENARIOS);
+  app.get('/api/history', async (req, reply) => {
+    const model = (req.query as Query)['model'];
+    if (!model) return reply.code(400).send({ error: 'Missing "model" parameter.' });
+    return { model, series: await priceHistory(model) };
   });
 
+  // Legacy Italian paths, same responses as before.
+  app.get('/api/raccomandazione', async (req) => {
+    const { snapshot, request, rec, config } = await recommendationData(req.query as Query);
+    if (!snapshot) return { errore: 'Nessuno snapshot pubblicato.' };
+    return { richiesta: request, raccomandazione: rec, opencode: config, aggiornatoIl: snapshot.generatedAt };
+  });
+  app.get('/api/stato', async () => {
+    const d = await statusData();
+    return { snapshot: d.stats, aggiornatoIl: d.updatedAt, ultimaEsecuzione: d.lastRun, esecuzioniStoriche: d.runs };
+  });
+  app.get('/api/fonti', async () => (await sourcesData()).map(({ s, outcome }) => ({ ...s, stato: outcome ?? 'mai eseguita' })));
+  app.get('/api/modelli', async () =>
+    (await modelsData()).map((m) => ({ chiave: m.key, nome: m.displayName, contesto: m.contextTokens, strumenti: m.toolCall })),
+  );
   app.get('/api/scenari', async () => SCENARIOS);
-
   app.get('/api/storico', async (req, reply) => {
     const model = (req.query as Query)['model'];
     if (!model) return reply.code(400).send({ errore: 'Parametro "model" mancante.' });
@@ -221,14 +245,18 @@ ${LANGS.map((alt) => `    <xhtml:link rel="alternate" hreflang="${alt}" href="${
   // A wrong address is a person who got lost, not a JSON client: the API keeps JSON.
   app.setNotFoundHandler(async (req, reply) => {
     const url = req.raw.url ?? '';
-    if (url.startsWith('/api/') || url.startsWith('/static/') || url === '/salute') {
-      return reply.code(404).send({ errore: 'Risorsa non trovata.', url });
+    if (url.startsWith('/api/') || url.startsWith('/static/') || url === '/health' || url === '/salute') {
+      return reply.code(404).send({ error: 'Not found.', url });
     }
     const lang = cookieLang(req.headers.cookie) ?? browserLang(req.headers['accept-language']);
     reply.code(404).type('text/html; charset=utf-8').header('vary', 'Accept-Language, Cookie');
     return notFoundPage(lang);
   });
 
+  app.get('/health', async () => {
+    const snapshot = await currentSnapshot();
+    return { status: 'ok', site: SITE.name, snapshot: snapshot ? snapshot.generatedAt : null };
+  });
   app.get('/salute', async () => {
     const snapshot = await currentSnapshot();
     return { stato: 'ok', sito: SITE.name, snapshot: snapshot ? snapshot.generatedAt : null };

@@ -40,7 +40,7 @@ export async function fetchAider(
       modelKey,
       metric: 'aider_polyglot',
       value: row.pass_rate_2,
-      harness: `Aider polyglot, formato di modifica "${format}"`,
+      harness: `Aider polyglot, edit format "${format}"`,
       harnessKey: `aider-polyglot|${format}`,
       attempts: 2,
       instanceCalls: null,

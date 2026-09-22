@@ -56,7 +56,7 @@ async function getPage(page: number): Promise<Page> {
     });
     if (!res.ok) {
       const reset = res.headers.get('x-ratelimit-reset');
-      throw new Error(`Artificial Analysis: HTTP ${res.status} sulla pagina ${page}${reset ? ` (quota ripristinata alle ${new Date(Number(reset) * 1000).toISOString()})` : ''}`);
+      throw new Error(`Artificial Analysis: HTTP ${res.status} on page ${page}${reset ? ` (quota resets at ${new Date(Number(reset) * 1000).toISOString()})` : ''}`);
     }
     return (await res.json()) as Page;
   } finally {
@@ -73,7 +73,7 @@ export async function downloadAa(now = Date.now(), cacheFile = CACHE_FILE()): Pr
   } catch {
     /* no usable cache */
   }
-  if (!AA.apiKey) throw new Error('Artificial Analysis: AA_API_KEY non impostata.');
+  if (!AA.apiKey) throw new Error('Artificial Analysis: AA_API_KEY not set.');
 
   const models: AaModel[] = [];
   let indexVersion: number | null = null;
@@ -162,7 +162,7 @@ export function aaEvidence(
   observedAt: string,
   displayNameOf: (modelKey: string) => string = () => '',
 ): { evidence: QualityEvidence[]; unmatched: string[]; wrongSnapshot: string[] } {
-  const version = download.indexVersion !== null ? `v${download.indexVersion}` : 'versione non dichiarata';
+  const version = download.indexVersion !== null ? `v${download.indexVersion}` : 'undeclared version';
   const best = new Map<string, { m: AaModel; value: number }>();
   const unmatched: string[] = [];
   const wrongSnapshot: string[] = [];

@@ -80,16 +80,17 @@ test/                tests on costs, fees, normalisation, stale data, recommenda
 
 ## API
 
-The paths are in Italian, the site's first language, and are kept unchanged so existing callers keep working.
-
 | Path | Response |
 |---|---|
-| `GET /api/raccomandazione?task=&priority=` | both recommendations, with their reasons and sources |
-| `GET /api/stato` | outcome of the last update |
-| `GET /api/fonti` | monitored sources, licences and state |
-| `GET /api/modelli` | models with quality measurements |
-| `GET /api/storico?model=` | history of the lowest price |
-| `GET /salute` | health check |
+| `GET /api/recommendation?task=&priority=` | both recommendations, with their reasons and sources |
+| `GET /api/status` | outcome of the last update |
+| `GET /api/sources` | monitored sources, licences and state |
+| `GET /api/models` | models with quality measurements |
+| `GET /api/scenarios` | the usage scenarios behind the monthly prices |
+| `GET /api/history?model=` | history of the lowest price |
+| `GET /health` | health check |
+
+The first version of the API used Italian paths (`/api/raccomandazione`, `/api/stato`, `/api/fonti`, `/api/modelli`, `/api/scenari`, `/api/storico`, `/salute`). They still answer, with their original Italian field names, so existing callers keep working; new code should use the paths above.
 
 ## Licence
 

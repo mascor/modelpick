@@ -120,7 +120,7 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
       offers.push(...rows);
       for (const m of Object.values(previous?.models ?? {})) mergeModel(models, m);
       statuses.push(fallback(st, err, rows.length, ageOf(rows)));
-      warnings.push(`OpenRouter non raggiungibile: uso i dati dell\'ultimo aggiornamento riuscito.`);
+      warnings.push(`OpenRouter unreachable: using data from the last successful update.`);
     }
   }
 
@@ -170,7 +170,7 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
       const rows = prevOffersBySource('modelsdev');
       offers.push(...rows);
       statuses.push(fallback(st, err, rows.length, ageOf(rows)));
-      warnings.push('Models.dev non raggiungibile: prezzi diretti dall\'ultimo aggiornamento riuscito.');
+      warnings.push('Models.dev unreachable: direct prices from the last successful update.');
     }
   }
 
@@ -192,7 +192,7 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     }
     for (const [foreign, key] of manualAliases) {
       if (models.has(key)) qualityKeys.set(matchForm(foreign), key);
-      else warnings.push(`Alias manuale ignorato: "${foreign}" punta a un modello sconosciuto (${key}).`);
+      else warnings.push(`Manual alias ignored: "${foreign}" points to an unknown model (${key}).`);
     }
   }
   if (enabled.has('swebench')) {
@@ -202,13 +202,13 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
       evidence.push(...res.evidence);
       statuses.push(finish(st, res.evidence.length));
       if (res.unmatched.length) {
-        warnings.push(`SWE-bench: ${res.unmatched.length} risultati non associati a un modello noto (es. ${res.unmatched.slice(0, 3).join(', ')}).`);
+        warnings.push(`SWE-bench: ${res.unmatched.length} results not matched to a known model (e.g. ${res.unmatched.slice(0, 3).join(', ')}).`);
       }
     } catch (err) {
       const rows = prevEvidenceBySource('swebench');
       evidence.push(...rows);
       statuses.push(fallback(st, err, rows.length, ageOf(rows)));
-      warnings.push('SWE-bench non raggiungibile: prove di qualità dall\'ultimo aggiornamento riuscito.');
+      warnings.push('SWE-bench unreachable: quality evidence from the last successful update.');
     }
   }
 
@@ -222,7 +222,7 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
       const rows = prevEvidenceBySource('aider');
       evidence.push(...rows);
       statuses.push(fallback(st, err, rows.length, ageOf(rows)));
-      warnings.push('Aider non raggiungibile: prove di qualità dall\'ultimo aggiornamento riuscito.');
+      warnings.push('Aider unreachable: quality evidence from the last successful update.');
     }
   }
 
@@ -234,19 +234,19 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
       const res = aaEvidence(dl, qualityKeys, observedAt, (key) => models.get(key)?.displayName ?? '');
       evidence.push(...res.evidence);
       statuses.push({ ...finish(st, res.evidence.length), servedFromCache: dl.fromCache, dataAgeHours: hoursSince(dl.fetchedAt) });
-      if (!dl.fromCache) warnings.push(`Artificial Analysis: ${dl.models.length} modelli scaricati con ${dl.calls} chiamate.`);
+      if (!dl.fromCache) warnings.push(`Artificial Analysis: ${dl.models.length} models downloaded with ${dl.calls} calls.`);
       if (res.wrongSnapshot.length) {
-        warnings.push(`Artificial Analysis: ${res.wrongSnapshot.length} punteggi scartati perché misurati su un'altra versione datata del modello (es. ${res.wrongSnapshot.slice(0, 2).join('; ')}).`);
+        warnings.push(`Artificial Analysis: ${res.wrongSnapshot.length} scores discarded because they were measured on another dated build of the model (e.g. ${res.wrongSnapshot.slice(0, 2).join('; ')}).`);
       }
       if (res.unmatched.length) {
-        warnings.push(`Artificial Analysis: ${res.unmatched.length} modelli non associati a un modello noto (es. ${res.unmatched.slice(0, 3).join(', ')}).`);
+        warnings.push(`Artificial Analysis: ${res.unmatched.length} models not matched to a known model (e.g. ${res.unmatched.slice(0, 3).join(', ')}).`);
       }
     } catch (err) {
       // Yesterday's values are still usable: the engine drops them once they pass the age limit.
       const rows = prevEvidenceBySource('artificialanalysis');
       evidence.push(...rows);
       statuses.push(fallback(st, err, rows.length, ageOf(rows)));
-      warnings.push('Artificial Analysis non raggiungibile: prove di qualità dall\'ultimo aggiornamento riuscito.');
+      warnings.push('Artificial Analysis unreachable: quality evidence from the last successful update.');
     }
   }
 
@@ -256,11 +256,11 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     const withEvidence = new Set(evidence.map((e) => e.modelKey));
     const wanted = agentCapableKeys.filter((k) => withEvidence.has(k));
     const st = baseStatus('openrouter');
-    st.name = 'OpenRouter (offerte per provider)';
+    st.name = 'OpenRouter (per-provider offers)';
     try {
       const res = await fetchOffers(wanted, pathByKey, observedAt);
       offers.push(...res.offers);
-      if (res.failures.length) warnings.push(`OpenRouter: ${res.failures.length} modelli senza dettaglio provider.`);
+      if (res.failures.length) warnings.push(`OpenRouter: ${res.failures.length} models without provider details.`);
       statuses.push(finish(st, res.offers.length));
     } catch (err) {
       const rows = prevOffersBySource('openrouter');
@@ -269,16 +269,16 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     }
   }
 
-  // Chi sono i provider: sede, GDPR, sito ufficiale.
+  // Who the providers are: headquarters, GDPR, official website.
   if (enabled.has('infrabase')) {
     const st = baseStatus('infrabase');
     try {
-      // Cerchiamo per nome i provider che compaiono davvero nelle offerte.
+      // Look up by name only the providers that actually appear in the offers.
       const nomi = [...new Set(offers.map((o) => o.providerName))];
       const res = await fetchInfrabase(nomi);
       for (const p of res.providers) providers.set(p.key, p);
-      // Ogni offerta porta con se' chi e' il provider, cosi' la scheda puo'
-      // dirlo senza dover risalire alla directory.
+      // Every offer carries who the provider is, so the card can say it
+      // without going back to the directory.
       for (const offer of offers) {
         const profilo = findProfile(providers.values(), offer.providerName);
         offer.profile = profilo
@@ -294,12 +294,12 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     } catch (err) {
       for (const [k, v] of Object.entries(previous?.providers ?? {})) providers.set(k, v);
       statuses.push(fallback(st, err, providers.size, null));
-      warnings.push('Infrabase non raggiungibile: scheda dei provider dall\'ultimo aggiornamento riuscito.');
+      warnings.push('Infrabase unreachable: provider profiles from the last successful update.');
     }
   }
 
-  // Provider sospesi a mano: il prezzo puo essere corretto, ma se non si riesce
-  // ad aprire un account la raccomandazione non serve a nulla.
+  // Providers suspended by hand: the price may be right, but if an account
+  // cannot be opened the recommendation is useless.
   try {
     const file = JSON.parse(await readFile(join(PATHS.curated, 'providers-sospesi.json'), 'utf8')) as {
       sospesi?: Record<string, string>;
@@ -313,18 +313,18 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
         contati++;
       }
     }
-    if (contati) warnings.push(`${contati} offerte escluse: provider sospeso a mano.`);
+    if (contati) warnings.push(`${contati} offers excluded: provider suspended by hand.`);
   } catch {
-    // L'elenco e facoltativo.
+    // The list is optional.
   }
 
-  // Ultimo passaggio: quali comandi OpenCode accetta davvero.
+  // Last step: which commands OpenCode actually accepts.
   const registry = await loadRegistry();
   const esito = applyRegistry(offers, registry);
   if (!registry) {
-    warnings.push('Elenco dei modelli OpenCode non disponibile: nessuna offerta può essere verificata.');
+    warnings.push('OpenCode model list not available: no offer can be verified.');
   } else if (esito.rejected) {
-    warnings.push(`${esito.rejected} offerte escluse: OpenCode non riconosce quella coppia modello-provider.`);
+    warnings.push(`${esito.rejected} offers excluded: OpenCode does not recognise that model-provider pair.`);
   }
 
   return { opencodeVersion: registry?.version ?? null, models, providers, offers, evidence, statuses, warnings };

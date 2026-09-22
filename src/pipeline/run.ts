@@ -28,7 +28,7 @@ export async function runUpdate(): Promise<RunStatus> {
 
     const dropSummary = new Map<string, number>();
     for (const d of validation.dropped) dropSummary.set(d.reason, (dropSummary.get(d.reason) ?? 0) + 1);
-    for (const [reason, count] of dropSummary) warnings.push(`${count} offerte scartate: ${reason}.`);
+    for (const [reason, count] of dropSummary) warnings.push(`${count} offers dropped: ${reason}.`);
 
     const liveSources = collected.statuses.filter((s) => s.outcome === 'ok');
     const failedSources = collected.statuses.filter((s) => s.outcome === 'failed');
@@ -58,18 +58,18 @@ export async function runUpdate(): Promise<RunStatus> {
     const tooThin = snapshot.offers.length === 0 || snapshot.evidence.length === 0;
     if (tooThin && previous) {
       ok = false;
-      message = 'Aggiornamento non pubblicato: risultato incompleto, resta valido lo snapshot precedente.';
+      message = 'Update not published: incomplete result, the previous snapshot stays valid.';
       warnings.push(message);
     } else {
       await publish(snapshot);
       published = true;
       const pruned = await pruneRuns();
-      message = `Pubblicate ${snapshot.offers.length} offerte su ${snapshot.stats.modelCount} modelli, ${snapshot.evidence.length} prove di qualità.${pruned ? ` ${pruned} run storiche rimosse.` : ''}`;
+      message = `Published ${snapshot.offers.length} offers across ${snapshot.stats.modelCount} models, ${snapshot.evidence.length} quality evidence items.${pruned ? ` ${pruned} old runs removed.` : ''}`;
       if (failedSources.length) ok = false;
     }
   } catch (err) {
     ok = false;
-    message = `Aggiornamento fallito: ${err instanceof Error ? err.message : String(err)}`;
+    message = `Update failed: ${err instanceof Error ? err.message : String(err)}`;
     warnings.push(message);
   }
 
@@ -93,12 +93,12 @@ const invokedDirectly = process.argv[1] && /run\.(ts|js)$/.test(process.argv[1])
 if (invokedDirectly) {
   runUpdate()
     .then((s) => {
-      console.log(`[modelpick] ${s.ok ? 'OK' : 'ATTENZIONE'} ${s.message}`);
+      console.log(`[modelpick] ${s.ok ? 'OK' : 'WARNING'} ${s.message}`);
       for (const w of s.warnings) console.log(`[modelpick]   - ${w}`);
       process.exit(s.published ? 0 : 1);
     })
     .catch((err) => {
-      console.error('[modelpick] errore fatale', err);
+      console.error('[modelpick] fatal error', err);
       process.exit(1);
     });
 }

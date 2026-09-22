@@ -25,27 +25,27 @@ const two = (ev: ReturnType<typeof evidence>[]) =>
     ev,
   );
 
-test('una misura di qualita piu vecchia di 7 giorni non viene usata', () => {
+test('a quality measurement older than 7 days is not used', () => {
   const r = recommend(two([evidence('v/a', 70, { measuredAt: daysAgo(8) }), evidence('v/b', 60)]), req());
   assert.equal(r.everyday?.model.key, 'v/b');
   assert.ok(r.method.excluded.some((e) => e.reason === 'stale-evidence'));
 });
 
-test('senza misure recenti non indichiamo nessun modello', () => {
+test('without recent measurements we name no model', () => {
   const r = recommend(two([evidence('v/a', 70, { measuredAt: '2026-02-01' })]), req());
   assert.equal(r.everyday, null);
 });
 
-test('Artificial Analysis ha la precedenza su SWE-bench come riferimento', () => {
-  // SWE-bench preferirebbe v/a; AA, che e il riferimento, preferisce v/b.
+test('Artificial Analysis takes precedence over SWE-bench as the reference', () => {
+  // SWE-bench would prefer v/a; AA, which is the reference, prefers v/b.
   const r = recommend(two([evidence('v/a', 80), aa('v/b', 60), aa('v/a', 40)]), req());
   assert.equal(r.everyday?.model.key, 'v/b');
   assert.equal(r.everyday?.quality.metric, 'aa_coding_index');
   assert.match(r.method.referenceHarness ?? '', /Artificial Analysis/);
-  assert.doesNotMatch(r.everyday!.reason, /%/); // l'indice non e una percentuale
+  assert.doesNotMatch(r.everyday!.reason, /%/); // the index is not a percentage
 });
 
-test('le varianti di sforzo AA si associano al modello e resta la migliore', () => {
+test('AA effort variants map to the model and the best one is kept', () => {
   const known = new Map([[matchForm('claude-opus-5'), 'anthropic/claude-opus-5']]);
   const m = (slug: string, name: string, v: number): AaModel => ({
     id: slug, name, slug, release_date: null, model_creator: null,
@@ -67,7 +67,7 @@ test('le varianti di sforzo AA si associano al modello e resta la migliore', () 
   assert.deepEqual(unmatched, ['ignoto-1']);
 });
 
-test('uno scaricamento AA recente viene riusato senza chiamare l API', async () => {
+test('a recent AA download is reused without calling the API', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'mp-aa-'));
   await mkdir(join(dir, 'cache'), { recursive: true });
   await writeFile(join(dir, 'cache', 'artificialanalysis-models.json'), JSON.stringify({
@@ -76,7 +76,7 @@ test('uno scaricamento AA recente viene riusato senza chiamare l API', async () 
   }));
   const realFetch = globalThis.fetch;
   let calls = 0;
-  globalThis.fetch = (async () => { calls++; throw new Error('nessuna chiamata attesa'); }) as typeof fetch;
+  globalThis.fetch = (async () => { calls++; throw new Error('no call expected'); }) as typeof fetch;
   try {
     const dl = await downloadAa(Date.now(), join(dir, 'cache', 'artificialanalysis-models.json'));
     assert.equal(dl.fromCache, true);
@@ -86,7 +86,7 @@ test('uno scaricamento AA recente viene riusato senza chiamare l API', async () 
   }
 });
 
-test('un punteggio misurato su un altra versione datata non viene usato', () => {
+test('a score measured on another dated build is not used', () => {
   const known = new Map([[matchForm('deepseek-v4-flash'), 'deepseek/deepseek-v4-flash']]);
   const nostri = new Map([['deepseek/deepseek-v4-flash', 'DeepSeek: DeepSeek V4 Flash 0423']]);
   const m = (slug: string, name: string): AaModel => ({
@@ -108,7 +108,7 @@ test('un punteggio misurato su un altra versione datata non viene usato', () => 
   const stessa = run('DeepSeek V4 Flash 0423 (Reasoning, Max Effort)');
   assert.equal(stessa.evidence.length, 1);
 
-  // Un numero di parametri non e una data: non deve bloccare l'associazione.
+  // A parameter count is not a date: it must not block the match.
   const known2 = new Map([[matchForm('qwen3-8-2-4t-a95b'), 'qwen/qwen3-8-2-4t-a95b']]);
   const nostri2 = new Map([['qwen/qwen3-8-2-4t-a95b', 'Qwen3.8 2.4T A95B']]);
   const params = aaEvidence(
@@ -138,7 +138,7 @@ test('a score for a dated build goes to the dated model we sell, not the older o
   assert.equal(r.wrongSnapshot.length, 0);
 });
 
-test('il modello indicato dall utente riceve sempre una risposta', () => {
+test('the model the user declared always gets an answer', () => {
   const s = two([aa('v/a', 70), aa('v/b', 60)]);
   const consigliato = recommend(s, req({ currentModelKey: 'v/a', priority: 'qualita' }));
   assert.equal(consigliato.savings?.outcome, 'already-recommended');

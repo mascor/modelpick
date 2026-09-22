@@ -53,7 +53,7 @@ const harnessOf = (dir: string, meta: Metadata): { harness: string; harnessKey: 
   const key = `${agent}@${version ?? 'unversioned'}|attempts=${attempts}|effort=${effort}`;
   const label = version ? `${agent} ${version}` : agent;
   void dir;
-  return { harness: `${label} (${attempts} tentativo/i, sforzo ${effort})`, harnessKey: key };
+  return { harness: `${label} (${attempts} attempt(s), effort ${effort})`, harnessKey: key };
 };
 
 export async function fetchSweBench(

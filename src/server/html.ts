@@ -167,8 +167,8 @@ function renderConfronto(pick: Pick, role: string, lang: Lang): string {
   const riga = (o: OfferView, i: number, scelto: boolean) => {
     const id = `cmd-${role}-${i}`;
     const conf = configFor(o.offer, lang);
-    // Righe instradate da OpenRouter condividono lo stesso comando: quello che
-    // cambia e' il provider fissato, quindi si copia la configurazione.
+    // Rows routed through OpenRouter share the same command: what changes is
+    // the pinned provider, so the configuration is what gets copied.
     const payload = conf.config ?? conf.command;
     const etichetta = conf.config ? c.home.copyConfig : c.home.copy;
     const link = signupUrl(o.offer);

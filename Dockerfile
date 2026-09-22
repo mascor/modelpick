@@ -41,5 +41,5 @@ RUN mkdir -p /app/data/cache /app/data/runs && chown -R app:app /app/data
 USER app
 EXPOSE 8031
 HEALTHCHECK --interval=60s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- "http://127.0.0.1:${PORT:-8031}/salute" >/dev/null || exit 1
+  CMD wget -qO- "http://127.0.0.1:${PORT:-8031}/health" >/dev/null || exit 1
 CMD ["node", "dist/server/server.js"]

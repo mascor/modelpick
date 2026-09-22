@@ -101,6 +101,6 @@ export async function fetchInfrabase(lookFor: string[] = []): Promise<{ provider
     }
   }
 
-  if (!ok) throw new Error('Nessuna query a Infrabase e andata a buon fine');
+  if (!ok) throw new Error('No Infrabase query succeeded');
   return { providers: [...byKey.values()], queries: ok };
 }

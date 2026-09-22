@@ -29,7 +29,7 @@ export async function fetchText(url: string, init: RequestInit = {}): Promise<st
         headers: { 'user-agent': HTTP.userAgent, accept: 'application/json, text/plain, */*', ...(init.headers ?? {}) },
       });
       if (!res.ok) {
-        const err = new HttpError(res.status, url, `HTTP ${res.status} su ${url}`);
+        const err = new HttpError(res.status, url, `HTTP ${res.status} on ${url}`);
         if (retriable(res.status) && attempt < HTTP.retries) {
           lastError = err;
           continue;
@@ -53,7 +53,7 @@ export async function fetchJson<T>(url: string, init: RequestInit = {}): Promise
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new Error(`Risposta non JSON da ${url}`);
+    throw new Error(`Non-JSON response from ${url}`);
   }
 }
 

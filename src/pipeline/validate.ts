@@ -28,7 +28,7 @@ export function validateOffers(offers: Offer[], previous: Snapshot | null): Vali
   for (const offer of offers) {
     // Two rows sharing an id would mean two products treated as one.
     if (seen.has(offer.id)) {
-      dropped.push({ offer, reason: 'identificativo di offerta duplicato' });
+      dropped.push({ offer, reason: 'duplicate offer id' });
       continue;
     }
     seen.add(offer.id);
@@ -36,18 +36,18 @@ export function validateOffers(offers: Offer[], previous: Snapshot | null): Vali
     // An offer with no usable price is not an offer.
     const anyPrice = priceFields.some((f) => offer.prices[f] !== null);
     if (!anyPrice) {
-      dropped.push({ offer, reason: 'nessun prezzo disponibile' });
+      dropped.push({ offer, reason: 'no price available' });
       continue;
     }
 
     const insane = priceFields.find((f) => !sane(offer.prices[f]));
     if (insane) {
-      dropped.push({ offer, reason: `prezzo fuori scala su ${insane} (possibile errore di unità)` });
+      dropped.push({ offer, reason: `price out of range on ${insane} (possible unit error)` });
       continue;
     }
 
     if (offer.prices.inputPerMTok === null && offer.prices.outputPerMTok === null) {
-      dropped.push({ offer, reason: 'mancano sia il prezzo di input sia quello di output' });
+      dropped.push({ offer, reason: 'both input and output prices are missing' });
       continue;
     }
 
@@ -60,7 +60,7 @@ export function validateOffers(offers: Offer[], previous: Snapshot | null): Vali
         if (now === null || then === null || then === 0) continue;
         const factor = now / then;
         if (factor > THRESHOLDS.priceJumpFactor || factor < 1 / THRESHOLDS.priceJumpFactor) {
-          quarantine = `variazione anomala su ${f}: da ${then} a ${now} USD/1M token rispetto all\'ultimo aggiornamento`;
+          quarantine = `abnormal change on ${f}: from ${then} to ${now} USD/1M tokens compared with the last update`;
           warnings.push(`${offer.id}: ${quarantine}`);
           break;
         }

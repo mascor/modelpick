@@ -12,7 +12,7 @@ const hard = {
   offer: offer({ id: 'b', modelKey: 'anthropic/claude-opus-5', providerId: 'openrouter', sourceId: 'openrouter', remoteModelId: 'anthropic/claude-opus-5', apiKeyEnv: 'OPENROUTER_API_KEY', access: 'intermediary', broker: 'OpenRouter' }),
 };
 
-test('la configurazione usa il formato provider/modello di OpenCode', () => {
+test('the configuration uses the OpenCode provider/model format', () => {
   const c = buildOpenCodeConfig(everyday, hard)!;
   assert.equal(c.everydayId, 'anthropic/claude-sonnet-5');
   assert.equal(c.backupId, 'openrouter/anthropic/claude-opus-5');
@@ -20,19 +20,19 @@ test('la configurazione usa il formato provider/modello di OpenCode', () => {
   assert.equal(JSON.parse(c.json).$schema, 'https://opencode.ai/config.json');
 });
 
-test('nessuna chiave API finisce mai nel file generato', () => {
+test('no API key ever ends up in the generated file', () => {
   const c = buildOpenCodeConfig(everyday, hard)!;
   assert.ok(!/sk-|api[_-]?key"\s*:\s*"[^{]/i.test(c.json));
   assert.deepEqual(c.envVars, ['ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY']);
   assert.match(c.instructions.join(' '), /non la chiede e non la riceve mai/);
 });
 
-test('non promettiamo un passaggio automatico al modello di riserva', () => {
+test('we do not promise an automatic switch to the backup model', () => {
   const c = buildOpenCodeConfig(everyday, hard)!;
   assert.match(c.instructions.join(' '), /non passa automaticamente/);
   assert.equal(JSON.parse(c.json).small_model, undefined);
 });
 
-test('senza un modello quotidiano non si genera alcuna configurazione', () => {
+test('without an everyday model no configuration is generated', () => {
   assert.equal(buildOpenCodeConfig(null, hard), null);
 });

@@ -29,22 +29,22 @@ export function msUntilNextRun(now = new Date()): number {
 }
 
 async function runOnce(reason: string) {
-  log(`avvio aggiornamento (${reason})`);
+  log(`starting update (${reason})`);
   try {
     const status = await runUpdate();
-    log(`${status.ok ? 'ok' : 'con problemi'}: ${status.message}`);
+    log(`${status.ok ? 'ok' : 'with problems'}: ${status.message}`);
     for (const w of status.warnings) log(`  - ${w}`);
   } catch (err) {
     // A failed run must never kill the scheduler.
-    log(`errore non gestito: ${err instanceof Error ? err.message : String(err)}`);
+    log(`unhandled error: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
 function scheduleNext() {
   const wait = msUntilNextRun();
-  log(`prossimo aggiornamento fra ${Math.round(wait / 60_000)} minuti (${SCHEDULE.hour}:${String(SCHEDULE.minute).padStart(2, '0')} ${SCHEDULE.timezone})`);
+  log(`next update in ${Math.round(wait / 60_000)} minutes (${SCHEDULE.hour}:${String(SCHEDULE.minute).padStart(2, '0')} ${SCHEDULE.timezone})`);
   setTimeout(async () => {
-    await runOnce('orario pianificato');
+    await runOnce('scheduled time');
     scheduleNext();
   }, wait).unref?.();
 }
@@ -54,7 +54,7 @@ if (invokedDirectly) {
   const snapshot = await loadCurrent();
   const age = hoursSince(snapshot?.generatedAt);
   if (!snapshot || (age !== null && age > SCHEDULE.catchUpAfterHours)) {
-    await runOnce(snapshot ? `dati vecchi di ${Math.round(age!)} ore` : 'nessuno snapshot pubblicato');
+    await runOnce(snapshot ? `data is ${Math.round(age!)} hours old` : 'no published snapshot');
   }
   scheduleNext();
   // Keep the process alive for the timers.
