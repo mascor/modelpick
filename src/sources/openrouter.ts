@@ -161,6 +161,7 @@ export async function fetchOffers(
         promo: null,
         remoteModelId: r.value.path,
         apiKeyEnv: 'OPENROUTER_API_KEY',
+        providerDocUrl: null,
         sourceId: 'openrouter',
         sourceUrl: `https://openrouter.ai/${r.value.path}/providers`,
         observedAt,

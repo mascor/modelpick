@@ -239,21 +239,6 @@ pre.codice {
 
 .caricamento { font-family: var(--cs-font-ui); color: var(--cs-text-muted); padding: 24px 0; }
 
-/* --- Scelta unica: spendere poco / lavorare bene --- */
-.scelte { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 24px; }
-.scelta {
-  display: flex; align-items: center; justify-content: center; padding: 11px 16px; text-decoration: none;
-  font-weight: 600; font-size: 15px;
-  border: 1px solid var(--cs-border-strong); border-radius: var(--cs-radius-md);
-  background: var(--cs-surface); color: var(--cs-text); font-family: var(--cs-font-ui);
-  transition: border-color var(--cs-transition), background var(--cs-transition);
-}
-.scelta:hover { border-color: var(--cs-color-primary); background: var(--cs-color-primary-soft); }
-.scelta--attiva { border-color: var(--cs-color-primary); background: var(--cs-color-primary-soft); box-shadow: var(--cs-shadow-sm); }
-.scelta__nome { font-weight: 700; font-size: 16px; }
-.scelta--attiva .scelta__nome { color: var(--cs-color-primary); }
-.scelta__nota { font-size: 13px; color: var(--cs-text-muted); }
-
 /* --- Scheda --- */
 .hero--compatto { padding: 28px 0 32px; }
 .hero--compatto h1 { font-size: clamp(28px, 6vw, 40px); margin: 0; }
@@ -308,3 +293,18 @@ pre.codice {
 .confronto td { vertical-align: middle; }
 .confronto td.nowrap { white-space: nowrap; }
 .acquisto__titolo .meta { font-weight: 400; }
+
+/* Tre passi per partire */
+.passi { list-style: none; counter-reset: passo; margin: 0 0 20px; padding: 14px; background: var(--cs-surface-alt); border-radius: var(--cs-radius-md); display: grid; gap: 8px; }
+.passo { counter-increment: passo; display: flex; align-items: center; gap: 10px; font-family: var(--cs-font-ui); font-size: 14px; }
+.passo::before {
+  content: counter(passo); flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--cs-color-primary); color: #fff; font-size: 12px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.passo__testo { flex: 1 1 auto; }
+.passo__codice {
+  flex: 1 1 auto; min-width: 0; overflow-x: auto; white-space: nowrap; font-size: 13px;
+  padding: 7px 10px; border-radius: var(--cs-radius-sm); background: var(--cs-surface); border: 1px solid var(--cs-border);
+}
+.riga-link { font-family: var(--cs-font-ui); font-size: 12px; margin-right: 8px; }

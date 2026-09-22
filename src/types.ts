@@ -70,6 +70,8 @@ export interface Offer {
   remoteModelId: string | null;
   /** Environment variable the provider's SDK reads its key from. */
   apiKeyEnv: string | null;
+  /** The provider's own documentation, used to send the reader to the key page. */
+  providerDocUrl: string | null;
   sourceId: string;
   sourceUrl: string;
   observedAt: Iso;

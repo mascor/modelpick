@@ -21,6 +21,7 @@ export const offer = (over: Partial<Offer> & Pick<Offer, 'id' | 'modelKey' | 'pr
   promo: null,
   remoteModelId: over.modelKey.split('/')[1] ?? over.modelKey,
   apiKeyEnv: 'TEST_API_KEY',
+  providerDocUrl: 'https://example.test/docs',
   sourceId: 'test',
   sourceUrl: 'https://example.test/offer',
   observedAt: now.toISOString(),

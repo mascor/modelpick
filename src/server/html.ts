@@ -6,6 +6,7 @@ import { SITE, THRESHOLDS, SOURCES } from '../config.js';
 import type { ModelRecord, Snapshot, SourceStatus } from '../types.js';
 import type { OfferView, Pick, Recommendation, RecommendationRequest } from '../engine/recommend.js';
 import { accountName, usabilityLabel } from '../engine/usability.js';
+import { signupUrl } from '../engine/signup.js';
 import { modelIdFor } from '../engine/opencode.js';
 import type { Change } from '../engine/changes.js';
 import { SCENARIOS, TASK_IDS, PRIORITIES, type Priority } from '../engine/scenarios.js';
@@ -96,38 +97,6 @@ export function layout(opts: { title: string; description: string; body: string;
 const option = (value: string, label: string, selected: string): string =>
   `<option value="${esc(value)}"${value === selected ? ' selected' : ''}>${esc(label)}</option>`;
 
-/** Rebuilds the page URL keeping every parameter except the one being changed. */
-function link(req: RecommendationRequest, override: Record<string, string>): string {
-  const params = new URLSearchParams();
-  params.set('task', req.task);
-  params.set('priority', req.priority);
-  if (req.usage?.input) params.set('input', String(req.usage.input));
-  if (req.usage?.output) params.set('output', String(req.usage.output));
-  if (req.usage?.cacheRead) params.set('cacheRead', String(req.usage.cacheRead));
-  if (req.usage?.cacheWrite) params.set('cacheWrite', String(req.usage.cacheWrite));
-  if (req.currentModelKey) params.set('currentModel', req.currentModelKey);
-  for (const [k, v] of Object.entries(override)) params.set(k, v);
-  return `/?${params.toString()}`;
-}
-
-/**
- * The only choice on the page: spend less versus work better. Three links, no
- * form to fill in and nothing to submit.
- */
-function renderChips(req: RecommendationRequest): string {
-  const labels: Record<Priority, string> = {
-    risparmio: 'Spendere poco',
-    equilibrio: 'Equilibrio',
-    qualita: 'Lavorare bene',
-  };
-  return `<nav class="scelte" aria-label="Che cosa conta di più per te">
-    ${PRIORITIES.map((p) => {
-      const attivo = p === req.priority;
-      return `<a class="scelta${attivo ? ' scelta--attiva' : ''}" href="${esc(link(req, { priority: p }))}"${attivo ? ' aria-current="true"' : ''}>${esc(labels[p])}</a>`;
-    }).join('')}
-  </nav>`;
-}
-
 /**
  * How to buy, and how to switch. Every provider row carries the two things you
  * need: what it costs you per month, and the exact command to use it.
@@ -144,6 +113,7 @@ function renderConfronto(pick: Pick, role: string): string {
       <td class="num nowrap"><strong>${esc(usd(o.cost.totalUsd))}</strong></td>
       <td class="azione">
         <code class="nascosto" id="${esc(id)}">${esc(comando)}</code>
+        ${signupUrl(o.offer) ? `<a class="riga-link" href="${esc(signupUrl(o.offer)!)}" target="_blank" rel="noopener">chiave</a>` : ''}
         <button class="bottone bottone--contorno bottone--piccolo" type="button" data-copia="#${esc(id)}">Copia</button>
       </td>
     </tr>`;
@@ -216,13 +186,20 @@ function renderPick(
     <h3 class="pick__modello">${esc(nomeModello(pick.model.displayName))}</h3>
     <p class="pick__sintesi"><strong>${esc(usd(pick.cost.totalUsd))}</strong> al mese · <strong>${esc(pick.quality.value.toFixed(0))}%</strong> di problemi risolti</p>
     ${change?.moved ? `<p class="pick__cambio pick__cambio--mosso">${esc(change.text)}</p>` : ''}
-    <div class="config">
-      <div class="config__riga">
-        <code id="config-${esc(role)}">opencode -m ${esc(modelIdFor(pick.offer))}</code>
+    <ol class="passi">
+      <li class="passo">
+        <span class="passo__testo">Prendi la chiave su <strong>${esc(accountName(pick.offer))}</strong></span>
+        ${signupUrl(pick.offer) ? `<a class="bottone bottone--contorno bottone--piccolo" href="${esc(signupUrl(pick.offer)!)}" target="_blank" rel="noopener">Apri</a>` : ''}
+      </li>
+      ${pick.offer.apiKeyEnv ? `<li class="passo">
+        <code class="passo__codice" id="key-${esc(role)}">export ${esc(pick.offer.apiKeyEnv)}="la-tua-chiave"</code>
+        <button class="bottone bottone--contorno bottone--piccolo" type="button" data-copia="#key-${esc(role)}">Copia</button>
+      </li>` : ''}
+      <li class="passo">
+        <code class="passo__codice" id="config-${esc(role)}">opencode -m ${esc(modelIdFor(pick.offer))}</code>
         <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">Copia</button>
-      </div>
-      <p class="config__serve">Account <strong>${esc(accountName(pick.offer))}</strong>${pick.offer.apiKeyEnv ? ` · <code class="chiave">export ${esc(pick.offer.apiKeyEnv)}="..."</code>` : ''}</p>
-    </div>
+      </li>
+    </ol>
     ${renderConfronto(pick, role)}
     ${renderDettagli(pick)}
   </article>`;
@@ -240,11 +217,18 @@ function renderIpotesi(req: RecommendationRequest, rec: Recommendation | null, m
     <div class="dettagli__corpo">
       <p class="meta">Di base stimiamo i costi su un mese di lavoro con un agente di codice: ${rec ? `${esc(tokens(rec.mix.input))} token di input, ${esc(tokens(rec.mix.output))} di output, ${esc(tokens(rec.mix.cacheRead))} letti dalla cache. È un'ipotesi dichiarata, non una misura dei tuoi consumi.` : ''}</p>
       <form class="modulo" method="get" action="/">
-        <input type="hidden" name="priority" value="${esc(req.priority)}">
         <div class="modulo__righe">
           <div class="campo">
             <label for="task">Tipo di lavoro</label>
             <select id="task" name="task">${TASK_IDS.map((t) => option(t, SCENARIOS[t].label, req.task)).join('')}</select>
+          </div>
+          <div class="campo">
+            <label for="priority">Cosa conta di più</label>
+            <select id="priority" name="priority">
+              ${option('risparmio', 'Spendere poco', req.priority)}
+              ${option('equilibrio', 'Equilibrio', req.priority)}
+              ${option('qualita', 'Lavorare bene', req.priority)}
+            </select>
           </div>
           <div class="campo">
             <label for="input">Token di input al mese</label>
@@ -309,7 +293,6 @@ export function homePage(opts: {
 
 <section class="sezione">
   <div class="contenitore">
-    ${renderChips(request)}
     ${!snapshot ? '<div class="avviso avviso--errore">Non è ancora stato pubblicato nessun aggiornamento verificato.</div>' : ''}
     ${stale ? '<div class="avviso">Questi dati non sono stati verificati oggi: la data reale è qui sopra.</div>' : ''}
     ${rec?.notes.map((n) => `<div class="avviso">${esc(n)}</div>`).join('') ?? ''}
