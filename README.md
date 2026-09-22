@@ -2,6 +2,8 @@
 
 **Il modello giusto. Il provider più conveniente.**
 
+> **In English.** ModelPick answers three questions, without signing up: which AI model to use for everyday coding, which one to keep for hard problems, and the cheapest monitored provider selling each. Prices are collected daily from public APIs; coding quality comes from published benchmarks, compared only within identical harness conditions. The site is bilingual — [modelpick.cloudsalus.com](https://modelpick.cloudsalus.com) in Italian, [/en](https://modelpick.cloudsalus.com/en) in English. The documentation below is in Italian; the [method](METHODOLOGY.md) is also summarised in English at [/en/method](https://modelpick.cloudsalus.com/en/method).
+
 Applicazione web open source che risponde a tre domande, senza registrazione:
 
 > Quale modello uso per il lavoro quotidiano? Quale per i problemi difficili? Da quale provider mi conviene acquistare oggi?

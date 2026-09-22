@@ -7,3 +7,5 @@ data/current.json.tmp
 .env
 *.log
 data/last-run.json
+# Descrive il server: resta locale, fuori dal repository pubblico.
+DEPLOY.md
