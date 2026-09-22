@@ -26,5 +26,5 @@ export function signupUrl(offer: Offer): string | null {
     const broker = (offer.broker ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
     return KEY_PAGE[broker] ?? null;
   }
-  return KEY_PAGE[offer.providerId] ?? offer.providerDocUrl ?? null;
+  return KEY_PAGE[offer.providerId] ?? offer.profile?.siteUrl ?? offer.providerDocUrl ?? null;
 }

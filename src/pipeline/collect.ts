@@ -7,15 +7,17 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PATHS, SOURCES, sourceById } from '../config.js';
 import { matchForm, hoursSince } from '../lib/normalize.js';
-import type { ModelRecord, Offer, QualityEvidence, Snapshot, SourceStatus } from '../types.js';
+import type { ModelRecord, Offer, ProviderProfile, QualityEvidence, Snapshot, SourceStatus } from '../types.js';
 import { fetchCatalogue, fetchOffers } from '../sources/openrouter.js';
 import { fetchModelsDev } from '../sources/modelsdev.js';
 import { fetchSweBench } from '../sources/swebench.js';
 import { fetchAider } from '../sources/aider.js';
+import { fetchInfrabase, providerKey } from '../sources/infrabase.js';
 import { pendingStatus } from '../sources/pending.js';
 
 export interface Collected {
   models: Map<string, ModelRecord>;
+  providers: Map<string, ProviderProfile>;
   offers: Offer[];
   evidence: QualityEvidence[];
   statuses: SourceStatus[];
@@ -86,6 +88,7 @@ const mergeModel = (into: Map<string, ModelRecord>, m: ModelRecord) => {
 
 export async function collect(previous: Snapshot | null, observedAt: string): Promise<Collected> {
   const models = new Map<string, ModelRecord>();
+  const providers = new Map<string, ProviderProfile>();
   const offers: Offer[] = [];
   const evidence: QualityEvidence[] = [];
   const statuses: SourceStatus[] = [];
@@ -212,5 +215,54 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     }
   }
 
-  return { models, offers, evidence, statuses, warnings };
+  // Chi sono i provider: sede, GDPR, sito ufficiale.
+  if (enabled.has('infrabase')) {
+    const st = baseStatus('infrabase');
+    try {
+      // Cerchiamo per nome i provider che compaiono davvero nelle offerte.
+      const nomi = [...new Set(offers.map((o) => o.providerName))];
+      const res = await fetchInfrabase(nomi);
+      for (const p of res.providers) providers.set(p.key, p);
+      // Ogni offerta porta con se' chi e' il provider, cosi' la scheda puo'
+      // dirlo senza dover risalire alla directory.
+      for (const offer of offers) {
+        const profilo = providers.get(providerKey(offer.providerName));
+        offer.profile = profilo
+          ? {
+              siteUrl: profilo.siteUrl,
+              hqCountry: profilo.hqCountry,
+              gdpr: profilo.gdpr,
+              directoryUrl: profilo.directoryUrl,
+            }
+          : null;
+      }
+      statuses.push(finish(st, res.providers.length));
+    } catch (err) {
+      for (const [k, v] of Object.entries(previous?.providers ?? {})) providers.set(k, v);
+      statuses.push(fallback(st, err, providers.size, null));
+      warnings.push('Infrabase non raggiungibile: scheda dei provider dall\'ultimo aggiornamento riuscito.');
+    }
+  }
+
+  // Provider sospesi a mano: il prezzo puo essere corretto, ma se non si riesce
+  // ad aprire un account la raccomandazione non serve a nulla.
+  try {
+    const file = JSON.parse(await readFile(join(PATHS.curated, 'providers-sospesi.json'), 'utf8')) as {
+      sospesi?: Record<string, string>;
+    };
+    const sospesi = file.sospesi ?? {};
+    let contati = 0;
+    for (const offer of offers) {
+      const motivo = sospesi[offer.providerId];
+      if (motivo) {
+        offer.blockedReason = motivo;
+        contati++;
+      }
+    }
+    if (contati) warnings.push(`${contati} offerte escluse: provider sospeso a mano.`);
+  } catch {
+    // L'elenco e facoltativo.
+  }
+
+  return { models, providers, offers, evidence, statuses, warnings };
 }

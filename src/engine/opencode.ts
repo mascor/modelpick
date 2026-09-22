@@ -1,34 +1,90 @@
 /**
- * OpenCode configuration generator.
+ * OpenCode configuration.
  *
- * Two things we do not do, because the documentation does not support them:
- * we never put a literal API key in the file, and we never claim OpenCode will
- * switch to the backup model on its own - it will not.
+ * The important subtlety: `opencode -m openrouter/<model>` does NOT choose a
+ * provider. OpenRouter routes the request itself, so a price quoted for one
+ * provider is not what that command will bill. To hold a provider you must pin
+ * it in the config, which OpenCode passes through to OpenRouter's routing.
+ *
+ * Two things we still never do: put a literal API key in the file, or claim
+ * OpenCode falls back to the backup model on its own.
  */
 import type { Offer, ModelRecord } from '../types.js';
 
+export interface PickConfig {
+  /** provider/model string, as OpenCode addresses it. */
+  modelId: string;
+  /** Quick try. Exact for a direct provider; unpinned through a broker. */
+  command: string;
+  /** True when the command alone really uses the quoted provider. */
+  commandIsExact: boolean;
+  /** Config that pins the provider, when pinning is possible. */
+  config: string | null;
+  /** Why a pin is needed, or why it cannot be done. */
+  pinNote: string | null;
+}
+
 export interface OpenCodeConfigResult {
-  /** File contents, ready to save as opencode.json. */
   json: string;
-  /** Provider/model string for the everyday pick. */
   everydayId: string;
   backupId: string | null;
-  /** One line to paste in a terminal: the fastest way to try the model. */
   everydayCommand: string;
   backupCommand: string | null;
-  /** Environment variables the user has to export themselves. */
   envVars: string[];
   instructions: string[];
 }
 
 /**
- * models.dev is the registry OpenCode itself uses, so a provider id coming from
- * that source is already the provider id OpenCode expects. OpenRouter offers are
- * addressed through the built-in `openrouter` provider.
+ * models.dev is the registry OpenCode uses, so its provider ids are the ones
+ * OpenCode expects. OpenRouter offers are addressed through its own provider.
  */
 export function modelIdFor(offer: Offer): string {
   if (offer.sourceId === 'openrouter') return `openrouter/${offer.remoteModelId}`;
   return `${offer.providerId}/${offer.remoteModelId}`;
+}
+
+/** Everything needed to actually use one offer. */
+export function configFor(offer: Offer): PickConfig {
+  const modelId = modelIdFor(offer);
+  const command = `opencode -m ${modelId}`;
+  const routed = offer.sourceId === 'openrouter';
+
+  if (!routed) {
+    // Buying straight from the provider: the model id already determines who bills you.
+    return { modelId, command, commandIsExact: true, config: null, pinNote: null };
+  }
+
+  if (!offer.routingSlug) {
+    return {
+      modelId,
+      command,
+      commandIsExact: false,
+      config: null,
+      pinNote: `OpenRouter sceglie il provider al momento della richiesta e non possiamo fissare ${offer.providerName}: il prezzo effettivo può differire.`,
+    };
+  }
+
+  const config = {
+    $schema: 'https://opencode.ai/config.json',
+    provider: {
+      openrouter: {
+        models: {
+          [offer.remoteModelId ?? '']: {
+            options: { provider: { order: [offer.routingSlug], allow_fallbacks: false } },
+          },
+        },
+      },
+    },
+    model: modelId,
+  };
+
+  return {
+    modelId,
+    command,
+    commandIsExact: false,
+    config: JSON.stringify(config, null, 2),
+    pinNote: `Senza questa configurazione OpenRouter può instradare la richiesta su un altro provider, a un prezzo diverso da quello indicato.`,
+  };
 }
 
 export function buildOpenCodeConfig(
@@ -37,33 +93,35 @@ export function buildOpenCodeConfig(
 ): OpenCodeConfigResult | null {
   if (!everyday) return null;
 
-  const everydayId = modelIdFor(everyday.offer);
-  const backupId = hard ? modelIdFor(hard.offer) : null;
+  const eConf = configFor(everyday.offer);
+  const hConf = hard ? configFor(hard.offer) : null;
 
-  const config: Record<string, unknown> = {
-    $schema: 'https://opencode.ai/config.json',
-    model: everydayId,
-  };
+  // The downloadable file pins the everyday provider when that is possible.
+  const config: Record<string, unknown> = eConf.config
+    ? (JSON.parse(eConf.config) as Record<string, unknown>)
+    : { $schema: 'https://opencode.ai/config.json', model: eConf.modelId };
 
   const envVars = [...new Set([everyday.offer.apiKeyEnv, hard?.offer.apiKeyEnv].filter(Boolean) as string[])];
 
   const instructions = [
-    `Prova subito senza cambiare niente: ${'`'}opencode -m ${everydayId}${'`'}.`,
-    'Per renderlo permanente salva il file come opencode.json nella cartella del progetto, oppure in ~/.config/opencode/opencode.json per usarlo ovunque.',
+    `Prova subito: ${eConf.command}${eConf.commandIsExact ? '' : ' (OpenRouter sceglie il provider, il prezzo può differire)'}.`,
+    eConf.config
+      ? 'Per usare davvero il provider indicato salva questa configurazione come opencode.json nella cartella del progetto, oppure in ~/.config/opencode/opencode.json.'
+      : 'Per renderlo predefinito salva questa configurazione come opencode.json nella cartella del progetto, oppure in ~/.config/opencode/opencode.json.',
     envVars.length
-      ? `Esporta la chiave del provider nella tua shell: ${envVars.map((v) => `export ${v}="..."`).join(' e ')}. La chiave resta sul tuo computer: questo sito non la chiede e non la riceve mai.`
+      ? `La chiave si registra con il comando /connect dentro OpenCode, oppure esportandola nella shell: ${envVars.map((v) => `export ${v}="..."`).join(', ')}. Il sito non la chiede e non la riceve mai.`
       : 'Configura la chiave del provider secondo la sua documentazione: questo sito non chiede mai le tue chiavi.',
-    backupId
-      ? `Per il modello dei problemi difficili usa ${backupId}: in OpenCode selezionalo a mano con il comando /models, oppure cambia il valore di "model" in questo file. OpenCode non passa automaticamente a un modello di riserva.`
+    hConf
+      ? `Per i problemi difficili usa ${hConf.modelId}: selezionalo a mano con /models o cambiando "model". OpenCode non passa automaticamente a un modello di riserva.`
       : 'Non indichiamo un modello di riserva: le prove disponibili non ne giustificano uno.',
   ];
 
   return {
     json: JSON.stringify(config, null, 2),
-    everydayId,
-    backupId,
-    everydayCommand: `opencode -m ${everydayId}`,
-    backupCommand: backupId ? `opencode -m ${backupId}` : null,
+    everydayId: eConf.modelId,
+    backupId: hConf?.modelId ?? null,
+    everydayCommand: eConf.command,
+    backupCommand: hConf?.command ?? null,
     envVars,
     instructions,
   };

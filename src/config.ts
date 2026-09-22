@@ -116,6 +116,15 @@ export const SOURCES: SourceConfig[] = [
     note: null,
   },
   {
+    id: 'infrabase',
+    name: 'Infrabase.ai',
+    url: 'https://infrabase.ai/compare/inference-apis',
+    enabled: bool(env.SOURCE_INFRABASE, true),
+    licence: 'CC-BY-4.0',
+    attribution: 'Dati sui provider da Infrabase.ai, licenza CC-BY-4.0',
+    note: 'Directory curata a mano: sede legale, stato GDPR e sito ufficiale di ogni provider. Il robots.txt del sito indirizza esplicitamente gli agenti alla sua API pubblica.',
+  },
+  {
     id: 'artificialanalysis',
     name: 'Artificial Analysis',
     url: 'https://artificialanalysis.ai/',

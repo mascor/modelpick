@@ -72,6 +72,10 @@ export interface Offer {
   apiKeyEnv: string | null;
   /** The provider's own documentation, used to send the reader to the key page. */
   providerDocUrl: string | null;
+  /** Slug the broker uses to route to this provider, when it can be pinned. */
+  routingSlug: string | null;
+  /** Who the provider is, from a curated directory. Null when no directory lists it. */
+  profile?: { siteUrl: string | null; hqCountry: string | null; gdpr: boolean | null; directoryUrl: string | null } | null;
   sourceId: string;
   sourceUrl: string;
   observedAt: Iso;
@@ -79,6 +83,8 @@ export interface Offer {
   demo: boolean;
   /** Set when validation distrusts this row; quarantined offers cannot win. */
   quarantine?: string | null;
+  /** Set when the provider is suspended: the price may be real, the account is not obtainable. */
+  blockedReason?: string | null;
 }
 
 export interface ModelRecord {
@@ -144,11 +150,23 @@ export interface SourceStatus {
   dataAgeHours: number | null;
 }
 
+export interface ProviderProfile {
+  key: string;
+  name: string;
+  siteUrl: string | null;
+  hqCountry: string | null;
+  gdpr: boolean | null;
+  directoryUrl: string | null;
+  updatedAt: Iso | null;
+}
+
 export interface Snapshot {
   version: 1;
   runId: string;
   generatedAt: Iso;
   models: Record<string, ModelRecord>;
+  /** Who the providers are, keyed by normalised name. */
+  providers?: Record<string, ProviderProfile>;
   offers: Offer[];
   evidence: QualityEvidence[];
   sources: SourceStatus[];

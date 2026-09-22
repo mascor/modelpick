@@ -7,7 +7,7 @@ import type { ModelRecord, Snapshot, SourceStatus } from '../types.js';
 import type { OfferView, Pick, Recommendation, RecommendationRequest } from '../engine/recommend.js';
 import { accountName, usabilityLabel } from '../engine/usability.js';
 import { signupUrl } from '../engine/signup.js';
-import { modelIdFor } from '../engine/opencode.js';
+import { configFor, modelIdFor } from '../engine/opencode.js';
 import type { Change } from '../engine/changes.js';
 import { SCENARIOS, TASK_IDS, PRIORITIES, type Priority } from '../engine/scenarios.js';
 import type { RunStatus } from '../pipeline/store.js';
@@ -39,6 +39,13 @@ const dateIt = (iso: string | null | undefined): string => {
   if (Number.isNaN(d.getTime())) return 'data non disponibile';
   return d.toLocaleString('it-IT', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' });
 };
+const meseAnno = (iso: string | null | undefined): string => {
+  if (!iso) return 'data non nota';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'data non nota';
+  return d.toLocaleDateString('it-IT', { month: 'short', year: 'numeric', timeZone: 'Europe/Rome' });
+};
+
 const dayIt = (iso: string | null | undefined): string => {
   if (!iso) return 'data non nota';
   const d = new Date(iso);
@@ -71,7 +78,6 @@ export function layout(opts: { title: string; description: string; body: string;
       <a href="/metodo"${opts.active === 'metodo' ? ' aria-current="page"' : ''}>Metodo</a>
       <a href="/fonti"${opts.active === 'fonti' ? ' aria-current="page"' : ''}>Fonti</a>
       <a href="/stato"${opts.active === 'stato' ? ' aria-current="page"' : ''}>Stato</a>
-      <a href="${esc(SITE.repo)}">Codice</a>
     </nav>
   </div>
 </header>
@@ -166,17 +172,19 @@ function renderPick(
   change: Change | null,
   empty: string,
 ): string {
-  const titolo = role === 'quotidiano' ? '🟢 Ogni giorno' : '🟠 Quando si blocca';
+  const titolo = role === 'quotidiano' ? '🟢 Ogni giorno' : '🟠 Per i problemi difficili';
   if (!pick) {
     return `<article class="scheda pick pick--${role}">
       <p class="pick__ruolo">${esc(titolo)}</p>
       <div class="avviso avviso--neutro">${esc(empty)}</div>
     </article>`;
   }
+  const conf = configFor(pick.offer);
   return `<article class="scheda pick pick--${role}">
     <p class="pick__ruolo">${esc(titolo)}</p>
     <h3 class="pick__modello">${esc(nomeModello(pick.model.displayName))}</h3>
-    <p class="pick__sintesi"><strong>${esc(usd(pick.cost.totalUsd))}</strong> al mese · <strong>${esc(pick.quality.value.toFixed(0))}%</strong> di problemi risolti</p>
+    <p class="pick__sintesi"><strong>${esc(usd(pick.cost.totalUsd))}</strong> stimati al mese a consumo · benchmark <strong>${esc(pick.quality.value.toFixed(0))}%</strong> <span class="meta nowrap">SWE-bench ${esc(meseAnno(pick.quality.measuredAt))}</span></p>
+    ${pick.cost.unquantifiedFees.length ? '<p class="allerta">Stima incompleta: una commissione applicabile non è quantificabile, il confronto fra provider vicini può ribaltarsi.</p>' : ''}
     ${change?.moved ? `<p class="pick__cambio pick__cambio--mosso">${esc(change.text)}</p>` : ''}
     <ol class="passi">
       <li class="passo">
@@ -187,11 +195,16 @@ function renderPick(
         <code class="passo__codice" id="key-${esc(role)}">export ${esc(pick.offer.apiKeyEnv)}="la-tua-chiave"</code>
         <button class="bottone bottone--contorno bottone--piccolo" type="button" data-copia="#key-${esc(role)}">Copia</button>
       </li>` : ''}
-      <li class="passo">
-        <code class="passo__codice" id="config-${esc(role)}">opencode -m ${esc(modelIdFor(pick.offer))}</code>
-        <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">Copia</button>
-      </li>
+      ${conf.config ? `<li class="passo">
+        <span class="passo__testo">Salva <code>opencode.json</code> con ${esc(pick.offer.providerName)} fissato</span>
+        <code class="nascosto" id="config-${esc(role)}">${esc(conf.config)}</code>
+        <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">Copia configurazione</button>
+      </li>` : `<li class="passo">
+        <code class="passo__codice" id="config-${esc(role)}">${esc(conf.command)}</code>
+        <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">Copia comando</button>
+      </li>`}
     </ol>
+    ${conf.pinNote ? `<p class="passi__nota">${esc(conf.pinNote)}</p>` : ''}
     ${renderConfronto(pick, role)}
     ${renderDettagli(pick)}
   </article>`;
@@ -266,7 +279,7 @@ export function homePage(opts: {
   const body = `
 <section class="hero hero--compatto">
   <div class="contenitore">
-    <p class="hero__sopratitolo">${snapshot ? `Verificato il ${esc(dateIt(snapshot.generatedAt))}` : 'Nessun dato verificato'}</p>
+    <p class="hero__sopratitolo">${snapshot ? `Prezzi verificati il ${esc(dateIt(snapshot.generatedAt))}` : 'Nessun dato verificato'}</p>
     <h1>Che modello usi oggi</h1>
   </div>
 </section>
@@ -280,7 +293,7 @@ export function homePage(opts: {
       ${renderPick(rec?.everyday ?? null, 'quotidiano', changes.everyday, 'Nessun modello supera la soglia di qualità con un prezzo verificato. Preferiamo non indicare un vincitore piuttosto che indicarne uno senza prove.')}
       ${renderPick(rec?.hard ?? null, 'difficile', changes.hard, 'Nessun modello risolve abbastanza più problemi da giustificarne un secondo.')}
     </div>
-    ${rec?.savings && rec.savings.deltaUsd !== null ? `<p class="risparmio">Rispetto a quello che usi oggi: ${rec.savings.deltaUsd > 0 ? `<strong>risparmi ${esc(usd(rec.savings.deltaUsd))} al mese</strong>` : `<strong>spendi ${esc(usd(Math.abs(rec.savings.deltaUsd)))} in più al mese</strong>`}, sugli stessi consumi. Stima, non misura.</p>` : ''}
+    ${rec?.savings && rec.savings.deltaUsd !== null ? `<p class="risparmio">Confronto con il <strong>prezzo piu basso monitorato</strong> per il modello che hai indicato${rec.savings.currentProviderName ? ` (${esc(rec.savings.currentProviderName)})` : ''}, non con quello che paghi tu: ${rec.savings.deltaUsd > 0 ? `<strong>${esc(usd(rec.savings.deltaUsd))} al mese in meno</strong>` : `<strong>${esc(usd(Math.abs(rec.savings.deltaUsd)))} al mese in piu</strong>`} sugli stessi consumi.</p>` : ''}
     <div class="coda">
       ${renderIpotesi(request, rec, models)}
     </div>

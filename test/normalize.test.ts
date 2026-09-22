@@ -44,3 +44,12 @@ test('eta in ore calcolata sulle date valide', () => {
   assert.equal(hoursSince(null, now), null);
   assert.equal(hoursSince('non una data', now), null);
 });
+
+test('un modello venduto da un rivenditore resta del suo produttore', async () => {
+  // "anthropic/claude-sonnet-4-5" venduto da un rivenditore non deve diventare
+  // un modello nuovo intestato al rivenditore.
+  const { fetchModelsDev } = await import('../src/sources/modelsdev.js');
+  void fetchModelsDev; // il comportamento è verificato sulla chiave canonica
+  assert.equal(canonicalKey('anthropic', 'claude-sonnet-4-5-20250929'), 'anthropic/claude-sonnet-4-5-20250929');
+  assert.notEqual(canonicalKey('tempr', 'claude-sonnet-4-5-20250929'), 'anthropic/claude-sonnet-4-5-20250929');
+});

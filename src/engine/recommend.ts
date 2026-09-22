@@ -10,7 +10,7 @@ import { THRESHOLDS } from '../config.js';
 import { hoursSince } from '../lib/normalize.js';
 import type { ModelRecord, Offer, QualityEvidence, Snapshot } from '../types.js';
 import { costOf, type CostBreakdown } from './cost.js';
-import { isReadyToUse, usabilityOf, type Usability } from './usability.js';
+import { isIdentified, providerKey, usabilityOf, type Usability } from './usability.js';
 import { QUALITY_GATE, SCENARIOS, type Priority, type TaskId, type TokenMix } from './scenarios.js';
 
 
@@ -78,6 +78,8 @@ export interface Recommendation {
   };
   savings: {
     currentTotalUsd: number | null;
+    /** Which provider that price belongs to: it is a reference, not your bill. */
+    currentProviderName: string | null;
     recommendedTotalUsd: number | null;
     deltaUsd: number | null;
     note: string;
@@ -145,6 +147,7 @@ function bestQuality(
 /** Offer-level eligibility. Returns null when usable, otherwise the reason it is not. */
 function offerBlocker(offer: Offer, req: RecommendationRequest, minContext: number, now: number): string | null {
   if (offer.demo) return 'dato dimostrativo';
+  if (offer.blockedReason) return 'provider sospeso: non risulta possibile aprire un account';
   if (offer.quarantine) return 'prezzo in quarantena per variazione anomala';
   const age = hoursSince(offer.observedAt, now);
   if (age !== null && age > THRESHOLDS.offerStaleHours) return `prezzo non verificato da oltre ${THRESHOLDS.offerStaleHours} ore`;
@@ -161,6 +164,7 @@ function rankOffers(
   minContext: number,
   now: number,
   modelVendor = '',
+  known?: Set<string>,
 ) {
   const usable: OfferView[] = [];
   const blocked: string[] = [];
@@ -182,17 +186,20 @@ function rankOffers(
       blocked.push('offerta gratuita o inclusa in un piano: nessun prezzo per token pubblicato da confrontare');
       continue;
     }
-    usable.push({ offer, cost, usability: usabilityOf(offer, modelVendor) });
+    usable.push({ offer, cost, usability: usabilityOf(offer, modelVendor, known) });
   }
   usable.sort((a, b) => (a.cost.totalUsd! - b.cost.totalUsd!) || a.offer.providerName.localeCompare(b.offer.providerName));
   // Offers you can use straight away come first; the others stay visible with
   // their price, clearly marked as requiring a new account.
-  const pronte = usable.filter((o) => isReadyToUse(o.usability));
+  // Only providers we can actually describe are eligible to be recommended.
+  const pronte = usable.filter((o) => isIdentified(o.usability));
   return { usable, pronte, blocked };
 }
 
 export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recommendation {
   const now = Date.now();
+  // Providers a curated directory lists, plus their own first-party sellers.
+  const known = new Set(Object.values(snapshot.providers ?? {}).map((p) => providerKey(p.name)));
   const scenario = SCENARIOS[req.task];
   const mix: TokenMix = {
     input: req.usage?.input ?? scenario.monthly.input,
@@ -248,7 +255,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
       bump('nessun provider monitorato vende questo modello');
       continue;
     }
-    const { usable, pronte, blocked } = rankOffers(offers, mix, req, minContext, now, model.vendor);
+    const { usable, pronte, blocked } = rankOffers(offers, mix, req, minContext, now, model.vendor, known);
     if (!usable.length) {
       bump(blocked[0] ?? 'nessuna offerta utilizzabile');
       continue;
@@ -257,10 +264,10 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   }
 
   /**
-   * The cheapest offer, full stop: that is what the site promises. Needing an
-   * account with the provider is normal - it is stated, not avoided.
+   * The cheapest offer among providers we can identify. Needing an account is
+   * normal and simply stated; being unable to say who the company is, is not.
    */
-  const sceltaDi = (c: Candidate): OfferView => c.offers[0]!;
+  const sceltaDi = (c: Candidate): OfferView => c.pronte[0] ?? c.offers[0]!;
 
   const toPick = (c: Candidate, role: 'everyday' | 'hard', other: Candidate | null): Pick => {
     const best = sceltaDi(c);
@@ -270,6 +277,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     if (best.cost.unquantifiedFees.length) provisionalReasons.push('una commissione applicabile non è quantificabile automaticamente');
     if (best.cost.assumptions.length) provisionalReasons.push('il costo usa un\'ipotesi prudenziale sui prezzi di cache non pubblicati');
     if (c.offers.length === 1) provisionalReasons.push('un solo provider monitorato soddisfa i requisiti');
+    if (!c.pronte.length) provisionalReasons.push('nessun provider identificabile vende questo modello');
 
     const price = best.cost.totalUsd!;
     const metricLabel = c.quality.metric === 'swebench_verified' ? 'SWE-bench Verified' : 'Aider polyglot';
@@ -345,7 +353,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   if (everyday && !hard) {
     notes.push(
       req.priority === 'qualita'
-        ? 'Con questa priorità il modello di ogni giorno è già il migliore misurato: un secondo modello non aggiungerebbe niente.'
+        ? 'Fra i modelli con prove confrontabili, quello di ogni giorno è già il più capace: non abbiamo prove sufficienti per consigliarne un secondo.'
         : `Nessun modello documenta una capacità superiore di almeno ${THRESHOLDS.backupQualityGapPoints} punti rispetto al quotidiano: preferiamo non indicare un backup piuttosto che indicarne uno senza prove.`,
     );
   }
@@ -356,17 +364,18 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     const currentOffers = (offersByModel.get(req.currentModelKey) ?? []).filter(
       (o) => !req.currentOfferId || o.id === req.currentOfferId,
     );
-    const ranked = rankOffers(currentOffers, mix, req, minContext, now, snapshot.models[req.currentModelKey]?.vendor ?? '').usable;
+    const ranked = rankOffers(currentOffers, mix, req, minContext, now, snapshot.models[req.currentModelKey]?.vendor ?? '', known).usable;
     const currentTotal = ranked[0]?.cost.totalUsd ?? null;
     const recommendedTotal = everyday?.cost.totalUsd ?? null;
     savings = {
       currentTotalUsd: currentTotal,
+      currentProviderName: ranked[0]?.offer.providerName ?? null,
       recommendedTotalUsd: recommendedTotal,
       deltaUsd: currentTotal !== null && recommendedTotal !== null ? currentTotal - recommendedTotal : null,
       note:
         currentTotal === null
-          ? 'Non abbiamo un prezzo verificato per la tua configurazione attuale, quindi non calcoliamo un risparmio.'
-          : 'Stima sui consumi indicati, non una misura: confronta gli stessi volumi sulle due offerte.',
+          ? 'Non abbiamo un prezzo verificato per il modello indicato, quindi non calcoliamo un confronto.'
+          : 'Confronto fra il prezzo più basso che monitoriamo per il tuo modello e quello consigliato, sugli stessi consumi. Non sappiamo quanto paghi davvero: indicaci il tuo provider per un confronto reale.',
     };
   }
 

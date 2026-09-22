@@ -9,9 +9,10 @@ import { normalizeVendor } from '../lib/normalize.js';
 import type { Offer } from '../types.js';
 
 export type Usability =
-  | 'hub'          // one account, almost every model: OpenRouter
-  | 'diretto'      // the company that makes the model, sold by itself
-  | 'rivenditore'; // a third party: needs its own account and key
+  | 'hub'            // one account, almost every model: OpenRouter
+  | 'diretto'        // the company that makes the model, sold by itself
+  | 'rivenditore'    // a third party we can identify in a curated directory
+  | 'sconosciuto';   // a third party no directory we read lists at all
 
 /** Model vendor -> the provider ids through which that vendor sells directly. */
 const FIRST_PARTY: Record<string, string[]> = {
@@ -29,14 +30,25 @@ const FIRST_PARTY: Record<string, string[]> = {
   microsoft: ['azure'],
 };
 
-export function usabilityOf(offer: Offer, modelVendor: string): Usability {
+/**
+ * @param known normalised names of providers listed in a curated directory.
+ *        A reseller absent from every directory we read is one we cannot
+ *        describe to the reader beyond its price, which is not enough to
+ *        recommend it.
+ */
+export function usabilityOf(offer: Offer, modelVendor: string, known?: Set<string>): Usability {
   if (offer.sourceId === 'openrouter' || offer.providerId === 'openrouter') return 'hub';
   const vendor = normalizeVendor(modelVendor);
-  return (FIRST_PARTY[vendor] ?? []).includes(offer.providerId) ? 'diretto' : 'rivenditore';
+  if ((FIRST_PARTY[vendor] ?? []).includes(offer.providerId)) return 'diretto';
+  if (!known) return 'rivenditore';
+  return known.has(providerKey(offer.providerName)) ? 'rivenditore' : 'sconosciuto';
 }
 
-/** True when the offer can be used without signing up with a third party. */
-export const isReadyToUse = (u: Usability): boolean => u !== 'rivenditore';
+/** "GMI Cloud" and "GMICloud" are the same company written by two sources. */
+export const providerKey = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+/** Whether we can tell the reader who this company is. */
+export const isIdentified = (u: Usability): boolean => u !== 'sconosciuto';
 
 /**
  * With whom you actually open the account. For a routed offer that is the
@@ -49,5 +61,6 @@ export const accountName = (offer: Offer): string =>
 export const usabilityLabel = (u: Usability, offer: Offer): string => {
   if (u === 'hub') return 'via OpenRouter';
   if (u === 'diretto') return 'diretto';
+  if (u === 'sconosciuto') return 'provider non identificato';
   return `account ${offer.providerName}`;
 };

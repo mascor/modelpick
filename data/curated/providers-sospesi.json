@@ -1,0 +1,7 @@
+{
+  "_commento": "Provider esclusi dalle raccomandazioni perche non risultano utilizzabili nella pratica, anche quando il prezzo pubblicato e valido. Ogni voce indica il motivo e la data della verifica. Rimuovere la voce riattiva il provider al primo aggiornamento.",
+  "sospesi": {
+    "qihang-ai": "Registrazione bloccata da una whitelist sui domini email: verificato il 22 settembre 2026, non e stato possibile aprire un account.",
+    "qihang": "Registrazione bloccata da una whitelist sui domini email: verificato il 22 settembre 2026, non e stato possibile aprire un account."
+  }
+}

@@ -162,6 +162,9 @@ export async function fetchOffers(
         remoteModelId: r.value.path,
         apiKeyEnv: 'OPENROUTER_API_KEY',
         providerDocUrl: null,
+        // "gmicloud/fp8" -> "gmicloud": lo slug che OpenRouter accetta in
+        // provider.order, senza il quale la richiesta viene instradata altrove.
+        routingSlug: ep.tag ? ep.tag.split('/')[0]! : null,
         sourceId: 'openrouter',
         sourceUrl: `https://openrouter.ai/${r.value.path}/providers`,
         observedAt,

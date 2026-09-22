@@ -39,6 +39,7 @@ export async function runUpdate(): Promise<RunStatus> {
       runId,
       generatedAt: new Date().toISOString(),
       models: Object.fromEntries(collected.models),
+      providers: Object.fromEntries(collected.providers),
       offers: validation.kept,
       evidence: collected.evidence,
       sources: collected.statuses,

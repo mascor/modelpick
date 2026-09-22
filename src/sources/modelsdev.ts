@@ -33,9 +33,23 @@ const VENDOR_BY_PREFIX: [RegExp, string][] = [
   [/^phi/, 'microsoft'],
 ];
 
+/**
+ * Several resellers key their models as "vendor/model" (for example
+ * "anthropic/claude-sonnet-4-5" sold by a reseller). Taking the reseller as the
+ * vendor created a phantom duplicate of a model we already knew, which then
+ * competed in the ranking as if it were a different product.
+ */
+const splitVendor = (modelId: string): { vendor: string | null; slug: string } => {
+  const slash = modelId.indexOf('/');
+  if (slash <= 0) return { vendor: null, slug: modelId };
+  return { vendor: modelId.slice(0, slash), slug: modelId.slice(slash + 1) };
+};
+
 const guessVendor = (modelId: string, providerId: string): string => {
-  const slug = normalizeSlug(modelId);
-  for (const [re, vendor] of VENDOR_BY_PREFIX) if (re.test(slug)) return vendor;
+  const { vendor, slug: bare } = splitVendor(modelId);
+  if (vendor) return vendor;
+  const slug = normalizeSlug(bare);
+  for (const [re, v] of VENDOR_BY_PREFIX) if (re.test(slug)) return v;
   return providerId;
 };
 
@@ -84,8 +98,9 @@ export async function fetchModelsDev(observedAt: string, knownKeys: Map<string, 
     providers.set(providerId, provider.name ?? providerId);
     for (const [modelId, model] of Object.entries(provider.models ?? {})) {
       const vendor = guessVendor(modelId, providerId);
-      const fallbackKey = canonicalKey(vendor, modelId);
-      const key = knownKeys.get(matchForm(modelId)) ?? fallbackKey;
+      const { slug: bareSlug } = splitVendor(modelId);
+      const fallbackKey = canonicalKey(vendor, bareSlug);
+      const key = knownKeys.get(matchForm(bareSlug)) ?? fallbackKey;
 
       if (!models.has(key)) {
         models.set(key, {
@@ -140,6 +155,7 @@ export async function fetchModelsDev(observedAt: string, knownKeys: Map<string, 
         remoteModelId: modelId,
         apiKeyEnv: provider.env?.[0] ?? null,
         providerDocUrl: provider.doc ?? null,
+        routingSlug: null,
         sourceId: 'modelsdev',
         sourceUrl: `https://models.dev/#${providerId}`,
         observedAt,

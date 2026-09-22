@@ -308,3 +308,8 @@ pre.codice {
   padding: 7px 10px; border-radius: var(--cs-radius-sm); background: var(--cs-surface); border: 1px solid var(--cs-border);
 }
 .riga-link { font-family: var(--cs-font-ui); font-size: 12px; margin-right: 8px; }
+.allerta { font-family: var(--cs-font-ui); font-size: 13px; color: var(--cs-warning); background: var(--cs-warning-soft); padding: 8px 12px; border-radius: var(--cs-radius-sm); margin: 0 0 16px; }
+.passi__nota { font-family: var(--cs-font-ui); font-size: 12px; color: var(--cs-text-muted); margin: -12px 0 20px; }
+.pick__sintesi .meta { font-size: 13px; }
+.pick__sintesi .nowrap { white-space: nowrap; }
+.passo .bottone { white-space: nowrap; }
