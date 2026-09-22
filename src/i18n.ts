@@ -89,6 +89,14 @@ export interface Catalog {
     defaultValue: string;
     recompute: string;
     comparison: (provider: string | null, delta: string, cheaper: boolean) => string;
+    answer: (model: string, price: string) => string;
+    answerHard: (model: string, price: string) => string;
+    answerNone: string;
+    updatedAt: (time: string) => string;
+    qualityBar: (score: string) => string;
+    jumpHard: string;
+    detailsFor: (model: string) => string;
+    showPreview: string;
     currentTitle: string;
     currentSame: (model: string) => string;
     currentSamePrice: (price: string) => string;
@@ -240,6 +248,14 @@ const it: Catalog = {
     recompute: 'Ricalcola',
     comparison: (p, d, cheaper) =>
       `Confronto con il <strong>prezzo più basso monitorato</strong> per il modello che hai indicato${p ? ` (${p})` : ''}, non con quello che paghi tu: <strong>${d} al mese in ${cheaper ? 'meno' : 'più'}</strong> sugli stessi consumi.`,
+    answer: (m, p) => `Oggi usa ${m}, ${p} al mese.`,
+    answerHard: (m, p) => `Per i problemi difficili tieni ${m}, ${p} al mese.`,
+    answerNone: 'Oggi non possiamo indicare un vincitore: le prove disponibili non bastano.',
+    updatedAt: (t2) => `aggiornato alle ${t2}`,
+    qualityBar: (s2) => `qualità ${s2} su 100`,
+    jumpHard: 'Vai al modello per i problemi difficili',
+    detailsFor: (m) => `Comandi, provider e prezzi per ${m}`,
+    showPreview: 'Vedi il testo',
     currentTitle: 'Il modello che usi oggi',
     currentSame: (m) => `Stai già usando il modello che consigliamo: ${m}.`,
     currentSamePrice: (p) => `Qui sotto trovi il provider più economico che lo vende: ${p} al mese sugli stessi consumi.`,
@@ -468,6 +484,14 @@ const en: Catalog = {
     recompute: 'Recalculate',
     comparison: (p, d, cheaper) =>
       `Compared with the <strong>lowest price we track</strong> for the model you named${p ? ` (${p})` : ''}, not with what you actually pay: <strong>${d} per month ${cheaper ? 'less' : 'more'}</strong> on the same usage.`,
+    answer: (m, p) => `Today use ${m}, ${p} per month.`,
+    answerHard: (m, p) => `For hard problems keep ${m}, ${p} per month.`,
+    answerNone: 'We cannot name a winner today: the available evidence is not enough.',
+    updatedAt: (t2) => `updated at ${t2}`,
+    qualityBar: (s2) => `quality ${s2} out of 100`,
+    jumpHard: 'Go to the model for hard problems',
+    detailsFor: (m) => `Commands, providers and prices for ${m}`,
+    showPreview: 'See the text',
     currentTitle: 'The model you use today',
     currentSame: (m) => `You are already using the model we recommend: ${m}.`,
     currentSamePrice: (p) => `Below is the cheapest provider selling it: ${p} per month on the same usage.`,

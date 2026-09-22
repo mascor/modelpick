@@ -181,12 +181,8 @@ function renderConfronto(pick: Pick, role: string, lang: Lang): string {
       <td class="azione">
         ${link ? `<a class="riga-link" href="${esc(link)}" target="_blank" rel="noopener">${esc(c.home.key)}</a>` : ''}
         <button class="bottone bottone--contorno bottone--piccolo" type="button" data-copia="#${esc(id)}">${esc(etichetta)}</button>
-      </td>
-    </tr>
-    <tr class="riga-config">
-      <td colspan="3">
-        <details class="dettagli dettagli--copia">
-          <summary>${esc(c.home.showConfig)}</summary>
+        <details class="anteprima">
+          <summary>${esc(c.home.showPreview)}</summary>
           <pre class="codice"><code id="${esc(id)}">${esc(payload)}</code></pre>
         </details>
       </td>
@@ -264,13 +260,17 @@ function renderPick(pick: Pick | null, role: 'quotidiano' | 'difficile', change:
   }
   const conf = configFor(pick.offer, lang);
   const link = signupUrl(pick.offer);
-  return `<article class="scheda pick pick--${role}">
+  return `<article class="scheda pick pick--${role}" id="${esc(role === 'quotidiano' ? 'quotidiano' : 'difficile')}">
     <p class="pick__ruolo">${esc(titolo)}</p>
     <h3 class="pick__modello">${esc(modelName(pick.model.displayName))}</h3>
     <p class="pick__sintesi">${esc(c.home.perMonth('\u0000')).replace('\u0000', `<strong class="pick__prezzo">${esc(usd(pick.cost.totalUsd, lang))}</strong>`)}</p>
     <p class="pick__prova">${esc(c.home.benchmark(formatScore(pick.quality.value, pick.quality.metric), pick.quality.metric === 'aa_coding_index' ? 'Coding Index' : metricLabel(pick.quality.metric), dateShort(pick.quality.measuredAt, lang)))}${pick.quality.metric === 'aa_coding_index' ? ` · <a href="${esc(pick.quality.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>` : ''}</p>
     ${pick.cost.unquantifiedFees.length ? `<p class="allerta">${esc(c.home.incompleteEstimate)}</p>` : ''}
     ${change?.moved ? `<p class="pick__cambio pick__cambio--mosso">${esc(change.text)}</p>` : ''}
+    <p class="pick__perche">${esc(pick.reason)}</p>
+    <details class="dettagli dettagli--azioni">
+      <summary>${esc(c.home.detailsFor(modelName(pick.model.displayName)))}</summary>
+      <div class="dettagli__corpo">
     <ol class="passi">
       <li class="passo">
         <span class="passo__testo">${esc(c.home.getKey(accountName(pick.offer)))}</span>
@@ -297,6 +297,8 @@ function renderPick(pick: Pick | null, role: 'quotidiano' | 'difficile', change:
     ${conf.pinNote ? `<p class="passi__nota">${esc(conf.pinNote)}</p>` : ''}
     ${renderConfronto(pick, role, lang)}
     ${renderDettagli(pick, lang, opencodeVersion)}
+      </div>
+    </details>
   </article>`;
 }
 
@@ -375,7 +377,10 @@ function renderEntrambi(rec: Recommendation | null, lang: Lang): string {
         ? `<p class="allerta">${esc(c.home.bothNotPinned(senzaPin.join(', ')))}</p>`
         : `<p class="meta">${esc(c.home.bothPinned)}</p>`;
     })()}
-    <pre class="codice"><code id="config-entrambi">${esc(config.json)}</code></pre>
+    <details class="anteprima anteprima--grande">
+      <summary>${esc(c.home.showPreview)}</summary>
+      <pre class="codice"><code id="config-entrambi">${esc(config.json)}</code></pre>
+    </details>
     <p class="modulo__azioni">
       <button class="bottone" type="button" data-copia="#config-entrambi">${esc(c.home.copyConfig)}</button>
       <a class="bottone bottone--contorno" href="/opencode.json?${esc(query)}">${esc(c.home.download)}</a>
@@ -408,6 +413,53 @@ function renderAttuale(rec: Recommendation | null, lang: Lang): string {
   </div>`;
 }
 
+/** Same page, one parameter changed: the controls are links, so they work without JavaScript. */
+const conParametri = (req: RecommendationRequest, lang: Lang, cambio: Record<string, string>): string => {
+  const q = new URLSearchParams();
+  if (req.task) q.set('task', req.task);
+  if (req.priority) q.set('priority', req.priority);
+  for (const [k, v] of Object.entries({
+    input: req.usage?.input, output: req.usage?.output, cacheRead: req.usage?.cacheRead, cacheWrite: req.usage?.cacheWrite,
+  })) if (v !== undefined && v !== null) q.set(k, String(v));
+  if (req.currentModelKey) q.set('currentModel', req.currentModelKey);
+  for (const [k, v] of Object.entries(cambio)) q.set(k, v);
+  return `${pagePath(lang, 'home')}?${q.toString()}`;
+};
+
+/** The answer first: what to use today, what it costs, and how the two compare. */
+function renderRisposta(rec: Recommendation | null, snapshot: Snapshot | null, req: RecommendationRequest, lang: Lang): string {
+  const c = t(lang);
+  const barra = (p: Pick | null) =>
+    p
+      ? `<div class="barra-gruppo">
+          <div class="barra" role="img" aria-label="${esc(c.home.qualityBar(formatScore(p.quality.value, p.quality.metric, 0)))}">
+            <span class="barra__riempimento" style="width:${Math.max(2, Math.min(100, p.quality.value))}%"></span>
+          </div>
+          <p class="barra__etichetta">${esc(modelName(p.model.displayName))} · ${esc(formatScore(p.quality.value, p.quality.metric, 0))}</p>
+        </div>`
+      : '';
+  const ora = snapshot ? new Date(snapshot.generatedAt).toLocaleTimeString(lang === 'en' ? 'en-GB' : 'it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' }) : '';
+  return `<section class="risposta">
+  <div class="contenitore">
+    <h1 class="risposta__titolo">${esc(c.home.title)}</h1>
+    ${rec?.everyday
+      ? `<p class="risposta__riga">${esc(c.home.answer(modelName(rec.everyday.model.displayName), usd(rec.everyday.cost.totalUsd, lang)))}
+         ${rec.hard ? `<span class="risposta__riga--due">${esc(c.home.answerHard(modelName(rec.hard.model.displayName), usd(rec.hard.cost.totalUsd, lang)))} <a href="#difficile">${esc(c.home.jumpHard)}</a></span>` : ''}</p>
+         <div class="barre">${barra(rec.everyday)}${barra(rec.hard)}</div>`
+      : `<p class="risposta__riga">${esc(c.home.answerNone)}</p>`}
+    <p class="risposta__data">${snapshot ? esc(c.home.updatedAt(ora)) : esc(c.home.noData)}</p>
+    <div class="scelte">
+      <span class="scelte__etichetta">${esc(c.home.priority)}</span>
+      ${PRIORITIES.map((p) => `<a class="scelta${p === req.priority ? ' scelta--attiva' : ''}" href="${esc(conParametri(req, lang, { priority: p }))}"${p === req.priority ? ' aria-current="true"' : ''}>${esc(c.priorities[p] ?? p)}</a>`).join('')}
+    </div>
+    <div class="scelte">
+      <span class="scelte__etichetta">${esc(c.home.workType)}</span>
+      ${TASK_IDS.map((t2) => `<a class="scelta${t2 === req.task ? ' scelta--attiva' : ''}" href="${esc(conParametri(req, lang, { task: t2 }))}"${t2 === req.task ? ' aria-current="true"' : ''}>${esc(c.tasks[t2] ?? SCENARIOS[t2].label)}</a>`).join('')}
+    </div>
+  </div>
+</section>`;
+}
+
 export function homePage(opts: {
   lang: Lang;
   rec: Recommendation | null;
@@ -421,12 +473,7 @@ export function homePage(opts: {
   const stale = rec?.method.snapshotStale ?? false;
 
   const body = `
-<section class="hero hero--compatto">
-  <div class="contenitore">
-    <p class="hero__sopratitolo">${snapshot ? esc(c.home.pricesVerified(dateLong(snapshot.generatedAt, lang))) : esc(c.home.noData)}</p>
-    <h1>${esc(c.home.title)}</h1>
-  </div>
-</section>
+${renderRisposta(rec, snapshot, request, lang)}
 
 <section class="sezione">
   <div class="contenitore">
