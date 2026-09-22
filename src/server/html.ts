@@ -112,6 +112,9 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Courier+Prime:wght@400;700&display=swap">
 <link rel="stylesheet" href="/static/styles.css?v=${ASSET_VERSION.css}">
+<link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/static/favicon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 </head>
 <body>
 <header class="intestazione">

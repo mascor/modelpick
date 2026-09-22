@@ -181,6 +181,9 @@ export async function buildServer() {
     return { modello: model, serie: await priceHistory(model) };
   });
 
+  // Browsers ask for /favicon.ico on their own: same CloudSalus icon as the <link> tags.
+  app.get('/favicon.ico', async (_req, reply) => reply.redirect('/static/favicon-32.png', 301));
+
   app.get('/salute', async () => {
     const snapshot = await currentSnapshot();
     return { stato: 'ok', sito: SITE.name, snapshot: snapshot ? snapshot.generatedAt : null };
