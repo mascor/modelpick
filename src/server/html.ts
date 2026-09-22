@@ -464,15 +464,14 @@ export function sourcesPage(snapshot: Snapshot | null, lang: Lang): string {
   const statuses = new Map<string, SourceStatus>();
   for (const s of snapshot?.sources ?? []) if (!statuses.has(s.id)) statuses.set(s.id, s);
 
-  const rows = SOURCES.map((cfg) => {
+  // Only the sources in use: a disabled one is a note for developers, not for visitors.
+  const rows = SOURCES.filter((cfg) => cfg.enabled).map((cfg) => {
     const st = statuses.get(cfg.id);
-    const state = !cfg.enabled
-      ? `<span class="label label--warning">${esc(c.sources.off)}</span>`
-      : st?.outcome === 'ok'
-        ? `<span class="label label--ok">${esc(c.sources.active)}</span>`
-        : st
-          ? `<span class="label label--warning">${esc(c.sources.failed)}</span>`
-          : `<span class="label label--info">${esc(c.sources.never)}</span>`;
+    const state = st?.outcome === 'ok'
+      ? `<span class="label label--ok">${esc(c.sources.active)}</span>`
+      : st
+        ? `<span class="label label--warning">${esc(c.sources.failed)}</span>`
+        : `<span class="label label--info">${esc(c.sources.never)}</span>`;
     const [, colState, colLicence, colNote, colCount] = c.sources.cols;
     const texts = lang === 'en' ? cfg.en : cfg;
     return `<tr>

@@ -163,7 +163,7 @@ export interface Catalog {
     limits: string[];
     fullDetails: string;
   };
-  sources: { title: string; cols: [string, string, string, string, string]; active: string; off: string; failed: string; never: string };
+  sources: { title: string; cols: [string, string, string, string, string]; active: string; failed: string; never: string };
   status: {
     title: string;
     intro: string;
@@ -371,7 +371,6 @@ const it: Catalog = {
     title: 'Fonti',
     cols: ['Fonte', 'Stato', 'Licenza o condizioni', 'Nota', 'Righe'],
     active: 'attiva',
-    off: 'non abilitata',
     failed: 'errore nell\'ultimo aggiornamento',
     never: 'mai eseguita',
   },
@@ -580,7 +579,6 @@ const en: Catalog = {
     title: 'Sources',
     cols: ['Source', 'State', 'Licence or terms', 'Note', 'Rows'],
     active: 'active',
-    off: 'not enabled',
     failed: 'failed in the last update',
     never: 'never run',
   },
