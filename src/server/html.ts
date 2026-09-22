@@ -302,7 +302,7 @@ function renderPick(pick: Pick | null, role: 'quotidiano' | 'difficile', change:
   </article>`;
 }
 
-/** Everything that used to be a question, tucked away for whoever wants it. */
+/** What the buttons at the top cannot say: your own usage and the model you use today. */
 function renderIpotesi(req: RecommendationRequest, rec: Recommendation | null, models: ModelRecord[], lang: Lang): string {
   const c = t(lang);
   const modelOptions = models
@@ -315,15 +315,9 @@ function renderIpotesi(req: RecommendationRequest, rec: Recommendation | null, m
     <div class="dettagli__corpo">
       ${rec ? `<p class="meta">${esc(c.home.scenarioNote(tokens(rec.mix.input, lang), tokens(rec.mix.output, lang), tokens(rec.mix.cacheRead, lang)))}</p>` : ''}
       <form class="modulo" method="get" action="${esc(pagePath(lang, 'home'))}">
+        <input type="hidden" name="task" value="${esc(req.task)}">
+        <input type="hidden" name="priority" value="${esc(req.priority)}">
         <div class="modulo__righe">
-          <div class="campo">
-            <label for="task">${esc(c.home.workType)}</label>
-            <select id="task" name="task">${TASK_IDS.map((t2) => option(t2, c.tasks[t2] ?? SCENARIOS[t2].label, req.task)).join('')}</select>
-          </div>
-          <div class="campo">
-            <label for="priority">${esc(c.home.priority)}</label>
-            <select id="priority" name="priority">${PRIORITIES.map((p) => option(p, c.priorities[p] ?? p, req.priority)).join('')}</select>
-          </div>
           <div class="campo">
             <label for="input">${esc(c.home.tokensIn)}</label>
             <input id="input" name="input" type="number" min="0" step="1" value="${req.usage?.input ?? ''}" placeholder="${esc(c.home.defaultValue)}">

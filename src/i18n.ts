@@ -233,7 +233,7 @@ const it: Catalog = {
     noEveryday:
       'Nessun modello supera la soglia di qualità con un prezzo verificato. Preferiamo non indicare un vincitore piuttosto che indicarne uno senza prove.',
     noHard: 'Nessun modello risolve abbastanza più problemi da giustificarne un secondo.',
-    customise: 'Cambia il tipo di lavoro o i tuoi consumi',
+    customise: 'Confronta con il tuo modello o i tuoi consumi',
     scenarioNote: (i, o, c) =>
       `Di base stimiamo i costi su un mese di lavoro con un agente di codice: ${i} token di input, ${o} di output, ${c} letti dalla cache. È un'ipotesi dichiarata, non una misura dei tuoi consumi.`,
     workType: 'Tipo di lavoro',
@@ -469,7 +469,7 @@ const en: Catalog = {
     noEveryday:
       'No model clears the quality bar with a verified price. We would rather name no winner than name one without evidence.',
     noHard: 'No model solves enough additional problems to justify a second one.',
-    customise: 'Change the kind of work or your usage',
+    customise: 'Compare with your model or your usage',
     scenarioNote: (i, o, c) =>
       `By default we price a month of work with a coding agent: ${i} input tokens, ${o} output, ${c} read from cache. It is a stated assumption, not a measurement of your usage.`,
     workType: 'Kind of work',
