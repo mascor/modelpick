@@ -1,6 +1,6 @@
 /**
  * Usage scenarios. These are explicit, documented assumptions - never presented
- * as measured usage. The user can replace every number from the UI.
+ * as measured usage. Published on the method page; the API also accepts custom usage.
  */
 export type TaskId = 'small-changes' | 'bug' | 'new-features' | 'refactoring' | 'analysis';
 export type Priority = 'cheap' | 'balanced' | 'quality';

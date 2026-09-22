@@ -149,16 +149,19 @@ export interface Catalog {
   method: {
     title: string;
     intro: string;
-    orderTitle: string;
-    order: string[];
-    notTitle: string;
-    not: string[];
-    thresholdsTitle: string;
-    thresholds: [string, string][];
-    missingTitle: string;
-    missing: string;
+    stepsTitle: string;
+    steps: string[];
+    gatesTitle: string;
+    gatesCols: [string, string, string];
+    gatesNote: (gap: string) => string;
+    costTitle: string;
+    costCols: [string, string, string, string];
+    costNote: string;
+    excludedTitle: string;
+    excluded: (t: { offerHours: string; uptime: string; jump: string }) => string[];
     limitsTitle: string;
     limits: string[];
+    fullDetails: string;
   };
   sources: { title: string; cols: [string, string, string, string, string]; active: string; off: string; failed: string; never: string };
   status: {
@@ -333,40 +336,36 @@ const it: Catalog = {
   },
   costLines: { input: 'Input', output: 'Output', cacheRead: 'Lettura cache', cacheWrite: 'Scrittura cache' },
   method: {
-    title: 'Metodo, soglie e limiti',
-    intro:
-      'Questa pagina descrive come si arriva alle due raccomandazioni. Se qualcosa qui non ti convince, la scelta giusta è non fidarti del risultato: per questo pubblichiamo tutto.',
-    orderTitle: 'Ordine delle decisioni',
-    order: [
-      '<strong>Prima i modelli.</strong> Consideriamo solo modelli con una misura di qualità sul codice degli ultimi 7 giorni: il Coding Index di Artificial Analysis, scaricato a ogni aggiornamento e misurato con lo stesso metodo per tutti. Le misure più vecchie non vengono usate. Un modello senza una misura recente non può vincere.',
-      '<strong>La tua scelta cambia che cosa significa "il migliore".</strong> Con "spendere poco" ed "equilibrio" prendiamo il modello meno costoso che supera la soglia di qualità. Con "risultati migliori" prendiamo il punteggio più alto, e il prezzo decide solo fra modelli praticamente pari.',
-      '<strong>Poi i provider.</strong> Per ogni modello ammesso cerchiamo tutte le offerte monitorate e teniamo quelle di provider che sappiamo identificare.',
-      '<strong>Infine la convenienza.</strong> Ogni offerta viene calcolata per intero, commissioni incluse, sullo stesso scenario di consumo.',
+    title: 'Come scegliamo',
+    intro: 'Ogni mattina alle 6:30 ripetiamo questi passi con prezzi e punteggi appena scaricati.',
+    stepsTitle: 'In tre passi',
+    steps: [
+      '<strong>Qualità.</strong> Contano solo i modelli con un Coding Index di Artificial Analysis misurato negli ultimi 7 giorni. Senza una misura recente un modello non può vincere.',
+      '<strong>Soglia.</strong> Il modello deve superare la soglia della priorità che hai scelto (tabella qui sotto).',
+      '<strong>Prezzo.</strong> Fra quelli che la superano vince la coppia modello-provider che costa meno al mese, commissioni incluse. Con "Risultati migliori" vince il punteggio più alto, e il prezzo decide solo fra modelli entro 2 punti.',
     ],
-    notTitle: 'Che cosa non facciamo',
-    not: [
-      'Non dividiamo il punteggio di qualità per il prezzo: non è una misura di niente.',
-      'Non trattiamo la differenza fra due punteggi come una percentuale di qualità.',
-      'Non confrontiamo misure ottenute con banchi di prova, versioni o condizioni diverse.',
-      'Non equipariamo versioni, quantizzazioni o modalità diverse dello stesso modello.',
-      'Non assumiamo che il prezzo di un intermediario valga anche comprando direttamente dal provider.',
-      'Non inventiamo consumi, percentuali di cache o tassi di riuscita.',
-      'Non chiediamo il paese di utilizzo né requisiti sul trattamento dei dati: nessuna fonte che leggiamo li pubblica in forma strutturata, quindi sarebbero domande senza effetto.',
+    gatesTitle: 'Le soglie',
+    gatesCols: ['Priorità', 'Ogni giorno', 'Problemi difficili'],
+    gatesNote: (g) => `Punteggio minimo sul Coding Index. Il modello per i problemi difficili deve anche fare almeno ${g} punti più di quello di ogni giorno: se nessuno ci riesce, non lo indichiamo.`,
+    costTitle: 'Il costo al mese',
+    costCols: ['Tipo di lavoro', 'Input', 'Output', 'Dalla cache'],
+    costNote: "Token al mese per una persona che usa un agente di codice ogni giorno. Sono ipotesi dichiarate, non misure dei tuoi consumi. Un prezzo mancante non diventa mai zero: se manca il prezzo della cache, quei token costano come l'input.",
+    excludedTitle: "Quando un'offerta è esclusa",
+    excluded: (t) => [
+      `Il prezzo ha più di ${t.offerHours} ore.`,
+      `Il provider è stato disponibile meno del ${t.uptime} delle volte nell'ultima mezz'ora.`,
+      'Il contesto è troppo piccolo per il tipo di lavoro scelto.',
+      'OpenCode non riconosce la coppia modello-provider: il comando non partirebbe.',
+      `Il prezzo è cambiato più di ${t.jump} volte dall'aggiornamento precedente: resta in attesa di conferma.`,
     ],
-    thresholdsTitle: 'Soglie in vigore',
-    thresholds: [],
-    missingTitle: 'Dati mancanti',
-    missing:
-      'Un prezzo mancante non diventa mai zero: l\'offerta viene esclusa dal confronto e lo diciamo. Se un provider non pubblica il prezzo della cache, quei token sono conteggiati al prezzo di input, che è un limite superiore, e l\'ipotesi è dichiarata. Se una fonte non risponde, conserviamo l\'ultimo dato valido e ne dichiariamo l\'età. Se le prove non bastano, la raccomandazione è marcata come provvisoria; se non bastano proprio, non assegniamo un vincitore.',
-    limitsTitle: 'Limiti dichiarati',
+    limitsTitle: 'Limiti',
     limits: [
-      'Copriamo i provider monitorati dalle fonti abilitate, non tutto il mercato.',
-      'Un provider che nessuna directory curata elenca non viene consigliato: resta visibile nel confronto, marcato come non identificato.',
-      'Gli scenari di consumo sono ipotesi dichiarate e modificabili, non misure dei tuoi consumi.',
-      'I banchi di prova pubblici misurano un agente su compiti standard: sono un indizio serio, non una garanzia sul tuo repository.',
-      'Per ogni modello usiamo la variante con il Coding Index più alto, spesso quella con lo sforzo di ragionamento massimo: la variante è indicata accanto al punteggio. Con impostazioni più leggere il modello può rendere meno.',
-      'OpenCode non passa automaticamente a un modello di riserva: il secondo modello va selezionato a mano.',
+      'Copriamo i provider raggiunti dalle nostre fonti, non tutto il mercato.',
+      'Un benchmark misura compiti standard: è un indizio serio, non una garanzia sul tuo codice.',
+      'Usiamo la variante con il punteggio più alto, spesso quella con il ragionamento al massimo: con impostazioni più leggere il modello può rendere meno.',
+      'OpenCode non passa da solo al modello per i problemi difficili: va scelto a mano con /models.',
     ],
+    fullDetails: 'Tutti i dettagli, comprese le regole per associare i modelli, in METHODOLOGY.md',
   },
   sources: {
     title: 'Fonti',
@@ -546,41 +545,36 @@ const en: Catalog = {
   },
   costLines: { input: 'Input', output: 'Output', cacheRead: 'Cache read', cacheWrite: 'Cache write' },
   method: {
-    title: 'Method, thresholds and limits',
-    intro:
-      'This page describes how the two recommendations are reached. If something here does not convince you, the right response is not to trust the result: that is why we publish all of it.',
-    orderTitle: 'Order of decisions',
-    order: [
-      '<strong>Models first.</strong> We only consider models with a coding-quality measurement from the last 7 days: the Artificial Analysis Coding Index, downloaded at every update and measured with the same method for every model. Older measurements are not used. A model without a recent measurement cannot win.',
-      '<strong>Your choice changes what "best" means.</strong> With "spend less" and "balanced" we take the cheapest model that clears the quality bar. With "best results" we take the highest score, and price only decides between models that are practically tied.',
-      '<strong>Providers second.</strong> For every eligible model we collect all monitored offers and keep those from providers we can identify.',
-      '<strong>Total cost last.</strong> Each offer is priced in full, fees included, on the same usage scenario.',
+    title: 'How we choose',
+    intro: 'Every morning at 6:30 (Rome time) we repeat these steps on freshly downloaded prices and scores.',
+    stepsTitle: 'In three steps',
+    steps: [
+      '<strong>Quality.</strong> Only models with an Artificial Analysis Coding Index measured in the last 7 days count. Without a recent measurement a model cannot win.',
+      '<strong>Bar.</strong> The model must clear the bar of the priority you chose (table below).',
+      '<strong>Price.</strong> Among those that clear it, the model-provider pair that costs least per month wins, fees included. With "Best results" the highest score wins, and price only decides between models within 2 points.',
     ],
-    notTitle: 'What we do not do',
-    not: [
-      'We do not divide a quality score by a price: that measures nothing.',
-      'We do not treat the gap between two scores as a percentage of quality.',
-      'We do not compare measurements taken with different harnesses, versions or conditions.',
-      'We do not treat different versions, quantisations or modes of a model as the same product.',
-      'We do not assume a broker price also applies when buying straight from the provider.',
-      'We do not invent usage figures, cache ratios or success rates.',
-      'We do not ask for your country or data-handling requirements: no source we read publishes them in structured form, so those questions would change nothing.',
+    gatesTitle: 'The bars',
+    gatesCols: ['Priority', 'Every day', 'Hard problems'],
+    gatesNote: (g) => `Minimum Coding Index score. The model for hard problems must also score at least ${g} points above the everyday one: if none does, we name none.`,
+    costTitle: 'The monthly cost',
+    costCols: ['Kind of work', 'Input', 'Output', 'From cache'],
+    costNote: 'Tokens per month for one person using a coding agent every day. They are stated assumptions, not measurements of your usage. A missing price never becomes zero: if the cache price is missing, those tokens cost as much as input.',
+    excludedTitle: 'When an offer is excluded',
+    excluded: (t) => [
+      `The price is more than ${t.offerHours} hours old.`,
+      `The provider was available less than ${t.uptime} of the time in the last half hour.`,
+      'The context is too small for the chosen kind of work.',
+      'OpenCode does not recognise the model-provider pair: the command would not start.',
+      `The price changed more than ${t.jump} times since the previous update: it waits for confirmation.`,
     ],
-    thresholdsTitle: 'Thresholds in force',
-    thresholds: [],
-    missingTitle: 'Missing data',
-    missing:
-      'A missing price never becomes zero: the offer is excluded from the comparison and we say so. If a provider publishes no cache price, those tokens are billed at the input price, which is an upper bound, and the assumption is stated. If a source fails, we keep the last valid data and state its age. If the evidence is thin the recommendation is marked provisional; if it is absent we name no winner.',
-    limitsTitle: 'Stated limits',
+    limitsTitle: 'Limits',
     limits: [
-      'We cover the providers reached by the enabled sources, not the whole market.',
-      'For direct purchases we only recommend providers a curated directory describes: if we are sending you to open an account with someone, that someone must have a name and an address. The others stay visible in the comparison, marked as unidentified.',
-      'For offers routed through OpenRouter the account is with OpenRouter: the provider running the model only supplies the machines, so no directory entry is required there. The page always says who runs the model and who bills you.',
-      'Usage scenarios are stated, editable assumptions, not measurements of your usage.',
-      'Public benchmarks measure an agent on standard tasks: a serious signal, not a guarantee about your repository.',
-      'For each model we use the variant with the highest Coding Index, often the one with maximum reasoning effort: the variant is named next to the score. With lighter settings the model may perform worse.',
-      'OpenCode does not switch to a backup model on its own: the second model must be selected by hand.',
+      'We cover the providers our sources reach, not the whole market.',
+      'A benchmark measures standard tasks: a serious signal, not a guarantee about your code.',
+      'We use the variant with the highest score, often the one with maximum reasoning: with lighter settings the model may perform worse.',
+      'OpenCode does not switch to the model for hard problems on its own: pick it by hand with /models.',
     ],
+    fullDetails: 'All the details, including how models are matched, in METHODOLOGY.md',
   },
   sources: {
     title: 'Sources',

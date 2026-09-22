@@ -8,7 +8,7 @@ import type { Snapshot, SourceStatus } from '../types.js';
 import type { OfferView, Pick, Recommendation, RecommendationRequest } from '../engine/recommend.js';
 import { formatScore, metricLabel } from '../engine/recommend.js';
 import type { Change } from '../engine/changes.js';
-import { SCENARIOS, TASK_IDS, PRIORITIES } from '../engine/scenarios.js';
+import { SCENARIOS, TASK_IDS, PRIORITIES, gateFor } from '../engine/scenarios.js';
 import { accountName, usabilityLabel } from '../engine/usability.js';
 import { signupUrl } from '../engine/signup.js';
 import { configFor } from '../engine/opencode.js';
@@ -416,27 +416,43 @@ export function notFoundPage(lang: Lang): string {
 export function methodPage(lang: Lang): string {
   const c = t(lang);
   const m = c.method;
-  const thresholds: [string, string][] = [
-    [String(THRESHOLDS.offerStaleHours), lang === 'en' ? 'hours: a price older than this cannot win' : 'ore: un prezzo più vecchio non può vincere'],
-    [String(THRESHOLDS.snapshotStaleHours), lang === 'en' ? 'hours: the data is flagged as out of date' : 'ore: i dati vengono segnalati come obsoleti'],
-    [String(THRESHOLDS.evidenceMaxAgeDays), lang === 'en' ? 'days: an older quality measurement is not used' : 'giorni: una misura di qualità più vecchia non viene usata'],
-    [String(THRESHOLDS.evidenceFreshDays), lang === 'en' ? 'days: an older measurement makes the pick provisional' : 'giorni: una misura più vecchia rende la scelta provvisoria'],
-    [`${THRESHOLDS.priceJumpFactor}×`, lang === 'en' ? 'price change: the offer is quarantined' : 'variazione di prezzo: offerta in quarantena'],
-    [`${THRESHOLDS.maxPricePerMTok} USD/1M`, lang === 'en' ? 'above this a price is discarded as a unit error' : 'oltre questo il prezzo è scartato come errore di unità'],
-    [`${THRESHOLDS.minUptime30m}%`, lang === 'en' ? 'minimum recent availability' : 'disponibilità recente minima'],
-    [String(THRESHOLDS.backupQualityGapPoints), lang === 'en' ? 'points the backup must add' : 'punti che il modello di riserva deve aggiungere'],
-  ];
+  const f = fmt(lang);
+  const gates = PRIORITIES.map((p) => {
+    const g = gateFor('aa_coding_index', p);
+    return `<tr><td>${esc(c.priorities[p] ?? p)}</td><td class="num">${g.everyday}</td><td class="num">${g.hard}</td></tr>`;
+  }).join('');
+  // Millions throughout, so the columns read at a glance.
+  const millions = (v: number) => `${f.n.format(Math.round(v / 100_000) / 10)} M`;
+  const costs = TASK_IDS.map((id) => {
+    const mix = SCENARIOS[id].monthly;
+    return `<tr><td>${esc(c.tasks[id] ?? SCENARIOS[id].label)}</td><td class="num">${esc(millions(mix.input))}</td><td class="num">${esc(millions(mix.output))}</td><td class="num">${esc(millions(mix.cacheRead))}</td></tr>`;
+  }).join('');
+  const excluded = m.excluded({
+    offerHours: String(THRESHOLDS.offerStaleHours),
+    uptime: `${f.n.format(THRESHOLDS.minUptime30m)}%`,
+    jump: f.n.format(THRESHOLDS.priceJumpFactor),
+  });
+  const th = (cols: string[]) => `<thead><tr>${cols.map((x, k) => `<th${k ? ' class="num"' : ''}>${esc(x)}</th>`).join('')}</tr></thead>`;
   const body = `<section class="section">
-  <div class="container">
+  <div class="container method">
     <h1>${esc(m.title)}</h1>
-    <p>${esc(m.intro)}</p>
-    <div class="card" style="margin-bottom:20px"><h2>${esc(m.orderTitle)}</h2><ol class="list">${m.order.map((x) => `<li>${x}</li>`).join('')}</ol></div>
-    <div class="card" style="margin-bottom:20px"><h2>${esc(m.notTitle)}</h2><ul class="list">${m.not.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
-    <div class="card" style="margin-bottom:20px"><h2>${esc(m.thresholdsTitle)}</h2>
-      <table class="table"><tbody>${thresholds.map(([v, d]) => `<tr><td class="num"><strong>${esc(v)}</strong></td><td>${esc(d)}</td></tr>`).join('')}</tbody></table>
+    <p class="meta">${esc(m.intro)}</p>
+    <div class="card"><h2>${esc(m.stepsTitle)}</h2><ol class="list">${m.steps.map((x) => `<li>${x}</li>`).join('')}</ol></div>
+    <div class="method__grid">
+      <div class="card"><h2>${esc(m.gatesTitle)}</h2>
+        <table class="table">${th(m.gatesCols)}<tbody>${gates}</tbody></table>
+        <p class="meta">${esc(m.gatesNote(String(THRESHOLDS.backupQualityGapPoints)))}</p>
+      </div>
+      <div class="card"><h2>${esc(m.costTitle)}</h2>
+        <table class="table">${th(m.costCols)}<tbody>${costs}</tbody></table>
+        <p class="meta">${esc(m.costNote)}</p>
+      </div>
     </div>
-    <div class="card" style="margin-bottom:20px"><h2>${esc(m.missingTitle)}</h2><p>${esc(m.missing)}</p></div>
-    <div class="card"><h2>${esc(m.limitsTitle)}</h2><ul class="list">${m.limits.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+    <div class="method__grid">
+      <div class="card"><h2>${esc(m.excludedTitle)}</h2><ul class="list">${excluded.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+      <div class="card"><h2>${esc(m.limitsTitle)}</h2><ul class="list">${m.limits.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+    </div>
+    <p class="meta"><a href="${esc(SITE.repo)}/blob/main/METHODOLOGY.md" rel="noopener">${esc(m.fullDetails)}</a></p>
   </div>
 </section>`;
   return layout({ lang, title: `${m.title} — ${SITE.name}`, description: m.intro, body, active: 'method' });
