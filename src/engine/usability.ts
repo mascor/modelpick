@@ -47,7 +47,7 @@ export const accountName = (offer: Offer): string =>
   offer.access === 'intermediary' && offer.broker ? offer.broker : offer.providerName;
 
 export const usabilityLabel = (u: Usability, offer: Offer): string => {
-  if (u === 'hub') return `account OpenRouter, instradato su ${offer.providerName}`;
-  if (u === 'diretto') return `account ${offer.providerName}, direttamente da chi fa il modello`;
+  if (u === 'hub') return 'via OpenRouter';
+  if (u === 'diretto') return 'diretto';
   return `account ${offer.providerName}`;
 };

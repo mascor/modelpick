@@ -115,19 +115,15 @@ function link(req: RecommendationRequest, override: Record<string, string>): str
  * form to fill in and nothing to submit.
  */
 function renderChips(req: RecommendationRequest): string {
-  const labels: Record<Priority, [string, string]> = {
-    risparmio: ['Spendere poco', 'la scelta più economica che regge il lavoro'],
-    equilibrio: ['Equilibrio', 'buon risultato senza esagerare col costo'],
-    qualita: ['Lavorare bene', 'la qualità prima del prezzo'],
+  const labels: Record<Priority, string> = {
+    risparmio: 'Spendere poco',
+    equilibrio: 'Equilibrio',
+    qualita: 'Lavorare bene',
   };
   return `<nav class="scelte" aria-label="Che cosa conta di più per te">
     ${PRIORITIES.map((p) => {
-      const [label, hint] = labels[p];
       const attivo = p === req.priority;
-      return `<a class="scelta${attivo ? ' scelta--attiva' : ''}" href="${esc(link(req, { priority: p }))}"${attivo ? ' aria-current="true"' : ''}>
-        <span class="scelta__nome">${esc(label)}</span>
-        <span class="scelta__nota">${esc(hint)}</span>
-      </a>`;
+      return `<a class="scelta${attivo ? ' scelta--attiva' : ''}" href="${esc(link(req, { priority: p }))}"${attivo ? ' aria-current="true"' : ''}>${esc(labels[p])}</a>`;
     }).join('')}
   </nav>`;
 }
@@ -143,7 +139,7 @@ function renderConfronto(pick: Pick, role: string): string {
     return `<tr${scelto ? ' class="scelto"' : ''}>
       <td>
         <strong>${esc(o.offer.providerName)}</strong>
-        <span class="meta">${esc(usabilityLabel(o.usability, o.offer))}${o.offer.apiKeyEnv ? ` · ${esc(o.offer.apiKeyEnv)}` : ''}</span>
+        <span class="meta">${esc(usabilityLabel(o.usability, o.offer))}</span>
       </td>
       <td class="num nowrap"><strong>${esc(usd(o.cost.totalUsd))}</strong></td>
       <td class="azione">
@@ -157,7 +153,7 @@ function renderConfronto(pick: Pick, role: string): string {
   const restanti = pick.alternatives.slice(3);
 
   return `<div class="acquisto">
-    <h4 class="acquisto__titolo">Dove comprarlo <span class="meta">— prezzo al mese, dal più economico</span></h4>
+    <h4 class="acquisto__titolo">Dove comprarlo</h4>
     <table class="tabella confronto">
       <tbody>
         ${riga(pick.chosen, 0, true)}
@@ -170,7 +166,6 @@ function renderConfronto(pick: Pick, role: string): string {
         <table class="tabella confronto"><tbody>${restanti.slice(0, 16).map((o, i) => riga(o, i + 100, false)).join('')}</tbody></table>
       </div>
     </details>` : ''}
-    <p class="meta acquisto__nota">${esc(String(pick.offersCompared))} provider confrontati. Per usarne uno: apri un account con lui, esporta la sua chiave nella shell e lancia il comando copiato.</p>
   </div>`;
 }
 
@@ -219,22 +214,14 @@ function renderPick(
   return `<article class="scheda pick pick--${role}">
     <p class="pick__ruolo">${esc(titolo)}</p>
     <h3 class="pick__modello">${esc(nomeModello(pick.model.displayName))}</h3>
-    <p class="pick__sintesi">
-      <strong>${esc(usd(pick.cost.totalUsd))}</strong> al mese da <strong>${esc(pick.offer.providerName)}</strong>
-      · risolve il <strong>${esc(pick.quality.value.toFixed(0))}%</strong> dei problemi di codice
-    </p>
-    ${change ? `<p class="pick__cambio${change.moved ? ' pick__cambio--mosso' : ''}">${esc(change.text)}</p>` : ''}
-    ${role === 'difficile' && pick.whenToUse ? `<p class="pick__quando">${esc(pick.whenToUse)}</p>` : ''}
+    <p class="pick__sintesi"><strong>${esc(usd(pick.cost.totalUsd))}</strong> al mese · <strong>${esc(pick.quality.value.toFixed(0))}%</strong> di problemi risolti</p>
+    ${change?.moved ? `<p class="pick__cambio pick__cambio--mosso">${esc(change.text)}</p>` : ''}
     <div class="config">
-      <span class="config__etichetta">Per usarlo subito</span>
       <div class="config__riga">
         <code id="config-${esc(role)}">opencode -m ${esc(modelIdFor(pick.offer))}</code>
         <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">Copia</button>
       </div>
-      <p class="config__serve">
-        Serve un account <strong>${esc(accountName(pick.offer))}</strong>${pick.offer.apiKeyEnv ? ` e la sua chiave nella shell: <code class="chiave">export ${esc(pick.offer.apiKeyEnv)}="..."</code>` : ''}.
-        ${pick.chosen.usability === 'hub' ? `OpenRouter instrada su ${esc(pick.offer.providerName)}, che oggi ha il prezzo più basso; con un solo account hai quasi tutti i modelli.` : ''}
-      </p>
+      <p class="config__serve">Account <strong>${esc(accountName(pick.offer))}</strong>${pick.offer.apiKeyEnv ? ` · <code class="chiave">export ${esc(pick.offer.apiKeyEnv)}="..."</code>` : ''}</p>
     </div>
     ${renderConfronto(pick, role)}
     ${renderDettagli(pick)}
@@ -317,7 +304,6 @@ export function homePage(opts: {
   <div class="contenitore">
     <p class="hero__sopratitolo">${snapshot ? `Verificato il ${esc(dateIt(snapshot.generatedAt))}` : 'Nessun dato verificato'}</p>
     <h1>Che modello usi oggi</h1>
-    <p class="hero__testo">Uno per il lavoro di tutti i giorni, uno per quando si blocca, con il provider più economico che li vende.</p>
   </div>
 </section>
 
