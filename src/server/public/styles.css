@@ -433,6 +433,18 @@ pre.code {
 .method__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 0 20px; }
 .method .table { margin-bottom: 10px; }
 
+/* Status page: the answer in one line, three numbers, the sources. */
+.status { font-family: var(--cs-font-ui); }
+.status h1 { font-size: clamp(24px, 3.4vw, 32px); margin: 0 0 16px; }
+.status h2 { font-size: 18px; margin: 0 0 12px; }
+.status .card { margin-bottom: 20px; }
+.status__line { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+.stats { display: flex; flex-wrap: wrap; gap: 12px 32px; margin-top: 16px; }
+.stat { display: flex; flex-direction: column; }
+.stat__value { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat__label { font-size: 13px; color: var(--cs-text-muted); }
+.status__technical { background: var(--cs-surface); border: 1px solid var(--cs-border); border-radius: var(--cs-radius-md); padding: 14px 16px; }
+
 /* Controls above the results: links that work without JavaScript. */
 .choices { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
 .choices__label { font-size: 13px; color: var(--cs-text-muted); margin-right: 4px; }

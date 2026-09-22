@@ -166,18 +166,20 @@ export interface Catalog {
   sources: { title: string; cols: [string, string, string, string, string]; active: string; failed: string; never: string };
   status: {
     title: string;
-    intro: string;
-    lastRun: (when: string) => string;
-    ok: string;
-    problems: string;
-    published: string;
+    ok: (when: string) => string;
+    problems: (when: string) => string;
     notPublished: string;
     never: string;
-    warnings: (n: number) => string;
-    dataTitle: string;
-    cols: [string, string, string, string, string];
-    reused: (age: string) => string;
-    duration: (ms: string) => string;
+    next: (when: string) => string;
+    models: string;
+    offers: string;
+    evidence: string;
+    sourcesTitle: string;
+    cols: [string, string, string];
+    fresh: string;
+    reused: (hours: string) => string;
+    failed: string;
+    technical: (n: number) => string;
   };
 }
 
@@ -376,18 +378,20 @@ const it: Catalog = {
   },
   status: {
     title: 'Stato degli aggiornamenti',
-    intro: 'L\'aggiornamento gira sul server ogni giorno alle 06:30 (Europe/Rome), indipendentemente dalle visite al sito.',
-    lastRun: (w) => `Ultimo tentativo: ${w}`,
-    ok: 'riuscito',
-    problems: 'con problemi',
-    published: 'pubblicato',
-    notPublished: 'non pubblicato',
+    ok: (w) => `Aggiornato il ${w}`,
+    problems: (w) => `Ultimo aggiornamento con problemi: ${w}`,
+    notPublished: "I nuovi dati non sono stati pubblicati: resta valido l'aggiornamento precedente.",
     never: 'Nessun aggiornamento ancora eseguito.',
-    warnings: (n) => `Segnalazioni (${n})`,
-    dataTitle: 'Dati pubblicati',
-    cols: ['Fonte', 'Esito', 'Righe', 'Nota', 'Durata'],
-    reused: (a) => `dati riusati, età ${a}`,
-    duration: (ms) => `${ms} ms`,
+    next: (w) => `Prossimo aggiornamento: ${w}`,
+    models: 'modelli',
+    offers: 'offerte',
+    evidence: 'punteggi di qualità',
+    sourcesTitle: 'Fonti',
+    cols: ['Fonte', 'Esito', 'Righe'],
+    fresh: 'aggiornata',
+    reused: (h) => `dati di ${h} ore fa`,
+    failed: 'non raggiungibile',
+    technical: (n) => `Dettagli tecnici (${n}, in inglese)`,
   },
 };
 
@@ -584,18 +588,20 @@ const en: Catalog = {
   },
   status: {
     title: 'Update status',
-    intro: 'The update runs on the server every day at 06:30 (Europe/Rome), independently of site traffic.',
-    lastRun: (w) => `Last attempt: ${w}`,
-    ok: 'succeeded',
-    problems: 'with problems',
-    published: 'published',
-    notPublished: 'not published',
+    ok: (w) => `Updated on ${w}`,
+    problems: (w) => `Last update had problems: ${w}`,
+    notPublished: 'The new data was not published: the previous update is still in use.',
     never: 'No update has run yet.',
-    warnings: (n) => `Warnings (${n})`,
-    dataTitle: 'Published data',
-    cols: ['Source', 'Outcome', 'Rows', 'Note', 'Duration'],
-    reused: (a) => `data reused, age ${a}`,
-    duration: (ms) => `${ms} ms`,
+    next: (w) => `Next update: ${w}`,
+    models: 'models',
+    offers: 'offers',
+    evidence: 'quality scores',
+    sourcesTitle: 'Sources',
+    cols: ['Source', 'Result', 'Rows'],
+    fresh: 'updated',
+    reused: (h) => `data from ${h} hours ago`,
+    failed: 'unreachable',
+    technical: (n) => `Technical details (${n})`,
   },
 };
 

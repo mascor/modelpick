@@ -14,6 +14,7 @@ import { signupUrl } from '../engine/signup.js';
 import { configFor } from '../engine/opencode.js';
 import { t, pagePath, otherLang, type Lang } from '../i18n.js';
 import type { RunStatus } from '../pipeline/store.js';
+import { msUntilNextRun } from '../scheduler.js';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
@@ -500,33 +501,44 @@ export function sourcesPage(snapshot: Snapshot | null, lang: Lang): string {
 export function statusPage(snapshot: Snapshot | null, status: RunStatus | null, lang: Lang): string {
   const c = t(lang);
   const f = fmt(lang);
-  const sources = (snapshot?.sources ?? [])
-    .map((s) => `<tr>
-        <td class="stack__title">${esc(s.name)}</td>
-        <td data-label="${esc(c.status.cols[1])}">${esc(s.outcome)}</td>
-        <td class="num" data-label="${esc(c.status.cols[2])}">${esc(f.n.format(s.itemCount))}</td>
-        <td data-label="${esc(c.status.cols[3])}">${s.error ? esc(s.error) : s.servedFromCache ? esc(c.status.reused(s.dataAgeHours !== null ? f.n2.format(s.dataAgeHours) + ' h' : '—')) : '—'}</td>
-        <td class="num" data-label="${esc(c.status.cols[4])}">${s.durationMs !== null ? esc(c.status.duration(f.n.format(s.durationMs))) : '—'}</td>
-      </tr>`)
-    .join('');
+  // One row per source in use: OpenRouter reports its models and its offers separately.
+  const bySource = new Map<string, { rows: number; failed: boolean; reusedHours: number | null }>();
+  for (const s of snapshot?.sources ?? []) {
+    if (s.outcome === 'disabled') continue;
+    const row = bySource.get(s.id) ?? { rows: 0, failed: false, reusedHours: null };
+    row.rows += s.itemCount;
+    row.failed ||= s.outcome === 'failed';
+    if (s.servedFromCache && s.dataAgeHours !== null) row.reusedHours = Math.max(row.reusedHours ?? 0, s.dataAgeHours);
+    bySource.set(s.id, row);
+  }
+  const sources = SOURCES.filter((cfg) => bySource.has(cfg.id)).map((cfg) => {
+    const row = bySource.get(cfg.id)!;
+    const result = row.failed
+      ? `<span class="label label--warning">${esc(c.status.failed)}</span>`
+      : row.reusedHours !== null
+        ? `<span class="label label--info">${esc(c.status.reused(f.n.format(Math.round(row.reusedHours))))}</span>`
+        : `<span class="label label--ok">${esc(c.status.fresh)}</span>`;
+    return `<tr><td>${esc(cfg.name)}</td><td>${result}</td><td class="num">${esc(f.n.format(row.rows))}</td></tr>`;
+  }).join('');
+  const stat = (n: number, label: string) => `<div class="stat"><span class="stat__value">${esc(f.n.format(n))}</span><span class="stat__label">${esc(label)}</span></div>`;
+  const next = dateLong(new Date(Date.now() + msUntilNextRun()).toISOString(), lang);
 
   const body = `<section class="section">
-  <div class="container">
+  <div class="container status">
     <h1>${esc(c.status.title)}</h1>
-    <p>${esc(c.status.intro)}</p>
-    ${status ? `<div class="card" style="margin-bottom:20px">
-      <p><strong>${esc(c.status.lastRun(dateLong(status.finishedAt, lang)))}</strong> — ${status.ok ? `<span class="label label--ok">${esc(c.status.ok)}</span>` : `<span class="label label--warning">${esc(c.status.problems)}</span>`} ${status.published ? `<span class="label label--ok">${esc(c.status.published)}</span>` : `<span class="label label--warning">${esc(c.status.notPublished)}</span>`}</p>
-      <p>${esc(status.message)}</p>
-      ${status.warnings.length ? `<details class="details"><summary>${esc(c.status.warnings(status.warnings.length))}</summary><div class="details__body"><ul class="list">${status.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div></details>` : ''}
-    </div>` : `<div class="notice">${esc(c.status.never)}</div>`}
-    ${snapshot ? `<div class="card">
-      <h2>${esc(c.status.dataTitle)}</h2>
-      <p class="meta">${esc(dateLong(snapshot.generatedAt, lang))}</p>
-      <table class="table table--stack">
-        <thead><tr>${c.status.cols.map((h, i) => `<th${i === 2 || i === 4 ? ' class="num"' : ''}>${esc(h)}</th>`).join('')}</tr></thead>
-        <tbody>${sources}</tbody>
-      </table>
+    ${status
+      ? `<div class="card">
+      <p class="status__line">${status.ok ? '✓' : '⚠'} ${esc(status.ok ? c.status.ok(dateLong(status.finishedAt, lang)) : c.status.problems(dateLong(status.finishedAt, lang)))}</p>
+      ${status.published ? '' : `<p class="alert">${esc(c.status.notPublished)}</p>`}
+      <p class="meta">${esc(c.status.next(next))}</p>
+      ${snapshot ? `<div class="stats">${stat(snapshot.stats.modelCount, c.status.models)}${stat(snapshot.stats.offerCount, c.status.offers)}${stat(snapshot.stats.evidenceCount, c.status.evidence)}</div>` : ''}
+    </div>`
+      : `<div class="notice">${esc(c.status.never)}</div>`}
+    ${sources ? `<div class="card">
+      <h2>${esc(c.status.sourcesTitle)}</h2>
+      <table class="table"><thead><tr><th>${esc(c.status.cols[0])}</th><th>${esc(c.status.cols[1])}</th><th class="num">${esc(c.status.cols[2])}</th></tr></thead><tbody>${sources}</tbody></table>
     </div>` : ''}
+    ${status?.warnings.length ? `<details class="details status__technical"><summary>${esc(c.status.technical(status.warnings.length))}</summary><div class="details__body"><ul class="list">${status.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div></details>` : ''}
   </div>
 </section>`;
   return layout({ lang, title: `${c.status.title} — ${SITE.name}`, description: c.siteDescription, body, active: 'status' });
