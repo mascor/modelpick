@@ -12,11 +12,13 @@ import type { ModelRecord, Offer, QualityEvidence, Snapshot } from '../types.js'
 import { costOf, type CostBreakdown } from './cost.js';
 import { isIdentified, providerKey, usabilityOf, type Usability } from './usability.js';
 import { QUALITY_GATE, SCENARIOS, type Priority, type TaskId, type TokenMix } from './scenarios.js';
+import { t, type Lang, type ReasonCode } from '../i18n.js';
 
 
 export interface RecommendationRequest {
   task: TaskId;
   priority: Priority;
+  lang: Lang;
   /** Real usage supplied by the user; replaces the scenario when present. */
   usage?: Partial<TokenMix> | null;
   currentModelKey?: string | null;
@@ -72,7 +74,7 @@ export interface Recommendation {
     referenceHarnessModels: number;
     gate: { everyday: number; hard: number };
     candidateModels: number;
-    excluded: { reason: string; count: number }[];
+    excluded: { reason: ReasonCode; count: number }[];
     snapshotAgeHours: number | null;
     snapshotStale: boolean;
   };
@@ -145,15 +147,16 @@ function bestQuality(
 }
 
 /** Offer-level eligibility. Returns null when usable, otherwise the reason it is not. */
-function offerBlocker(offer: Offer, req: RecommendationRequest, minContext: number, now: number): string | null {
-  if (offer.demo) return 'dato dimostrativo';
-  if (offer.blockedReason) return 'provider sospeso: non risulta possibile aprire un account';
-  if (offer.quarantine) return 'prezzo in quarantena per variazione anomala';
+function offerBlocker(offer: Offer, req: RecommendationRequest, minContext: number, now: number): ReasonCode | null {
+  void req;
+  if (offer.demo) return 'demo';
+  if (offer.blockedReason) return 'suspended';
+  if (offer.quarantine) return 'quarantine';
   const age = hoursSince(offer.observedAt, now);
-  if (age !== null && age > THRESHOLDS.offerStaleHours) return `prezzo non verificato da oltre ${THRESHOLDS.offerStaleHours} ore`;
-  if (offer.supportsTools === false) return 'non supporta gli strumenti richiesti da un agente di codice';
-  if (offer.contextTokens !== null && offer.contextTokens < minContext) return 'contesto insufficiente per questa attività';
-  if (offer.uptime30m !== null && offer.uptime30m < THRESHOLDS.minUptime30m) return 'disponibilità recente troppo bassa';
+  if (age !== null && age > THRESHOLDS.offerStaleHours) return 'stale-price';
+  if (offer.supportsTools === false) return 'offer-no-tools';
+  if (offer.contextTokens !== null && offer.contextTokens < minContext) return 'offer-context';
+  if (offer.uptime30m !== null && offer.uptime30m < THRESHOLDS.minUptime30m) return 'offer-uptime';
   return null;
 }
 
@@ -167,23 +170,23 @@ function rankOffers(
   known?: Set<string>,
 ) {
   const usable: OfferView[] = [];
-  const blocked: string[] = [];
+  const blocked: ReasonCode[] = [];
   for (const offer of offers) {
     const blocker = offerBlocker(offer, req, minContext, now);
     if (blocker) {
       blocked.push(blocker);
       continue;
     }
-    const cost = costOf(offer, mix);
+    const cost = costOf(offer, mix, req.lang);
     // An incomplete cost cannot be compared with a complete one.
     if (!cost.complete) {
-      blocked.push('prezzi incompleti per questo scenario');
+      blocked.push('incomplete-prices');
       continue;
     }
     // Free tiers and bundled plans have a real cost that is not published per
     // token: treating them as 0 would make them win every comparison.
     if (cost.planBased) {
-      blocked.push('offerta gratuita o inclusa in un piano: nessun prezzo per token pubblicato da confrontare');
+      blocked.push('plan-based');
       continue;
     }
     usable.push({ offer, cost, usability: usabilityOf(offer, modelVendor, known) });
@@ -198,6 +201,7 @@ function rankOffers(
 
 export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recommendation {
   const now = Date.now();
+  const c = t(req.lang);
   // Providers a curated directory lists, plus their own first-party sellers.
   const known = new Set(Object.values(snapshot.providers ?? {}).map((p) => providerKey(p.name)));
   const scenario = SCENARIOS[req.task];
@@ -221,8 +225,8 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     offersByModel.set(o.modelKey, list);
   }
 
-  const excluded = new Map<string, number>();
-  const bump = (reason: string) => excluded.set(reason, (excluded.get(reason) ?? 0) + 1);
+  const excluded = new Map<ReasonCode, number>();
+  const bump = (reason: ReasonCode) => excluded.set(reason, (excluded.get(reason) ?? 0) + 1);
 
   interface Candidate {
     model: ModelRecord;
@@ -238,26 +242,26 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     const quality = bestQuality(model.key, snapshot.evidence, ref.key, now);
     if (!quality) {
       if (snapshot.evidence.some((e) => e.modelKey === model.key)) {
-        bump('misurato solo con banchi di prova non confrontabili con quello di riferimento');
+        bump('not-comparable');
       }
       continue; // no comparable coding evidence: cannot be recommended
     }
     if (model.toolCall === false) {
-      bump('il modello non supporta gli strumenti');
+      bump('no-tools');
       continue;
     }
     if (model.contextTokens !== null && model.contextTokens < minContext) {
-      bump('contesto del modello insufficiente per questa attività');
+      bump('model-context');
       continue;
     }
     const offers = offersByModel.get(model.key) ?? [];
     if (!offers.length) {
-      bump('nessun provider monitorato vende questo modello');
+      bump('no-seller');
       continue;
     }
     const { usable, pronte, blocked } = rankOffers(offers, mix, req, minContext, now, model.vendor, known);
     if (!usable.length) {
-      bump(blocked[0] ?? 'nessuna offerta utilizzabile');
+      bump(blocked[0] ?? 'no-usable-offer');
       continue;
     }
     candidates.push({ model, quality, offers: usable, pronte });
@@ -269,42 +273,40 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
    */
   const sceltaDi = (c: Candidate): OfferView => c.pronte[0] ?? c.offers[0]!;
 
-  const toPick = (c: Candidate, role: 'everyday' | 'hard', other: Candidate | null): Pick => {
-    const best = sceltaDi(c);
+  const toPick = (cand: Candidate, role: 'everyday' | 'hard', other: Candidate | null): Pick => {
+    const best = sceltaDi(cand);
     const provisionalReasons: string[] = [];
-    if (!c.quality.comparable) provisionalReasons.push('la prova disponibile viene da un banco di prova diverso da quello di riferimento');
-    if (c.quality.stale) provisionalReasons.push(`la misura ha più di ${THRESHOLDS.evidenceStaleDays} giorni`);
-    if (best.cost.unquantifiedFees.length) provisionalReasons.push('una commissione applicabile non è quantificabile automaticamente');
-    if (best.cost.assumptions.length) provisionalReasons.push('il costo usa un\'ipotesi prudenziale sui prezzi di cache non pubblicati');
-    if (c.offers.length === 1) provisionalReasons.push('un solo provider monitorato soddisfa i requisiti');
-    if (!c.pronte.length) provisionalReasons.push('nessun provider identificabile vende questo modello');
+    if (!cand.quality.comparable) provisionalReasons.push(c.engine.provisionalCrossHarness);
+    if (cand.quality.stale) provisionalReasons.push(c.engine.provisionalStale(String(THRESHOLDS.evidenceStaleDays)));
+    if (best.cost.unquantifiedFees.length) provisionalReasons.push(c.engine.provisionalFee);
+    if (best.cost.assumptions.length) provisionalReasons.push(c.engine.provisionalCacheAssumption);
+    if (cand.offers.length === 1) provisionalReasons.push(c.engine.provisionalSingle);
+    if (!cand.pronte.length) provisionalReasons.push(c.engine.provisionalUnidentified);
 
-    const price = best.cost.totalUsd!;
-    const metricLabel = c.quality.metric === 'swebench_verified' ? 'SWE-bench Verified' : 'Aider polyglot';
+    const price = fmtUsd(best.cost.totalUsd!);
+    const metricLabel = cand.quality.metric === 'swebench_verified' ? 'SWE-bench Verified' : 'Aider polyglot';
+    const score = `${cand.quality.value.toFixed(1)}%`;
+    const gap = other ? (cand.quality.value - other.quality.value).toFixed(1) : null;
+
     const reason =
       role === 'everyday'
         ? req.priority === 'qualita'
-          ? `È il punteggio più alto fra i modelli misurati nelle stesse condizioni (${c.quality.value.toFixed(1)}% su ${metricLabel}), e fra quelli che stanno in questa fascia è il meno costoso: ${fmtUsd(price)} al mese sullo scenario scelto.`
-          : `Risolve il ${c.quality.value.toFixed(1)}% dei problemi su ${metricLabel}, sopra la soglia di ${gate.everyday}% richiesta per questa priorità, ed è la combinazione modello-provider meno costosa fra quelle che ci riescono (${fmtUsd(price)} al mese sullo scenario scelto).`
-        : `Risolve il ${c.quality.value.toFixed(1)}% dei problemi su ${metricLabel}${other ? `, ${(c.quality.value - other.quality.value).toFixed(1)} punti percentuali sopra il modello quotidiano, misurati nelle stesse condizioni` : ''}: la capacità superiore è documentata, non dedotta dal prezzo.`;
+          ? c.engine.everydayBest(score, metricLabel, price)
+          : c.engine.everydayCheapest(score, metricLabel, `${gate.everyday}%`, price)
+        : c.engine.hardReason(score, metricLabel, gap);
 
-    const whenToUse =
-      role === 'hard'
-        ? other
-          ? 'Tienilo per i bug che non si riproducono, i refactoring su molti file e il codice che il modello di ogni giorno continua a sbagliare.'
-          : 'Usalo quando il modello di ogni giorno non arriva a una soluzione.'
-        : null;
+    const whenToUse = role === 'hard' ? c.engine.hardWhen : null;
 
     return {
-      model: c.model,
+      model: cand.model,
       offer: best.offer,
       cost: best.cost,
       chosen: best,
-      quality: c.quality,
+      quality: cand.quality,
       reason,
       whenToUse,
-      alternatives: c.offers.filter((o) => o !== best).slice(0, 20),
-      offersCompared: c.offers.length,
+      alternatives: cand.offers.filter((o) => o !== best).slice(0, 20),
+      offersCompared: cand.offers.length,
       provisional: provisionalReasons.length > 0,
       provisionalReasons,
     };
@@ -345,16 +347,12 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   const hard = hardCandidate ? toPick(hardCandidate, 'hard', everydayCandidate) : null;
 
   const notes: string[] = [];
-  if (!everyday) {
-    notes.push(
-      `Nessun modello supera la soglia di qualità di ${gate.everyday}% con un provider che soddisfa i tuoi requisiti: non assegniamo un vincitore.`,
-    );
-  }
+  if (!everyday) notes.push(c.engine.noWinner(`${gate.everyday}%`));
   if (everyday && !hard) {
     notes.push(
       req.priority === 'qualita'
-        ? 'Fra i modelli con prove confrontabili, quello di ogni giorno è già il più capace: non abbiamo prove sufficienti per consigliarne un secondo.'
-        : `Nessun modello documenta una capacità superiore di almeno ${THRESHOLDS.backupQualityGapPoints} punti rispetto al quotidiano: preferiamo non indicare un backup piuttosto che indicarne uno senza prove.`,
+        ? c.engine.noBackupBest
+        : c.engine.noBackup(String(THRESHOLDS.backupQualityGapPoints)),
     );
   }
 
@@ -372,10 +370,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
       currentProviderName: ranked[0]?.offer.providerName ?? null,
       recommendedTotalUsd: recommendedTotal,
       deltaUsd: currentTotal !== null && recommendedTotal !== null ? currentTotal - recommendedTotal : null,
-      note:
-        currentTotal === null
-          ? 'Non abbiamo un prezzo verificato per il modello indicato, quindi non calcoliamo un confronto.'
-          : 'Confronto fra il prezzo più basso che monitoriamo per il tuo modello e quello consigliato, sugli stessi consumi. Non sappiamo quanto paghi davvero: indicaci il tuo provider per un confronto reale.',
+      note: currentTotal === null ? c.engine.savingsNoPrice : c.engine.savingsNote,
     };
   }
 

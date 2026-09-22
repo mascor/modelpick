@@ -6,6 +6,7 @@ import { SERVER, SITE, SOURCES } from '../config.js';
 import { recommend, type RecommendationRequest } from '../engine/recommend.js';
 import { buildOpenCodeConfig } from '../engine/opencode.js';
 import { SCENARIOS, TASK_IDS, PRIORITIES, type Priority, type TaskId } from '../engine/scenarios.js';
+import { DEFAULT_LANG, isLang, type Lang } from '../i18n.js';
 import { priceHistory, listRuns, previousRun } from '../pipeline/store.js';
 import { describeChange, type Change } from '../engine/changes.js';
 import { homePage, methodPage, sourcesPage, statusPage } from './html.js';
@@ -19,7 +20,7 @@ const positive = (v: string | undefined): number | undefined => {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 };
 
-export function parseRequest(q: Query): RecommendationRequest {
+export function parseRequest(q: Query, lang: Lang = DEFAULT_LANG): RecommendationRequest {
   const task = (TASK_IDS as string[]).includes(q['task'] ?? '') ? (q['task'] as TaskId) : 'bug';
   const priority = (PRIORITIES as string[]).includes(q['priority'] ?? '') ? (q['priority'] as Priority) : 'equilibrio';
   const usage = {
@@ -32,6 +33,7 @@ export function parseRequest(q: Query): RecommendationRequest {
   return {
     task,
     priority,
+    lang,
     usage: hasUsage ? usage : null,
     currentModelKey: q['currentModel'] || null,
     currentOfferId: q['currentOffer'] || null,
@@ -48,9 +50,9 @@ export async function buildServer() {
   });
 
   /** Everything a page needs: snapshot, recommendation and OpenCode config. */
-  const compute = async (query: Query) => {
+  const compute = async (query: Query, lang: Lang = DEFAULT_LANG) => {
     const snapshot = await currentSnapshot();
-    const request = parseRequest(query);
+    const request = parseRequest(query, lang);
     const noChanges: { everyday: Change | null; hard: Change | null } = { everyday: null, hard: null };
     if (!snapshot) return { snapshot: null, request, rec: null, config: null, models: [], changes: noChanges };
     const rec = recommend(snapshot, request);
@@ -71,36 +73,43 @@ export async function buildServer() {
     if (before) {
       const prima = recommend(before, request);
       changes = {
-        everyday: describeChange(prima.everyday, rec.everyday),
-        hard: describeChange(prima.hard, rec.hard),
+        everyday: describeChange(prima.everyday, rec.everyday, lang),
+        hard: describeChange(prima.hard, rec.hard, lang),
       };
     }
     return { snapshot, request, rec, config, models, changes };
   };
 
-  app.get('/', async (req, reply) => {
-    const { snapshot, request, rec, models, changes } = await compute(req.query as Query);
-    reply.type('text/html; charset=utf-8');
-    return homePage({ rec, snapshot, models, request, changes });
-  });
+  /** The same four pages in two languages: Italian at the root, English under /en. */
+  const registra = (lang: Lang, paths: { home: string; method: string; sources: string; status: string }) => {
+    app.get(paths.home, async (req, reply) => {
+      const { snapshot, request, rec, models, changes } = await compute(req.query as Query, lang);
+      reply.type('text/html; charset=utf-8');
+      return homePage({ lang, rec, snapshot, models, request, changes });
+    });
+    app.get(paths.method, async (_req, reply) => {
+      reply.type('text/html; charset=utf-8');
+      return methodPage(lang);
+    });
+    app.get(paths.sources, async (_req, reply) => {
+      reply.type('text/html; charset=utf-8');
+      return sourcesPage(await currentSnapshot(), lang);
+    });
+    app.get(paths.status, async (_req, reply) => {
+      reply.type('text/html; charset=utf-8');
+      return statusPage(await currentSnapshot(), await currentStatus(), lang);
+    });
+  };
 
-  app.get('/metodo', async (_req, reply) => {
-    reply.type('text/html; charset=utf-8');
-    return methodPage();
-  });
+  registra('it', { home: '/', method: '/metodo', sources: '/fonti', status: '/stato' });
+  registra('en', { home: '/en', method: '/en/method', sources: '/en/sources', status: '/en/status' });
+  // Trailing slash on the English home, so /en/ works like /en.
+  app.get('/en/', async (req, reply) => reply.redirect('/en' + (req.raw.url?.includes('?') ? req.raw.url.slice(req.raw.url.indexOf('?')) : ''), 301));
 
-  app.get('/fonti', async (_req, reply) => {
-    reply.type('text/html; charset=utf-8');
-    return sourcesPage(await currentSnapshot());
-  });
-
-  app.get('/stato', async (_req, reply) => {
-    reply.type('text/html; charset=utf-8');
-    return statusPage(await currentSnapshot(), await currentStatus());
-  });
+  const langOf = (q: Query): Lang => (isLang(q['lang']) ? q['lang'] : DEFAULT_LANG);
 
   app.get('/opencode.json', async (req, reply) => {
-    const { config } = await compute(req.query as Query);
+    const { config } = await compute(req.query as Query, langOf(req.query as Query));
     if (!config) return reply.code(404).send({ errore: 'Nessuna raccomandazione disponibile.' });
     reply.header('content-disposition', 'attachment; filename="opencode.json"');
     reply.type('application/json; charset=utf-8');
@@ -108,7 +117,7 @@ export async function buildServer() {
   });
 
   app.get('/api/raccomandazione', async (req) => {
-    const { snapshot, request, rec, config } = await compute(req.query as Query);
+    const { snapshot, request, rec, config } = await compute(req.query as Query, langOf(req.query as Query));
     if (!snapshot) return { errore: 'Nessuno snapshot pubblicato.' };
     return { richiesta: request, raccomandazione: rec, opencode: config, aggiornatoIl: snapshot.generatedAt };
   });

@@ -1,15 +1,17 @@
 /**
- * Server-rendered pages. The form is a plain GET form: the site works without
- * JavaScript, which also keeps it readable for screen readers and crawlers.
+ * Server-rendered pages, in both languages. The form is a plain GET form: the
+ * site works without JavaScript. Every user-facing string comes from the
+ * catalogue in i18n.ts - none is written here.
  */
 import { SITE, THRESHOLDS, SOURCES } from '../config.js';
 import type { ModelRecord, Snapshot, SourceStatus } from '../types.js';
 import type { OfferView, Pick, Recommendation, RecommendationRequest } from '../engine/recommend.js';
+import type { Change } from '../engine/changes.js';
+import { SCENARIOS, TASK_IDS, PRIORITIES } from '../engine/scenarios.js';
 import { accountName, usabilityLabel } from '../engine/usability.js';
 import { signupUrl } from '../engine/signup.js';
-import { configFor, modelIdFor } from '../engine/opencode.js';
-import type { Change } from '../engine/changes.js';
-import { SCENARIOS, TASK_IDS, PRIORITIES, type Priority } from '../engine/scenarios.js';
+import { configFor } from '../engine/opencode.js';
+import { t, pagePath, otherLang, type Lang } from '../i18n.js';
 import type { RunStatus } from '../pipeline/store.js';
 
 export const esc = (v: unknown): string =>
@@ -20,47 +22,72 @@ export const esc = (v: unknown): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-const nf = new Intl.NumberFormat('it-IT');
-const nf2 = new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const nf4 = new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const locale = (lang: Lang) => (lang === 'en' ? 'en-GB' : 'it-IT');
 
-const usd = (v: number | null): string => (v === null ? 'non disponibile' : `${nf2.format(v)} USD`);
+const fmt = (lang: Lang) => ({
+  n: new Intl.NumberFormat(locale(lang)),
+  n2: new Intl.NumberFormat(locale(lang), { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+  n4: new Intl.NumberFormat(locale(lang), { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
+});
 
-/** "DeepSeek: DeepSeek V3.2" -> "DeepSeek V3.2": il fornitore e gia scritto accanto. */
-const nomeModello = (raw: string): string => {
+const usd = (v: number | null, lang: Lang): string =>
+  v === null ? t(lang).home.notAvailable : `${fmt(lang).n2.format(v)} USD`;
+
+const tokens = (v: number, lang: Lang): string => {
+  const f = fmt(lang);
+  return v >= 1_000_000 ? `${f.n.format(Math.round(v / 100_000) / 10)} M` : f.n.format(v);
+};
+
+const dateLong = (iso: string | null | undefined, lang: Lang): string => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString(locale(lang), {
+    day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome',
+  });
+};
+const dateDay = (iso: string | null | undefined, lang: Lang): string => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(locale(lang), { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Europe/Rome' });
+};
+const dateShort = (iso: string | null | undefined, lang: Lang): string => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(locale(lang), { month: 'short', year: 'numeric', timeZone: 'Europe/Rome' });
+};
+
+/** "DeepSeek: DeepSeek V3.2" -> "DeepSeek V3.2": the vendor is written beside it. */
+const modelName = (raw: string): string => {
   const i = raw.indexOf(': ');
   return i > 0 ? raw.slice(i + 2) : raw;
 };
-const tokens = (v: number): string => (v >= 1_000_000 ? `${nf.format(Math.round(v / 100_000) / 10)} M` : nf.format(v));
 
-const dateIt = (iso: string | null | undefined): string => {
-  if (!iso) return 'data non disponibile';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'data non disponibile';
-  return d.toLocaleString('it-IT', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' });
-};
-const meseAnno = (iso: string | null | undefined): string => {
-  if (!iso) return 'data non nota';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'data non nota';
-  return d.toLocaleDateString('it-IT', { month: 'short', year: 'numeric', timeZone: 'Europe/Rome' });
-};
+type PageId = 'home' | 'method' | 'sources' | 'status';
 
-const dayIt = (iso: string | null | undefined): string => {
-  if (!iso) return 'data non nota';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'data non nota';
-  return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Europe/Rome' });
-};
-
-export function layout(opts: { title: string; description: string; body: string; active?: string }): string {
+export function layout(opts: { lang: Lang; title: string; description: string; body: string; active: PageId }): string {
+  const c = t(opts.lang);
+  const other = otherLang(opts.lang);
+  const canonical = `https://${SITE.domain}${pagePath(opts.lang, opts.active)}`;
+  const nav: [PageId, string][] = [
+    ['home', c.nav.choice],
+    ['method', c.nav.method],
+    ['sources', c.nav.sources],
+    ['status', c.nav.status],
+  ];
   return `<!doctype html>
-<html lang="it">
+<html lang="${esc(c.htmlLang)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(opts.title)}</title>
 <meta name="description" content="${esc(opts.description)}">
+<link rel="canonical" href="${esc(canonical)}">
+<link rel="alternate" hreflang="it" href="https://${esc(SITE.domain)}${esc(pagePath('it', opts.active))}">
+<link rel="alternate" hreflang="en" href="https://${esc(SITE.domain)}${esc(pagePath('en', opts.active))}">
+<link rel="alternate" hreflang="x-default" href="https://${esc(SITE.domain)}${esc(pagePath('it', opts.active))}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Courier+Prime:wght@400;700&display=swap">
@@ -69,22 +96,20 @@ export function layout(opts: { title: string; description: string; body: string;
 <body>
 <header class="intestazione">
   <div class="intestazione__barra">
-    <a class="marchio" href="/">
+    <a class="marchio" href="${esc(pagePath(opts.lang, 'home'))}">
       <span class="marchio__nome">MODELPICK</span>
       <span class="marchio__di">by CloudSalus</span>
     </a>
     <nav class="menu">
-      <a href="/"${opts.active === 'home' ? ' aria-current="page"' : ''}>Scelta</a>
-      <a href="/metodo"${opts.active === 'metodo' ? ' aria-current="page"' : ''}>Metodo</a>
-      <a href="/fonti"${opts.active === 'fonti' ? ' aria-current="page"' : ''}>Fonti</a>
-      <a href="/stato"${opts.active === 'stato' ? ' aria-current="page"' : ''}>Stato</a>
+      ${nav.map(([id, label]) => `<a href="${esc(pagePath(opts.lang, id))}"${opts.active === id ? ' aria-current="page"' : ''}>${esc(label)}</a>`).join('')}
+      <a class="lingua" href="${esc(pagePath(other, opts.active))}" hreflang="${esc(other)}">${esc(c.nav.otherLang)}</a>
     </nav>
   </div>
 </header>
 <main>${opts.body}</main>
 <footer class="pie">
   <div class="contenitore pie__righe">
-    <p class="meta"><strong>${esc(SITE.name)}</strong> di CloudSalus · <a href="/metodo">Metodo</a> · <a href="/fonti">Fonti</a> · <a href="/stato">Stato</a> · codice MIT</p>
+    <p class="meta"><strong>${esc(SITE.name)}</strong> by CloudSalus · <a href="${esc(pagePath(opts.lang, 'method'))}">${esc(c.nav.method)}</a> · <a href="${esc(pagePath(opts.lang, 'sources'))}">${esc(c.nav.sources)}</a> · <a href="${esc(pagePath(opts.lang, 'status'))}">${esc(c.nav.status)}</a> · MIT</p>
   </div>
 </footer>
 <script src="/static/app.js" defer></script>
@@ -95,24 +120,23 @@ export function layout(opts: { title: string; description: string; body: string;
 const option = (value: string, label: string, selected: string): string =>
   `<option value="${esc(value)}"${value === selected ? ' selected' : ''}>${esc(label)}</option>`;
 
-/**
- * How to buy, and how to switch. Every provider row carries the two things you
- * need: what it costs you per month, and the exact command to use it.
- */
-function renderConfronto(pick: Pick, role: string): string {
+/** The provider comparison: the answer to "where do I buy this". */
+function renderConfronto(pick: Pick, role: string, lang: Lang): string {
+  const c = t(lang);
   const riga = (o: OfferView, i: number, scelto: boolean) => {
     const id = `cmd-${role}-${i}`;
-    const comando = `opencode -m ${modelIdFor(o.offer)}`;
+    const comando = configFor(o.offer, lang).command;
+    const link = signupUrl(o.offer);
     return `<tr${scelto ? ' class="scelto"' : ''}>
       <td>
         <strong>${esc(o.offer.providerName)}</strong>
-        <span class="meta">${esc(usabilityLabel(o.usability, o.offer))}</span>
+        <span class="meta">${esc(usabilityLabel(o.usability, o.offer, lang))}</span>
       </td>
-      <td class="num nowrap"><strong>${esc(usd(o.cost.totalUsd))}</strong></td>
+      <td class="num nowrap"><strong>${esc(usd(o.cost.totalUsd, lang))}</strong></td>
       <td class="azione">
         <code class="nascosto" id="${esc(id)}">${esc(comando)}</code>
-        ${signupUrl(o.offer) ? `<a class="riga-link" href="${esc(signupUrl(o.offer)!)}" target="_blank" rel="noopener">chiave</a>` : ''}
-        <button class="bottone bottone--contorno bottone--piccolo" type="button" data-copia="#${esc(id)}">Copia</button>
+        ${link ? `<a class="riga-link" href="${esc(link)}" target="_blank" rel="noopener">${esc(c.home.key)}</a>` : ''}
+        <button class="bottone bottone--contorno bottone--piccolo" type="button" data-copia="#${esc(id)}">${esc(c.home.copy)}</button>
       </td>
     </tr>`;
   };
@@ -121,7 +145,7 @@ function renderConfronto(pick: Pick, role: string): string {
   const restanti = pick.alternatives.slice(3);
 
   return `<div class="acquisto">
-    <h4 class="acquisto__titolo">Dove comprarlo</h4>
+    <h4 class="acquisto__titolo">${esc(c.home.whereToBuy)}</h4>
     <table class="tabella confronto">
       <tbody>
         ${riga(pick.chosen, 0, true)}
@@ -129,7 +153,7 @@ function renderConfronto(pick: Pick, role: string): string {
       </tbody>
     </table>
     ${restanti.length ? `<details class="dettagli">
-      <summary>Altri ${esc(String(restanti.length))} provider</summary>
+      <summary>${esc(c.home.otherProviders(restanti.length))}</summary>
       <div class="dettagli__corpo">
         <table class="tabella confronto"><tbody>${restanti.slice(0, 16).map((o, i) => riga(o, i + 100, false)).join('')}</tbody></table>
       </div>
@@ -137,129 +161,131 @@ function renderConfronto(pick: Pick, role: string): string {
   </div>`;
 }
 
-function renderDettagli(pick: Pick): string {
+function renderDettagli(pick: Pick, lang: Lang): string {
+  const c = t(lang);
   const q = pick.quality;
+  const f = fmt(lang);
   const righe = pick.cost.lines
     .filter((l) => l.tokens > 0)
     .map((l) => `<div class="prezzi__riga">
-        <span class="prezzi__etichetta">${esc(l.label)} · ${esc(tokens(l.tokens))} token</span>
-        <span>${esc(usd(l.usd))}</span>
+        <span class="prezzi__etichetta">${esc(l.label)} · ${esc(tokens(l.tokens, lang))} token</span>
+        <span>${esc(usd(l.usd, lang))}</span>
       </div>`)
     .join('');
   const commissioni = [
-    ...pick.cost.feeNotes.map((n) => `<div class="prezzi__riga"><span class="prezzi__etichetta">${esc(n)}</span><span>${esc(usd(pick.cost.feesUsd))}</span></div>`),
-    ...pick.cost.unquantifiedFees.map((n) => `<div class="prezzi__riga"><span class="prezzi__etichetta">${esc(n)}</span><span class="etichetta etichetta--commissione">non quantificata</span></div>`),
+    ...pick.cost.feeNotes.map((n) => `<div class="prezzi__riga"><span class="prezzi__etichetta">${esc(n)}</span><span>${esc(usd(pick.cost.feesUsd, lang))}</span></div>`),
+    ...pick.cost.unquantifiedFees.map((n) => `<div class="prezzi__riga"><span class="prezzi__etichetta">${esc(n)}</span><span class="etichetta etichetta--commissione">—</span></div>`),
   ].join('');
 
+  const profilo = pick.offer.profile;
+  const gdpr = profilo?.gdpr === true ? c.home.gdprYes : profilo?.gdpr === false ? c.home.gdprNo : c.home.gdprUnknown;
+
   return `<details class="dettagli">
-    <summary>Perché proprio questo</summary>
+    <summary>${esc(c.home.whyThis)}</summary>
     <div class="dettagli__corpo">
       <p>${esc(pick.reason)}</p>
-      <p><strong>La prova.</strong> ${esc(q.value.toFixed(1))}% di problemi risolti su ${q.metric === 'swebench_verified' ? 'SWE-bench Verified' : 'Aider polyglot'}, misurato con ${esc(q.harness)} il ${esc(dayIt(q.measuredAt))}. <a href="${esc(q.sourceUrl)}" rel="noopener">Vedi la misura</a>.</p>
+      <p>${c.home.theEvidence(esc(q.value.toFixed(1)) + '%', q.metric === 'swebench_verified' ? 'SWE-bench Verified' : 'Aider polyglot', esc(q.harness), esc(dateDay(q.measuredAt, lang)))} <a href="${esc(q.sourceUrl)}" rel="noopener">${esc(c.home.priceSource)}</a>.</p>
       <div class="prezzi">${righe}${commissioni}
-        <div class="prezzi__riga prezzi__riga--totale"><span>Totale stimato al mese</span><span>${esc(usd(pick.cost.totalUsd))}</span></div>
+        <div class="prezzi__riga prezzi__riga--totale"><span>${esc(c.home.monthlyTotal)}</span><span>${esc(usd(pick.cost.totalUsd, lang))}</span></div>
       </div>
       ${pick.cost.assumptions.length ? `<p class="meta">${pick.cost.assumptions.map(esc).join(' ')}</p>` : ''}
-      ${pick.provisional ? `<p class="meta">Raccomandazione provvisoria: ${esc(pick.provisionalReasons.join('; '))}.</p>` : ''}
-      <p class="meta">Prezzo verificato il ${esc(dateIt(pick.offer.observedAt))}. <a href="${esc(pick.offer.sourceUrl)}" rel="noopener">Fonte del prezzo</a>${pick.model.officialUrl ? ` · <a href="${esc(pick.model.officialUrl)}" rel="noopener">Pagina del modello</a>` : ''}.</p>
+      ${pick.provisional ? `<p class="meta">${esc(pick.provisionalReasons.join('; '))}.</p>` : ''}
+      <p><strong>${esc(c.home.whoIs(pick.offer.providerName))}</strong> ${profilo
+        ? `${esc(c.home.profileKnown(profilo.hqCountry ?? c.home.countryUnknown, gdpr))}${profilo.directoryUrl ? `. <a href="${esc(profilo.directoryUrl)}" rel="noopener">${esc(c.home.directoryLink)}</a>` : ''}.`
+        : esc(c.home.profileUnknown)} ${esc(c.home.geoNote)}</p>
+      <p class="meta">${esc(c.home.priceChecked(dateLong(pick.offer.observedAt, lang)))} <a href="${esc(pick.offer.sourceUrl)}" rel="noopener">${esc(c.home.priceSource)}</a>${pick.model.officialUrl ? ` · <a href="${esc(pick.model.officialUrl)}" rel="noopener">${esc(c.home.modelPage)}</a>` : ''}. ${esc(f.n.format(pick.offersCompared))} provider.</p>
     </div>
   </details>`;
 }
 
-function renderPick(
-  pick: Pick | null,
-  role: 'quotidiano' | 'difficile',
-  change: Change | null,
-  empty: string,
-): string {
-  const titolo = role === 'quotidiano' ? '🟢 Ogni giorno' : '🟠 Per i problemi difficili';
+function renderPick(pick: Pick | null, role: 'quotidiano' | 'difficile', change: Change | null, lang: Lang, empty: string): string {
+  const c = t(lang);
+  const titolo = role === 'quotidiano' ? c.home.everyday : c.home.hard;
   if (!pick) {
     return `<article class="scheda pick pick--${role}">
       <p class="pick__ruolo">${esc(titolo)}</p>
       <div class="avviso avviso--neutro">${esc(empty)}</div>
     </article>`;
   }
-  const conf = configFor(pick.offer);
+  const conf = configFor(pick.offer, lang);
+  const link = signupUrl(pick.offer);
   return `<article class="scheda pick pick--${role}">
     <p class="pick__ruolo">${esc(titolo)}</p>
-    <h3 class="pick__modello">${esc(nomeModello(pick.model.displayName))}</h3>
-    <p class="pick__sintesi"><strong>${esc(usd(pick.cost.totalUsd))}</strong> stimati al mese a consumo · benchmark <strong>${esc(pick.quality.value.toFixed(0))}%</strong> <span class="meta nowrap">SWE-bench ${esc(meseAnno(pick.quality.measuredAt))}</span></p>
-    ${pick.cost.unquantifiedFees.length ? '<p class="allerta">Stima incompleta: una commissione applicabile non è quantificabile, il confronto fra provider vicini può ribaltarsi.</p>' : ''}
+    <h3 class="pick__modello">${esc(modelName(pick.model.displayName))}</h3>
+    <p class="pick__sintesi">${esc(c.home.perMonth(usd(pick.cost.totalUsd, lang)))} · ${esc(c.home.benchmark(pick.quality.value.toFixed(0) + '%', ''))} <span class="meta nowrap">SWE-bench ${esc(dateShort(pick.quality.measuredAt, lang))}</span></p>
+    ${pick.cost.unquantifiedFees.length ? `<p class="allerta">${esc(c.home.incompleteEstimate)}</p>` : ''}
     ${change?.moved ? `<p class="pick__cambio pick__cambio--mosso">${esc(change.text)}</p>` : ''}
     <ol class="passi">
       <li class="passo">
-        <span class="passo__testo">Prendi la chiave su <strong>${esc(accountName(pick.offer))}</strong></span>
-        ${signupUrl(pick.offer) ? `<a class="bottone bottone--contorno bottone--piccolo" href="${esc(signupUrl(pick.offer)!)}" target="_blank" rel="noopener">Apri</a>` : ''}
+        <span class="passo__testo">${esc(c.home.getKey(accountName(pick.offer)))}</span>
+        ${link ? `<a class="bottone bottone--contorno bottone--piccolo" href="${esc(link)}" target="_blank" rel="noopener">${esc(c.home.open)}</a>` : ''}
       </li>
       ${pick.offer.apiKeyEnv ? `<li class="passo">
-        <code class="passo__codice" id="key-${esc(role)}">export ${esc(pick.offer.apiKeyEnv)}="la-tua-chiave"</code>
-        <button class="bottone bottone--contorno bottone--piccolo" type="button" data-copia="#key-${esc(role)}">Copia</button>
+        <code class="passo__codice" id="key-${esc(role)}">export ${esc(pick.offer.apiKeyEnv)}="..."</code>
+        <button class="bottone bottone--contorno bottone--piccolo" type="button" data-copia="#key-${esc(role)}">${esc(c.home.copy)}</button>
       </li>` : ''}
       ${conf.config ? `<li class="passo">
-        <span class="passo__testo">Salva <code>opencode.json</code> con ${esc(pick.offer.providerName)} fissato</span>
+        <span class="passo__testo">${esc(c.home.saveConfig(pick.offer.providerName))}</span>
         <code class="nascosto" id="config-${esc(role)}">${esc(conf.config)}</code>
-        <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">Copia configurazione</button>
+        <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">${esc(c.home.copyConfig)}</button>
       </li>` : `<li class="passo">
         <code class="passo__codice" id="config-${esc(role)}">${esc(conf.command)}</code>
-        <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">Copia comando</button>
+        <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">${esc(c.home.copyCommand)}</button>
       </li>`}
     </ol>
     ${conf.pinNote ? `<p class="passi__nota">${esc(conf.pinNote)}</p>` : ''}
-    ${renderConfronto(pick, role)}
-    ${renderDettagli(pick)}
+    ${renderConfronto(pick, role, lang)}
+    ${renderDettagli(pick, lang)}
   </article>`;
 }
 
 /** Everything that used to be a question, tucked away for whoever wants it. */
-function renderIpotesi(req: RecommendationRequest, rec: Recommendation | null, models: ModelRecord[]): string {
+function renderIpotesi(req: RecommendationRequest, rec: Recommendation | null, models: ModelRecord[], lang: Lang): string {
+  const c = t(lang);
   const modelOptions = models
     .slice()
-    .sort((a, b) => nomeModello(a.displayName).localeCompare(nomeModello(b.displayName)))
-    .map((m) => option(m.key, nomeModello(m.displayName), req.currentModelKey ?? ''))
+    .sort((a, b) => modelName(a.displayName).localeCompare(modelName(b.displayName)))
+    .map((m) => option(m.key, modelName(m.displayName), req.currentModelKey ?? ''))
     .join('');
   return `<details class="dettagli dettagli--ipotesi">
-    <summary>Cambia il tipo di lavoro o i tuoi consumi</summary>
+    <summary>${esc(c.home.customise)}</summary>
     <div class="dettagli__corpo">
-      <p class="meta">Di base stimiamo i costi su un mese di lavoro con un agente di codice: ${rec ? `${esc(tokens(rec.mix.input))} token di input, ${esc(tokens(rec.mix.output))} di output, ${esc(tokens(rec.mix.cacheRead))} letti dalla cache. È un'ipotesi dichiarata, non una misura dei tuoi consumi.` : ''}</p>
-      <form class="modulo" method="get" action="/">
+      ${rec ? `<p class="meta">${esc(c.home.scenarioNote(tokens(rec.mix.input, lang), tokens(rec.mix.output, lang), tokens(rec.mix.cacheRead, lang)))}</p>` : ''}
+      <form class="modulo" method="get" action="${esc(pagePath(lang, 'home'))}">
         <div class="modulo__righe">
           <div class="campo">
-            <label for="task">Tipo di lavoro</label>
-            <select id="task" name="task">${TASK_IDS.map((t) => option(t, SCENARIOS[t].label, req.task)).join('')}</select>
+            <label for="task">${esc(c.home.workType)}</label>
+            <select id="task" name="task">${TASK_IDS.map((t2) => option(t2, c.tasks[t2] ?? SCENARIOS[t2].label, req.task)).join('')}</select>
           </div>
           <div class="campo">
-            <label for="priority">Cosa conta di più</label>
-            <select id="priority" name="priority">
-              ${option('risparmio', 'Spendere poco', req.priority)}
-              ${option('equilibrio', 'Equilibrio', req.priority)}
-              ${option('qualita', 'Lavorare bene', req.priority)}
-            </select>
+            <label for="priority">${esc(c.home.priority)}</label>
+            <select id="priority" name="priority">${PRIORITIES.map((p) => option(p, c.priorities[p] ?? p, req.priority)).join('')}</select>
           </div>
           <div class="campo">
-            <label for="input">Token di input al mese</label>
-            <input id="input" name="input" type="number" min="0" step="100000" value="${req.usage?.input ?? ''}" placeholder="predefinito">
+            <label for="input">${esc(c.home.tokensIn)}</label>
+            <input id="input" name="input" type="number" min="0" step="100000" value="${req.usage?.input ?? ''}" placeholder="${esc(c.home.defaultValue)}">
           </div>
           <div class="campo">
-            <label for="output">Token di output al mese</label>
-            <input id="output" name="output" type="number" min="0" step="10000" value="${req.usage?.output ?? ''}" placeholder="predefinito">
+            <label for="output">${esc(c.home.tokensOut)}</label>
+            <input id="output" name="output" type="number" min="0" step="10000" value="${req.usage?.output ?? ''}" placeholder="${esc(c.home.defaultValue)}">
           </div>
           <div class="campo">
-            <label for="cacheRead">Lettura cache al mese</label>
-            <input id="cacheRead" name="cacheRead" type="number" min="0" step="100000" value="${req.usage?.cacheRead ?? ''}" placeholder="predefinito">
+            <label for="cacheRead">${esc(c.home.cacheRead)}</label>
+            <input id="cacheRead" name="cacheRead" type="number" min="0" step="100000" value="${req.usage?.cacheRead ?? ''}" placeholder="${esc(c.home.defaultValue)}">
           </div>
           <div class="campo">
-            <label for="cacheWrite">Scrittura cache al mese</label>
-            <input id="cacheWrite" name="cacheWrite" type="number" min="0" step="100000" value="${req.usage?.cacheWrite ?? ''}" placeholder="predefinito">
+            <label for="cacheWrite">${esc(c.home.cacheWrite)}</label>
+            <input id="cacheWrite" name="cacheWrite" type="number" min="0" step="100000" value="${req.usage?.cacheWrite ?? ''}" placeholder="${esc(c.home.defaultValue)}">
           </div>
           <div class="campo">
-            <label for="currentModel">Modello che usi oggi</label>
+            <label for="currentModel">${esc(c.home.currentModel)}</label>
             <select id="currentModel" name="currentModel">
-              <option value="">Non indicato</option>${modelOptions}
+              <option value="">${esc(c.home.notSet)}</option>${modelOptions}
             </select>
           </div>
         </div>
         <div class="modulo__azioni">
-          <button class="bottone bottone--piccolo" type="submit">Ricalcola</button>
+          <button class="bottone bottone--piccolo" type="submit">${esc(c.home.recompute)}</button>
         </div>
       </form>
     </div>
@@ -267,178 +293,147 @@ function renderIpotesi(req: RecommendationRequest, rec: Recommendation | null, m
 }
 
 export function homePage(opts: {
+  lang: Lang;
   rec: Recommendation | null;
   snapshot: Snapshot | null;
   models: ModelRecord[];
   request: RecommendationRequest;
   changes: { everyday: Change | null; hard: Change | null };
 }): string {
-  const { rec, snapshot, models, request, changes } = opts;
+  const { lang, rec, snapshot, models, request, changes } = opts;
+  const c = t(lang);
   const stale = rec?.method.snapshotStale ?? false;
 
   const body = `
 <section class="hero hero--compatto">
   <div class="contenitore">
-    <p class="hero__sopratitolo">${snapshot ? `Prezzi verificati il ${esc(dateIt(snapshot.generatedAt))}` : 'Nessun dato verificato'}</p>
-    <h1>Che modello usi oggi</h1>
+    <p class="hero__sopratitolo">${snapshot ? esc(c.home.pricesVerified(dateLong(snapshot.generatedAt, lang))) : esc(c.home.noData)}</p>
+    <h1>${esc(c.home.title)}</h1>
   </div>
 </section>
 
 <section class="sezione">
   <div class="contenitore">
-    ${!snapshot ? '<div class="avviso avviso--errore">Non è ancora stato pubblicato nessun aggiornamento verificato.</div>' : ''}
-    ${stale ? '<div class="avviso">Questi dati non sono stati verificati oggi: la data reale è qui sopra.</div>' : ''}
+    ${!snapshot ? `<div class="avviso avviso--errore">${esc(c.home.noData)}</div>` : ''}
+    ${stale ? `<div class="avviso">${esc(c.home.stale)}</div>` : ''}
     ${rec?.notes.map((n) => `<div class="avviso">${esc(n)}</div>`).join('') ?? ''}
     <div class="risultati">
-      ${renderPick(rec?.everyday ?? null, 'quotidiano', changes.everyday, 'Nessun modello supera la soglia di qualità con un prezzo verificato. Preferiamo non indicare un vincitore piuttosto che indicarne uno senza prove.')}
-      ${renderPick(rec?.hard ?? null, 'difficile', changes.hard, 'Nessun modello risolve abbastanza più problemi da giustificarne un secondo.')}
+      ${renderPick(rec?.everyday ?? null, 'quotidiano', changes.everyday, lang, c.home.noEveryday)}
+      ${renderPick(rec?.hard ?? null, 'difficile', changes.hard, lang, c.home.noHard)}
     </div>
-    ${rec?.savings && rec.savings.deltaUsd !== null ? `<p class="risparmio">Confronto con il <strong>prezzo piu basso monitorato</strong> per il modello che hai indicato${rec.savings.currentProviderName ? ` (${esc(rec.savings.currentProviderName)})` : ''}, non con quello che paghi tu: ${rec.savings.deltaUsd > 0 ? `<strong>${esc(usd(rec.savings.deltaUsd))} al mese in meno</strong>` : `<strong>${esc(usd(Math.abs(rec.savings.deltaUsd)))} al mese in piu</strong>`} sugli stessi consumi.</p>` : ''}
+    ${rec?.savings && rec.savings.deltaUsd !== null ? `<p class="risparmio">${c.home.comparison(rec.savings.currentProviderName ? esc(rec.savings.currentProviderName) : null, esc(usd(Math.abs(rec.savings.deltaUsd), lang)), rec.savings.deltaUsd > 0)}</p>` : ''}
     <div class="coda">
-      ${renderIpotesi(request, rec, models)}
+      ${renderIpotesi(request, rec, models, lang)}
     </div>
   </div>
 </section>
 `;
   return layout({
-    title: `${SITE.name} — ${SITE.tagline}`,
-    description:
-      'Quale modello AI usare oggi per programmare, quale tenere per i problemi difficili e da quale provider conviene comprarlo. Prezzi verificati ogni giorno.',
+    lang,
+    title: `${SITE.name} — ${c.home.title}`,
+    description: c.siteDescription,
     body,
     active: 'home',
   });
 }
 
-export function methodPage(): string {
+export function methodPage(lang: Lang): string {
+  const c = t(lang);
+  const m = c.method;
+  const soglie: [string, string][] = [
+    [String(THRESHOLDS.offerStaleHours), lang === 'en' ? 'hours: a price older than this cannot win' : 'ore: un prezzo più vecchio non può vincere'],
+    [String(THRESHOLDS.snapshotStaleHours), lang === 'en' ? 'hours: the data is flagged as out of date' : 'ore: i dati vengono segnalati come obsoleti'],
+    [String(THRESHOLDS.evidenceStaleDays), lang === 'en' ? 'days: an older measurement makes the pick provisional' : 'giorni: una misura più vecchia rende la scelta provvisoria'],
+    [`${THRESHOLDS.priceJumpFactor}×`, lang === 'en' ? 'price change: the offer is quarantined' : 'variazione di prezzo: offerta in quarantena'],
+    [`${THRESHOLDS.maxPricePerMTok} USD/1M`, lang === 'en' ? 'above this a price is discarded as a unit error' : 'oltre questo il prezzo è scartato come errore di unità'],
+    [`${THRESHOLDS.minUptime30m}%`, lang === 'en' ? 'minimum recent availability' : 'disponibilità recente minima'],
+    [String(THRESHOLDS.backupQualityGapPoints), lang === 'en' ? 'points the backup must add' : 'punti che il modello di riserva deve aggiungere'],
+  ];
   const body = `<section class="sezione">
   <div class="contenitore">
-    <h1>Metodo, soglie e limiti</h1>
-    <p>Questa pagina descrive esattamente come si arriva alle due raccomandazioni. Se qualcosa qui non ti convince, la scelta giusta e non fidarti del risultato: per questo pubblichiamo tutto.</p>
-
-    <div class="scheda" style="margin-bottom:20px">
-      <h2>Ordine delle decisioni</h2>
-      <ol class="elenco">
-        <li><strong>Prima i modelli.</strong> Consideriamo solo modelli con una misura pubblicata di qualità sul codice, ottenuta nelle stesse condizioni degli altri. Un modello senza prove confrontabili non può vincere.</li>
-        <li><strong>La tua scelta cambia che cosa significa "il migliore".</strong> Con "spendere poco" ed "equilibrio" prendiamo il modello meno costoso che supera la soglia di qualità. Con "lavorare bene" prendiamo il punteggio più alto, e il prezzo decide solo fra modelli praticamente pari.</li>
-        <li><strong>Poi i provider.</strong> Per ogni modello ammesso cerchiamo tutte le offerte monitorate e teniamo quelle che soddisfano i requisiti indicati.</li>
-        <li><strong>Infine la convenienza.</strong> Ogni offerta viene calcolata per intero, commissioni incluse, sullo stesso scenario di consumo.</li>
-      </ol>
+    <h1>${esc(m.title)}</h1>
+    <p>${esc(m.intro)}</p>
+    <div class="scheda" style="margin-bottom:20px"><h2>${esc(m.orderTitle)}</h2><ol class="elenco">${m.order.map((x) => `<li>${x}</li>`).join('')}</ol></div>
+    <div class="scheda" style="margin-bottom:20px"><h2>${esc(m.notTitle)}</h2><ul class="elenco">${m.not.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+    <div class="scheda" style="margin-bottom:20px"><h2>${esc(m.thresholdsTitle)}</h2>
+      <table class="tabella"><tbody>${soglie.map(([v, d]) => `<tr><td class="num"><strong>${esc(v)}</strong></td><td>${esc(d)}</td></tr>`).join('')}</tbody></table>
     </div>
-
-    <div class="scheda" style="margin-bottom:20px">
-      <h2>Che cosa non facciamo</h2>
-      <ul class="elenco">
-        <li>Non dividiamo il punteggio di qualità per il prezzo: non è una misura di niente.</li>
-        <li>Non trattiamo la differenza fra due punteggi come una percentuale di qualità.</li>
-        <li>Non confrontiamo misure ottenute con banchi di prova, versioni o condizioni diverse: ogni misura porta con se il gruppo di confronto a cui appartiene.</li>
-        <li>Non equipariamo versioni, quantizzazioni o modalita diverse dello stesso modello: sono offerte distinte.</li>
-        <li>Non assumiamo che il prezzo di un intermediario valga anche comprando direttamente dal provider.</li>
-        <li>Non inventiamo consumi, percentuali di cache o tassi di riuscita.</li>
-      </ul>
-    </div>
-
-    <div class="scheda" style="margin-bottom:20px">
-      <h2>Soglie in vigore</h2>
-      <table class="tabella">
-        <tbody>
-          <tr><td>Un prezzo non verificato da più di</td><td class="num">${esc(String(THRESHOLDS.offerStaleHours))} ore</td><td>non può vincere il confronto</td></tr>
-          <tr><td>Uno snapshot più vecchio di</td><td class="num">${esc(String(THRESHOLDS.snapshotStaleHours))} ore</td><td>viene segnalato come obsoleto in pagina</td></tr>
-          <tr><td>Una misura di qualità più vecchia di</td><td class="num">${esc(String(THRESHOLDS.evidenceStaleDays))} giorni</td><td>rende la raccomandazione provvisoria</td></tr>
-          <tr><td>Una variazione di prezzo oltre un fattore</td><td class="num">${esc(String(THRESHOLDS.priceJumpFactor))}×</td><td>mette l\'offerta in quarantena</td></tr>
-          <tr><td>Un prezzo superiore a</td><td class="num">${esc(String(THRESHOLDS.maxPricePerMTok))} USD/1M</td><td>viene scartato come probabile errore di unità</td></tr>
-          <tr><td>Disponibilità recente sotto</td><td class="num">${esc(String(THRESHOLDS.minUptime30m))}%</td><td>esclude l\'offerta</td></tr>
-          <tr><td>Il modello di riserva deve superare il quotidiano di almeno</td><td class="num">${esc(String(THRESHOLDS.backupQualityGapPoints))} punti</td><td>altrimenti non lo indichiamo</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="scheda" style="margin-bottom:20px">
-      <h2>Dati mancanti</h2>
-      <p>Un prezzo mancante non diventa mai zero: l\'offerta viene esclusa dal confronto e lo diciamo. Se una fonte non risponde, conserviamo l\'ultimo dato valido e ne dichiariamo l\'età. Se le prove non bastano, la raccomandazione e marcata come <em>provvisoria</em>; se non bastano proprio, non assegniamo un vincitore.</p>
-    </div>
-
-    <div class="scheda">
-      <h2>Limiti dichiarati</h2>
-      <ul class="elenco">
-        <li>Copriamo i provider monitorati dalle fonti abilitate, non tutto il mercato. La formula che usiamo e sempre: "il più economico tra i provider monitorati che soddisfano i tuoi requisiti".</li>
-        <li>La disponibilità per paese è il trattamento dei dati spesso non sono pubblicati in modo strutturato: quando non li conosciamo lo scriviamo invece di indovinare.</li>
-        <li>Gli scenari di consumo sono ipotesi dichiarate e modificabili, non misure dei tuoi consumi.</li>
-        <li>I banchi di prova pubblici misurano un agente su compiti standard: sono un indizio serio, non una garanzia sul tuo repository.</li>
-      </ul>
-    </div>
+    <div class="scheda" style="margin-bottom:20px"><h2>${esc(m.missingTitle)}</h2><p>${esc(m.missing)}</p></div>
+    <div class="scheda"><h2>${esc(m.limitsTitle)}</h2><ul class="elenco">${m.limits.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
   </div>
 </section>`;
-  return layout({ title: `Metodo — ${SITE.name}`, description: 'Come ModelPick sceglie i modelli e i provider: regole, soglie, dati mancanti e limiti.', body, active: 'metodo' });
+  return layout({ lang, title: `${m.title} — ${SITE.name}`, description: m.intro, body, active: 'method' });
 }
 
-export function sourcesPage(snapshot: Snapshot | null): string {
+export function sourcesPage(snapshot: Snapshot | null, lang: Lang): string {
+  const c = t(lang);
+  const f = fmt(lang);
   const statuses = new Map<string, SourceStatus>();
   for (const s of snapshot?.sources ?? []) if (!statuses.has(s.id)) statuses.set(s.id, s);
 
   const rows = SOURCES.map((cfg) => {
     const st = statuses.get(cfg.id);
     const state = !cfg.enabled
-      ? '<span class="etichetta etichetta--attenzione">non abilitata</span>'
+      ? `<span class="etichetta etichetta--attenzione">${esc(c.sources.off)}</span>`
       : st?.outcome === 'ok'
-        ? '<span class="etichetta etichetta--ok">attiva</span>'
+        ? `<span class="etichetta etichetta--ok">${esc(c.sources.active)}</span>`
         : st
-          ? '<span class="etichetta etichetta--attenzione">errore nell\'ultimo aggiornamento</span>'
-          : '<span class="etichetta etichetta--info">mai eseguita</span>';
+          ? `<span class="etichetta etichetta--attenzione">${esc(c.sources.failed)}</span>`
+          : `<span class="etichetta etichetta--info">${esc(c.sources.never)}</span>`;
     return `<tr>
       <td><a href="${esc(cfg.url)}" rel="noopener">${esc(cfg.name)}</a></td>
       <td>${state}</td>
       <td>${esc(cfg.licence)}</td>
       <td>${esc(cfg.note ?? cfg.attribution)}</td>
-      <td class="num">${esc(st ? nf.format(st.itemCount) : '—')}</td>
+      <td class="num">${esc(st ? f.n.format(st.itemCount) : '—')}</td>
     </tr>`;
   }).join('');
 
   const body = `<section class="sezione">
   <div class="contenitore">
-    <h1>Fonti</h1>
-    <div class="scheda" style="margin-bottom:20px">
+    <h1>${esc(c.sources.title)}</h1>
+    <div class="scheda">
       <table class="tabella">
-        <thead><tr><th>Fonte</th><th>Stato</th><th>Licenza o condizioni</th><th>Nota</th><th class="num">Righe</th></tr></thead>
+        <thead><tr>${c.sources.cols.map((h, i) => `<th${i === 4 ? ' class="num"' : ''}>${esc(h)}</th>`).join('')}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
   </div>
 </section>`;
-  return layout({ title: `Fonti — ${SITE.name}`, description: 'Fonti dati monitorate da ModelPick, licenze, attribuzioni è stato di ogni connettore.', body, active: 'fonti' });
+  return layout({ lang, title: `${c.sources.title} — ${SITE.name}`, description: c.siteDescription, body, active: 'sources' });
 }
 
-export function statusPage(snapshot: Snapshot | null, status: RunStatus | null): string {
+export function statusPage(snapshot: Snapshot | null, status: RunStatus | null, lang: Lang): string {
+  const c = t(lang);
+  const f = fmt(lang);
   const sources = (snapshot?.sources ?? [])
-    .map(
-      (s) => `<tr>
+    .map((s) => `<tr>
         <td>${esc(s.name)}</td>
         <td>${esc(s.outcome)}</td>
-        <td class="num">${esc(nf.format(s.itemCount))}</td>
-        <td>${s.error ? esc(s.error) : s.servedFromCache ? `dati riusati, età ${s.dataAgeHours !== null ? esc(nf2.format(s.dataAgeHours)) + ' ore' : 'non nota'}` : '—'}</td>
-        <td class="num">${s.durationMs !== null ? esc(nf.format(s.durationMs)) + ' ms' : '—'}</td>
-      </tr>`,
-    )
+        <td class="num">${esc(f.n.format(s.itemCount))}</td>
+        <td>${s.error ? esc(s.error) : s.servedFromCache ? esc(c.status.reused(s.dataAgeHours !== null ? f.n2.format(s.dataAgeHours) + ' h' : '—')) : '—'}</td>
+        <td class="num">${s.durationMs !== null ? esc(c.status.duration(f.n.format(s.durationMs))) : '—'}</td>
+      </tr>`)
     .join('');
 
   const body = `<section class="sezione">
   <div class="contenitore">
-    <h1>Stato degli aggiornamenti</h1>
-    <p>L aggiornamento gira sul server ogni giorno alle 06:30 (Europe/Rome), indipendentemente dalle visite al sito.</p>
+    <h1>${esc(c.status.title)}</h1>
+    <p>${esc(c.status.intro)}</p>
     ${status ? `<div class="scheda" style="margin-bottom:20px">
-      <p><strong>Ultimo tentativo:</strong> ${esc(dateIt(status.finishedAt))} — ${status.ok ? '<span class="etichetta etichetta--ok">riuscito</span>' : '<span class="etichetta etichetta--attenzione">con problemi</span>'} ${status.published ? '<span class="etichetta etichetta--ok">pubblicato</span>' : '<span class="etichetta etichetta--attenzione">non pubblicato</span>'}</p>
+      <p><strong>${esc(c.status.lastRun(dateLong(status.finishedAt, lang)))}</strong> — ${status.ok ? `<span class="etichetta etichetta--ok">${esc(c.status.ok)}</span>` : `<span class="etichetta etichetta--attenzione">${esc(c.status.problems)}</span>`} ${status.published ? `<span class="etichetta etichetta--ok">${esc(c.status.published)}</span>` : `<span class="etichetta etichetta--attenzione">${esc(c.status.notPublished)}</span>`}</p>
       <p>${esc(status.message)}</p>
-      <p class="meta">Durata: ${esc(nf.format(status.durationMs))} ms · identificativo ${esc(status.runId)}</p>
-      ${status.warnings.length ? `<details class="dettagli"><summary>Segnalazioni (${esc(String(status.warnings.length))})</summary><div class="dettagli__corpo"><ul class="elenco">${status.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div></details>` : ''}
-    </div>` : '<div class="avviso">Nessun aggiornamento ancora eseguito.</div>'}
+      ${status.warnings.length ? `<details class="dettagli"><summary>${esc(c.status.warnings(status.warnings.length))}</summary><div class="dettagli__corpo"><ul class="elenco">${status.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div></details>` : ''}
+    </div>` : `<div class="avviso">${esc(c.status.never)}</div>`}
     ${snapshot ? `<div class="scheda">
-      <h2>Dati pubblicati</h2>
-      <p class="meta">Snapshot ${esc(snapshot.runId)} del ${esc(dateIt(snapshot.generatedAt))}</p>
+      <h2>${esc(c.status.dataTitle)}</h2>
+      <p class="meta">${esc(dateLong(snapshot.generatedAt, lang))}</p>
       <table class="tabella">
-        <thead><tr><th>Fonte</th><th>Esito</th><th class="num">Righe</th><th>Nota</th><th class="num">Durata</th></tr></thead>
+        <thead><tr>${c.status.cols.map((h, i) => `<th${i === 2 || i === 4 ? ' class="num"' : ''}>${esc(h)}</th>`).join('')}</tr></thead>
         <tbody>${sources}</tbody>
       </table>
     </div>` : ''}
   </div>
 </section>`;
-  return layout({ title: `Stato — ${SITE.name}`, description: 'Stato dell\'ultimo aggiornamento dati di ModelPick, per fonte.', body, active: 'stato' });
+  return layout({ lang, title: `${c.status.title} — ${SITE.name}`, description: c.siteDescription, body, active: 'status' });
 }

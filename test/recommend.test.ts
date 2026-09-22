@@ -6,6 +6,7 @@ import { evidence, model, now, offer, snapshot } from './fixtures.js';
 const req = (over: Partial<RecommendationRequest> = {}): RecommendationRequest => ({
   task: 'bug',
   priority: 'equilibrio',
+  lang: 'it',
   usage: null,
   currentModelKey: null,
   currentOfferId: null,
@@ -121,7 +122,7 @@ test('un modello misurato con un altro banco di prova non entra nel confronto', 
   // v/economico costerebbe meno ma il suo punteggio non e confrontabile: vince v/bravo.
   assert.equal(r.everyday?.model.key, 'v/bravo');
   assert.equal(r.everyday?.quality.comparable, true);
-  assert.ok(r.method.excluded.some((e) => /non confrontabili/.test(e.reason)));
+  assert.ok(r.method.excluded.some((e) => e.reason === 'not-comparable'));
 });
 
 test('un offerta gratuita o a piano non vince il confronto sul prezzo', () => {

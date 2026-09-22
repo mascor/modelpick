@@ -3,6 +3,7 @@
  * worth opening in the morning: not the numbers, but what moved since yesterday.
  */
 import type { Pick } from './recommend.js';
+import { t, type Lang } from '../i18n.js';
 
 export interface Change {
   /** Short sentence for the card. */
@@ -17,29 +18,21 @@ const nome = (raw: string) => {
   return i > 0 ? raw.slice(i + 2) : raw;
 };
 
-export function describeChange(before: Pick | null, now: Pick | null): Change | null {
+export function describeChange(before: Pick | null, now: Pick | null, lang: Lang = 'it'): Change | null {
+  const c = t(lang).changes;
   if (!now) return null;
-  if (!before) return { text: 'Nuova raccomandazione: nell\'aggiornamento precedente non ce n\'era una.', moved: true };
+  if (!before) return { text: c.newPick, moved: true };
 
   if (before.model.key !== now.model.key) {
-    return {
-      text: `Modello cambiato: prima consigliavamo ${nome(before.model.displayName)} da ${before.offer.providerName}.`,
-      moved: true,
-    };
+    return { text: c.modelChanged(nome(before.model.displayName), before.offer.providerName), moved: true };
   }
   if (before.offer.providerId !== now.offer.providerId) {
-    return {
-      text: `Provider cambiato: il più economico era ${before.offer.providerName} a ${usd(before.cost.totalUsd!)} al mese.`,
-      moved: true,
-    };
+    return { text: c.providerChanged(before.offer.providerName, usd(before.cost.totalUsd!)), moved: true };
   }
   const a = before.cost.totalUsd;
   const b = now.cost.totalUsd;
   if (a !== null && b !== null && a > 0 && Math.abs(b - a) / a > 0.01) {
-    return {
-      text: `Prezzo ${b < a ? 'sceso' : 'salito'} da ${usd(a)} a ${usd(b)} al mese.`,
-      moved: true,
-    };
+    return { text: c.priceMoved(b < a, usd(a), usd(b)), moved: true };
   }
-  return { text: 'Invariato rispetto all\'aggiornamento precedente.', moved: false };
+  return { text: c.unchanged, moved: false };
 }

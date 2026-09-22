@@ -7,6 +7,7 @@
  */
 import { normalizeVendor } from '../lib/normalize.js';
 import type { Offer } from '../types.js';
+import { t, type Lang } from '../i18n.js';
 
 export type Usability =
   | 'hub'            // one account, almost every model: OpenRouter
@@ -58,9 +59,10 @@ export const isIdentified = (u: Usability): boolean => u !== 'sconosciuto';
 export const accountName = (offer: Offer): string =>
   offer.access === 'intermediary' && offer.broker ? offer.broker : offer.providerName;
 
-export const usabilityLabel = (u: Usability, offer: Offer): string => {
-  if (u === 'hub') return 'via OpenRouter';
-  if (u === 'diretto') return 'diretto';
-  if (u === 'sconosciuto') return 'provider non identificato';
-  return `account ${offer.providerName}`;
+export const usabilityLabel = (u: Usability, offer: Offer, lang: Lang = 'it'): string => {
+  const c = t(lang).usability;
+  if (u === 'hub') return c.hub;
+  if (u === 'diretto') return c.direct;
+  if (u === 'sconosciuto') return c.unknown;
+  return c.reseller(offer.providerName);
 };

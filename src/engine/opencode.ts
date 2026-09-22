@@ -10,6 +10,7 @@
  * OpenCode falls back to the backup model on its own.
  */
 import type { Offer, ModelRecord } from '../types.js';
+import { t, type Lang } from '../i18n.js';
 
 export interface PickConfig {
   /** provider/model string, as OpenCode addresses it. */
@@ -44,7 +45,8 @@ export function modelIdFor(offer: Offer): string {
 }
 
 /** Everything needed to actually use one offer. */
-export function configFor(offer: Offer): PickConfig {
+export function configFor(offer: Offer, lang: Lang = 'it'): PickConfig {
+  const c = t(lang).engine;
   const modelId = modelIdFor(offer);
   const command = `opencode -m ${modelId}`;
   const routed = offer.sourceId === 'openrouter';
@@ -60,7 +62,7 @@ export function configFor(offer: Offer): PickConfig {
       command,
       commandIsExact: false,
       config: null,
-      pinNote: `OpenRouter sceglie il provider al momento della richiesta e non possiamo fissare ${offer.providerName}: il prezzo effettivo può differire.`,
+      pinNote: c.cannotPin(offer.providerName),
     };
   }
 
@@ -83,7 +85,7 @@ export function configFor(offer: Offer): PickConfig {
     command,
     commandIsExact: false,
     config: JSON.stringify(config, null, 2),
-    pinNote: `Senza questa configurazione OpenRouter può instradare la richiesta su un altro provider, a un prezzo diverso da quello indicato.`,
+    pinNote: c.pinNote(offer.providerName),
   };
 }
 

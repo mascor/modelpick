@@ -145,7 +145,7 @@ export async function fetchOffers(
             ...(CREDIT_FEE_PERCENT !== undefined && Number.isFinite(CREDIT_FEE_PERCENT)
               ? { percent: CREDIT_FEE_PERCENT }
               : {}),
-            note: 'OpenRouter applica una commissione sull\'acquisto dei crediti (i prezzi per token sono invece passanti)',
+            note: 'OPENROUTER_CREDIT_FEE',
             sourceUrl: CREDIT_FEE_URL,
           },
         ],
