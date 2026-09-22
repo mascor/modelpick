@@ -131,10 +131,10 @@ export const SOURCES: SourceConfig[] = [
     name: 'Artificial Analysis',
     url: 'https://artificialanalysis.ai/',
     enabled: bool(env.SOURCE_ARTIFICIALANALYSIS, false),
-    licence: 'Da verificare (Data Platform Terms separati)',
+    licence: 'Data Platform Terms: uso vietato per questo sito senza consenso scritto',
     attribution: 'Artificial Analysis',
     note:
-      'Disattivata: il riuso dei dati strutturati sembra regolato da termini separati a pagamento. Serve una verifica scritta prima di abilitarla.',
+      "Disattivata: la sezione 2.5 dei Data Platform Terms (che valgono anche per l'API gratuita) vieta di usare i dati in un servizio pubblico di confronto o di scelta di modelli e provider senza consenso scritto di Artificial Analysis. Riattivabile solo con quel consenso.",
   },
   {
     id: 'pricepertoken',

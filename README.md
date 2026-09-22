@@ -32,7 +32,7 @@ Le regole complete e le soglie sono su [`/metodo`](https://modelpick.cloudsalus.
 | [Models.dev](https://models.dev) | attiva | listini diretti dei provider e capacità dichiarate; è anche il registro che usa OpenCode |
 | [SWE-bench Verified](https://github.com/SWE-bench/experiments) | attiva | misure di qualità sul codice in condizioni confrontabili |
 | [Aider polyglot](https://aider.chat/docs/leaderboards/) | attiva | seconda misura sul codice, licenza Apache-2.0 |
-| Artificial Analysis | **spenta** | il riuso dei dati strutturati sembra regolato da termini separati a pagamento |
+| Artificial Analysis | **spenta** | i [Data Platform Terms](https://artificialanalysiscdn.com/legal/ProDataPlatformTerms.pdf) (§2.5, validi anche per l'API gratuita) vietano l'uso in un servizio di scelta di modelli e provider senza consenso scritto |
 | pricepertoken.com | **spenta** | nessun termine di riuso pubblicato, nessuna API |
 | cheaperinference.com | **spenta** | `robots.txt` blocca `/api/`, termini non ancora letti integralmente |
 | llmprice.gitlab.io | non integrata | dichiara di aggregare models.dev, che leggiamo già alla fonte |
