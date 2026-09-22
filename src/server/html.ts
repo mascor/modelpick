@@ -10,7 +10,6 @@ import { signupUrl } from '../engine/signup.js';
 import { modelIdFor } from '../engine/opencode.js';
 import type { Change } from '../engine/changes.js';
 import { SCENARIOS, TASK_IDS, PRIORITIES, type Priority } from '../engine/scenarios.js';
-import type { OpenCodeConfigResult } from '../engine/opencode.js';
 import type { RunStatus } from '../pipeline/store.js';
 
 export const esc = (v: unknown): string =>
@@ -79,14 +78,7 @@ export function layout(opts: { title: string; description: string; body: string;
 <main>${opts.body}</main>
 <footer class="pie">
   <div class="contenitore pie__righe">
-    <div>
-      <p><strong>${esc(SITE.name)}</strong> — ${esc(SITE.tagline)}</p>
-      <p class="meta">Progetto open source di CloudSalus. Codice con licenza MIT; i dati di terze parti restano dei rispettivi titolari.</p>
-    </div>
-    <div>
-      <p><a href="/metodo">Metodo e limiti</a> · <a href="/fonti">Fonti</a> · <a href="/stato">Stato aggiornamenti</a></p>
-      <p class="meta">Nessuna sponsorizzazione influenza l\'ordine dei risultati. Non chiediamo mai le tue chiavi API.</p>
-    </div>
+    <p class="meta"><strong>${esc(SITE.name)}</strong> di CloudSalus · <a href="/metodo">Metodo</a> · <a href="/fonti">Fonti</a> · <a href="/stato">Stato</a> · codice MIT</p>
   </div>
 </footer>
 <script src="/static/app.js" defer></script>
@@ -261,26 +253,14 @@ function renderIpotesi(req: RecommendationRequest, rec: Recommendation | null, m
   </details>`;
 }
 
-function renderMetodoBreve(rec: Recommendation): string {
-  const m = rec.method;
-  return `<details class="dettagli">
-    <summary>Come scegliamo</summary>
-    <div class="dettagli__corpo">
-      <p>Prima i modelli, poi i provider. Entra nel confronto solo un modello con una misura di qualità sul codice ottenuta nelle stesse condizioni degli altri${m.referenceHarness ? ` (${esc(m.referenceHarness)}, ${esc(String(m.referenceHarnessModels))} modelli)` : ''}. Fra quelli che superano la soglia di ${esc(String(m.gate.everyday))}%, scegliamo il più economico. Il secondo modello deve risolvere almeno 3 punti in più, misurati allo stesso modo.</p>
-      <p class="meta">Modelli arrivati al confronto: ${esc(String(m.candidateModels))}.${m.excluded.length ? ` Esclusi: ${m.excluded.slice(0, 3).map((e) => `${esc(String(e.count))} per ${esc(e.reason)}`).join(', ')}.` : ''} Il metodo completo è su <a href="/metodo">/metodo</a>, le fonti su <a href="/fonti">/fonti</a>.</p>
-    </div>
-  </details>`;
-}
-
 export function homePage(opts: {
   rec: Recommendation | null;
   snapshot: Snapshot | null;
   models: ModelRecord[];
   request: RecommendationRequest;
-  config: OpenCodeConfigResult | null;
   changes: { everyday: Change | null; hard: Change | null };
 }): string {
-  const { rec, snapshot, models, request, config, changes } = opts;
+  const { rec, snapshot, models, request, changes } = opts;
   const stale = rec?.method.snapshotStale ?? false;
 
   const body = `
@@ -303,18 +283,6 @@ export function homePage(opts: {
     ${rec?.savings && rec.savings.deltaUsd !== null ? `<p class="risparmio">Rispetto a quello che usi oggi: ${rec.savings.deltaUsd > 0 ? `<strong>risparmi ${esc(usd(rec.savings.deltaUsd))} al mese</strong>` : `<strong>spendi ${esc(usd(Math.abs(rec.savings.deltaUsd)))} in più al mese</strong>`}, sugli stessi consumi. Stima, non misura.</p>` : ''}
     <div class="coda">
       ${renderIpotesi(request, rec, models)}
-      ${rec ? renderMetodoBreve(rec) : ''}
-      ${config ? `<details class="dettagli">
-        <summary>File di configurazione completo</summary>
-        <div class="dettagli__corpo">
-          <pre class="codice" id="opencode-json">${esc(config.json)}</pre>
-          <p>
-            <button class="bottone bottone--piccolo" type="button" data-copia="#opencode-json">Copia</button>
-            <a class="bottone bottone--contorno bottone--piccolo" href="/opencode.json?task=${esc(request.task)}&priority=${esc(request.priority)}" download="opencode.json">Scarica</a>
-          </p>
-          <ul class="elenco">${config.instructions.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>
-        </div>
-      </details>` : ''}
     </div>
   </div>
 </section>
@@ -414,21 +382,12 @@ export function sourcesPage(snapshot: Snapshot | null): string {
 
   const body = `<section class="sezione">
   <div class="contenitore">
-    <h1>Fonti e provider monitorati</h1>
-    <p>Prima di integrare una fonte ne controlliamo le condizioni di accesso e di riuso. La licenza MIT del nostro codice non si applica ai dati di terzi: ogni fonte resta dei suoi titolari e viene attribuita.</p>
+    <h1>Fonti</h1>
     <div class="scheda" style="margin-bottom:20px">
       <table class="tabella">
         <thead><tr><th>Fonte</th><th>Stato</th><th>Licenza o condizioni</th><th>Nota</th><th class="num">Righe</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-    </div>
-    <div class="scheda" style="margin-bottom:20px">
-      <h2>Perché alcune fonti sono spente</h2>
-      <p>Una fonte resta spenta finche non abbiamo letto per intero le sue condizioni di riuso. Preferiamo una copertura più piccola e difendibile a una più grande e discutibile. Se conosci i termini di una di queste fonti, o rappresenti la fonte stessa, scrivici: abilitarla e una riga di configurazione.</p>
-    </div>
-    <div class="scheda">
-      <h2>Sponsorizzazioni e affiliazioni</h2>
-      <p>Oggi non esistono accordi di sponsorizzazione né link di affiliazione. Se in futuro ce ne saranno, saranno dichiarati in questa pagina e non influenzeranno l\'ordine dei risultati, che resta determinato solo dal metodo pubblicato.</p>
     </div>
   </div>
 </section>`;

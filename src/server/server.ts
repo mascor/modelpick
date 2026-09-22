@@ -79,9 +79,9 @@ export async function buildServer() {
   };
 
   app.get('/', async (req, reply) => {
-    const { snapshot, request, rec, config, models, changes } = await compute(req.query as Query);
+    const { snapshot, request, rec, models, changes } = await compute(req.query as Query);
     reply.type('text/html; charset=utf-8');
-    return homePage({ rec, snapshot, models, request, config, changes });
+    return homePage({ rec, snapshot, models, request, changes });
   });
 
   app.get('/metodo', async (_req, reply) => {
