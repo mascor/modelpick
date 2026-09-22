@@ -343,6 +343,7 @@ pre.code {
   .menu::-webkit-scrollbar { display: none; }
   .menu a { display: inline-flex; align-items: center; min-height: 32px; white-space: nowrap; }
   .menu .lang-switch { margin-left: auto; font-weight: 600; color: var(--cs-color-primary); }
+  @media (max-width: 400px) { .menu { gap: 12px; } }
 
   /* Compact notices: they inform, but must not push the action off screen. */
   .alert { font-size: 12.5px; padding: 7px 10px; line-height: 1.45; margin-bottom: 10px; }
@@ -460,12 +461,11 @@ pre.code {
 @media (max-width: 720px) {
   .answer { padding: 20px 0 16px; }
   .answer__title { font-size: 20px; margin-bottom: 8px; }
-  /* A single scrolling row, instead of four rows of buttons. */
-  .choices { gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
-  .choices::-webkit-scrollbar { display: none; }
-  .choice { white-space: nowrap; }
-  .choices__label { flex: 0 0 auto; }
-  .choice { font-size: 13px; padding: 4px 12px; min-height: 34px; }
+  /* Label on its own line, buttons wrap: every choice stays visible,
+     none is cut off at the edge of a row that scrolls without saying so. */
+  .choices { gap: 6px; margin-top: 12px; }
+  .choices__label { flex: 0 0 100%; margin: 0 0 2px; }
+  .choice { white-space: nowrap; font-size: 13px; padding: 4px 12px; min-height: 36px; }
 
   /* Less nesting: the content gains the width the boxes were taking. */
   .card { padding: 16px 14px; }
