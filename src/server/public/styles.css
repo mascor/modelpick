@@ -312,6 +312,10 @@ pre.codice {
 .passi__nota { font-family: var(--cs-font-ui); font-size: 12px; color: var(--cs-text-muted); margin: -12px 0 20px; }
 .pick__sintesi .meta { font-size: 13px; }
 .pick__sintesi .nowrap { white-space: nowrap; }
+.pick__sintesi { margin-bottom: 2px; }
+.pick__prezzo { font-size: 1.3em; font-weight: 700; color: var(--cs-text); }
+.pick__prova { font-family: var(--cs-font-ui); font-size: 13px; color: var(--cs-text-muted); margin-bottom: 14px; }
+.pick__prova a { color: var(--cs-text-muted); }
 .passo .bottone { white-space: nowrap; }
 
 /* --- Telefono --- */
@@ -321,12 +325,13 @@ pre.codice {
 .passo__testo { min-width: 0; }
 
 @media (max-width: 720px) {
-  :root { --margine: 14px; }
+  :root { --margine: 20px; }
   /* Il monospazio a questa larghezza lascia 35 caratteri per riga: testo in Inter. */
   body { font-family: var(--cs-font-ui); font-size: 15px; letter-spacing: 0; }
-  .sezione { padding: 24px 0; }
+  .sezione { padding: 28px 0; }
+  .risultati { gap: 24px; }
   .hero { padding: 28px 0 32px; }
-  .scheda { padding: 16px; border-radius: var(--cs-radius-md); }
+  .scheda { padding: 20px 18px; border-radius: var(--cs-radius-md); }
   .elenco { padding-left: 18px; }
 
   /* Menu: sotto il marchio, sempre raggiungibile, scorre se non ci sta. */
@@ -339,19 +344,38 @@ pre.codice {
   .menu a { display: inline-flex; align-items: center; min-height: 32px; white-space: nowrap; }
   .menu .lingua { margin-left: auto; font-weight: 600; color: var(--cs-color-primary); }
 
-  /* Passi: il bottone va a capo sotto il testo invece di uscire dalla scheda. */
-  .passi { padding: 12px; }
-  .passo { flex-wrap: wrap; }
-  .passo__testo, .passo__codice { flex: 1 1 calc(100% - 30px); }
-  .passo .bottone { margin-left: 30px; }
+  /* Avvisi compatti: informano, ma non devono spingere l'azione fuori schermo. */
+  .allerta { font-size: 12.5px; padding: 7px 10px; line-height: 1.45; margin-bottom: 10px; }
+  .pick__cambio--mosso { display: block; border-radius: var(--cs-radius-sm); font-size: 12.5px; padding: 6px 10px; line-height: 1.45; margin-bottom: 14px; }
 
-  /* Confronto provider: niente larghezza minima, il prezzo resta leggibile. */
+  /* Passi: testo o comando a sinistra, bottone sulla stessa riga a destra. */
+  .passi { padding: 14px; gap: 12px; }
+  .passo { gap: 8px; }
+  .passo__testo { flex: 1 1 0; line-height: 1.35; }
+  .passo__codice { flex: 1 1 0; font-size: 12px; padding: 7px 8px; }
+  .passo .bottone { flex: 0 0 auto; min-height: 36px; padding: 6px 12px; }
+
+  /* Confronto provider: ogni offerta è una riga a due livelli,
+     provider e prezzo sopra, azioni sotto allineate a destra. */
   .acquisto { overflow-x: visible; }
-  .confronto { min-width: 0; table-layout: auto; }
-  .confronto td, .confronto th { padding: 7px 4px; }
-  .confronto td:first-child { overflow-wrap: anywhere; }
-  .confronto td.azione { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-  .riga-link { margin-right: 0; }
+  .confronto, .confronto tbody { display: block; min-width: 0; }
+  .confronto tr {
+    display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 12px;
+    padding: 10px 10px; border-bottom: 1px solid var(--cs-border);
+  }
+  .confronto td { display: block; padding: 0; border: 0; }
+  .confronto tr.scelto td { background: none; }
+  .confronto tr.scelto { background: var(--cs-success-soft); border-left: 3px solid var(--cs-success); border-radius: var(--cs-radius-sm); }
+  .confronto tr.scelto td:first-child { border-left: 0; }
+  .confronto td:first-child { min-width: 0; overflow-wrap: anywhere; grid-row: 1 / span 2; align-self: center; }
+  .confronto td.num { font-size: 15px; text-align: right; }
+  .confronto td.azione {
+    grid-column: 2; display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 2px;
+  }
+  .confronto td.azione .bottone { min-height: 34px; padding: 4px 12px; font-size: 13px; }
+  .riga-link { margin-right: 0; font-size: 13px; }
+
+  .hero__sopratitolo { font-size: 11.5px; }
 
   /* Tabelle lunghe: ogni riga diventa una scheda con le etichette in chiaro. */
   .tabella--pila thead { display: none; }

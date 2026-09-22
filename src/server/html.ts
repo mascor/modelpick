@@ -240,7 +240,8 @@ function renderPick(pick: Pick | null, role: 'quotidiano' | 'difficile', change:
   return `<article class="scheda pick pick--${role}">
     <p class="pick__ruolo">${esc(titolo)}</p>
     <h3 class="pick__modello">${esc(modelName(pick.model.displayName))}</h3>
-    <p class="pick__sintesi">${esc(c.home.perMonth(usd(pick.cost.totalUsd, lang)))} · ${esc(c.home.benchmark(formatScore(pick.quality.value, pick.quality.metric), pick.quality.metric === 'aa_coding_index' ? 'Coding Index' : metricLabel(pick.quality.metric), dateShort(pick.quality.measuredAt, lang)))}${pick.quality.metric === 'aa_coding_index' ? ` <a class="meta nowrap" href="${esc(pick.quality.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>` : ''}</p>
+    <p class="pick__sintesi">${esc(c.home.perMonth('\u0000')).replace('\u0000', `<strong class="pick__prezzo">${esc(usd(pick.cost.totalUsd, lang))}</strong>`)}</p>
+    <p class="pick__prova">${esc(c.home.benchmark(formatScore(pick.quality.value, pick.quality.metric), pick.quality.metric === 'aa_coding_index' ? 'Coding Index' : metricLabel(pick.quality.metric), dateShort(pick.quality.measuredAt, lang)))}${pick.quality.metric === 'aa_coding_index' ? ` · <a href="${esc(pick.quality.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>` : ''}</p>
     ${pick.cost.unquantifiedFees.length ? `<p class="allerta">${esc(c.home.incompleteEstimate)}</p>` : ''}
     ${change?.moved ? `<p class="pick__cambio pick__cambio--mosso">${esc(change.text)}</p>` : ''}
     <ol class="passi">
