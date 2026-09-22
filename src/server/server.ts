@@ -67,18 +67,12 @@ export async function buildServer() {
     const snapshot = await currentSnapshot();
     const request = parseRequest(query, lang);
     const noChanges: { everyday: Change | null; hard: Change | null } = { everyday: null, hard: null };
-    if (!snapshot) return { snapshot: null, request, rec: null, config: null, models: [], changes: noChanges };
+    if (!snapshot) return { snapshot: null, request, rec: null, config: null, changes: noChanges };
     const rec = recommend(snapshot, request);
     const config = buildOpenCodeConfig(
       rec.everyday ? { model: rec.everyday.model, offer: rec.everyday.offer } : null,
       rec.hard ? { model: rec.hard.model, offer: rec.hard.offer } : null,
     );
-    // The form only lists models a developer could plausibly be coding with:
-    // something measured on a coding benchmark and actually sold somewhere.
-    const withOffers = new Set(snapshot.offers.map((o) => o.modelKey));
-    const measured = new Set(snapshot.evidence.map((e) => e.modelKey));
-    const models = Object.values(snapshot.models).filter((m) => withOffers.has(m.key) && measured.has(m.key));
-
     // What moved since the previous published update: the reason to open the
     // page in the morning at all.
     let changes = noChanges;
@@ -90,7 +84,7 @@ export async function buildServer() {
         hard: describeChange(earlier.hard, rec.hard, lang),
       };
     }
-    return { snapshot, request, rec, config, models, changes };
+    return { snapshot, request, rec, config, changes };
   };
 
   /** The same four pages in two languages: Italian at the root, English under /en. */
@@ -131,9 +125,9 @@ export async function buildServer() {
 
   const register = (lang: Lang, paths: { home: string; method: string; sources: string; status: string }) => {
     app.get(paths.home, { onRequest: negotiate(lang, 'home') }, async (req, reply) => {
-      const { snapshot, request, rec, models, changes } = await compute(req.query as Query, lang);
+      const { snapshot, request, rec, changes } = await compute(req.query as Query, lang);
       reply.type('text/html; charset=utf-8');
-      return homePage({ lang, rec, snapshot, models, request, changes });
+      return homePage({ lang, rec, snapshot, request, changes });
     });
     app.get(paths.method, { onRequest: negotiate(lang, 'method') }, async (_req, reply) => {
       reply.type('text/html; charset=utf-8');

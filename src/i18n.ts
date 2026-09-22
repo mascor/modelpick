@@ -76,25 +76,12 @@ export interface Catalog {
     key: string;
     noEveryday: string;
     noHard: string;
-    customise: string;
-    scenarioNote: (input: string, output: string, cache: string) => string;
     workType: string;
     priority: string;
-    tokensIn: string;
-    tokensOut: string;
-    cacheRead: string;
-    cacheWrite: string;
-    currentModel: string;
-    notSet: string;
-    defaultValue: string;
-    recompute: string;
     comparison: (provider: string | null, delta: string, cheaper: boolean) => string;
     answer: (model: string, price: string) => string;
-    answerHard: (model: string, price: string) => string;
     answerNone: string;
     updatedAt: (time: string) => string;
-    qualityBar: (score: string) => string;
-    jumpHard: string;
     detailsFor: (model: string) => string;
     showPreview: string;
     currentTitle: string;
@@ -105,12 +92,6 @@ export interface Catalog {
     currentNoPrice: (model: string) => string;
     currentUnknown: string;
     showConfig: string;
-    bothTitle: string;
-    bothIntro: (everyday: string, hard: string) => string;
-    bothPinned: string;
-    bothNotPinned: (models: string) => string;
-    bothSwitch: (hard: string) => string;
-    download: string;
     whyThis: string;
     theEvidence: (value: string, metric: string, harness: string, when: string) => string;
     aaSource: string;
@@ -233,27 +214,13 @@ const it: Catalog = {
     noEveryday:
       'Nessun modello supera la soglia di qualità con un prezzo verificato. Preferiamo non indicare un vincitore piuttosto che indicarne uno senza prove.',
     noHard: 'Nessun modello risolve abbastanza più problemi da giustificarne un secondo.',
-    customise: 'Confronta con il tuo modello o i tuoi consumi',
-    scenarioNote: (i, o, c) =>
-      `Di base stimiamo i costi su un mese di lavoro con un agente di codice: ${i} token di input, ${o} di output, ${c} letti dalla cache. È un'ipotesi dichiarata, non una misura dei tuoi consumi.`,
     workType: 'Tipo di lavoro',
     priority: 'Cosa conta di più',
-    tokensIn: 'Token di input al mese',
-    tokensOut: 'Token di output al mese',
-    cacheRead: 'Lettura cache al mese',
-    cacheWrite: 'Scrittura cache al mese',
-    currentModel: 'Modello che usi oggi',
-    notSet: 'Non indicato',
-    defaultValue: 'predefinito',
-    recompute: 'Ricalcola',
     comparison: (p, d, cheaper) =>
       `Confronto con il <strong>prezzo più basso monitorato</strong> per il modello che hai indicato${p ? ` (${p})` : ''}, non con quello che paghi tu: <strong>${d} al mese in ${cheaper ? 'meno' : 'più'}</strong> sugli stessi consumi.`,
     answer: (m, p) => `Oggi usa ${m}, ${p} al mese.`,
-    answerHard: (m, p) => `Per i problemi difficili tieni ${m}, ${p} al mese.`,
     answerNone: 'Oggi non possiamo indicare un vincitore: le prove disponibili non bastano.',
     updatedAt: (t2) => `aggiornato alle ${t2}`,
-    qualityBar: (s2) => `qualità ${s2} su 100`,
-    jumpHard: 'Vai al modello per i problemi difficili',
     detailsFor: (m) => `Comandi, provider e prezzi per ${m}`,
     showPreview: 'Vedi il testo',
     currentTitle: 'Il modello che usi oggi',
@@ -264,13 +231,6 @@ const it: Catalog = {
     currentNoPrice: (m) => `Per ${m} nessuna offerta monitorata ha un prezzo completo per questo scenario: un prezzo mancante non lo trattiamo come zero, quindi non calcoliamo il confronto.`,
     currentUnknown: 'Il modello indicato non è fra quelli che monitoriamo.',
     showConfig: 'Mostra quello che copi',
-    bothTitle: 'Configura entrambi in OpenCode',
-    bothIntro: (e, h) => `Un unico opencode.json: ${e} come predefinito e ${h} pronto da selezionare.`,
-    bothPinned: 'Il file fissa il provider di entrambi: il prezzo che vedi è quello che pagherai.',
-    bothNotPinned: (m) =>
-      `Attenzione: per ${m} il file non può fissare il provider, perché l'offerta più economica passa dall'instradamento automatico di OpenRouter. OpenRouter può servirla da un provider diverso, a un prezzo diverso da quello indicato.`,
-    bothSwitch: (h) => `Per passare al modello dei problemi difficili usa /models dentro OpenCode e scegli ${h}. OpenCode non cambia modello da solo.`,
-    download: 'Scarica opencode.json',
     whyThis: 'Perché proprio questo',
     theEvidence: (v, m, h, w) => `<strong>La prova.</strong> ${v} su ${m} (${h}), indice letto il ${w}.`,
     evidenceNoDate:
@@ -296,7 +256,7 @@ const it: Catalog = {
     gdprUnknown: 'non valutato',
     countryUnknown: 'non dichiarata',
   },
-  priorities: { cheap: 'Spendere poco', balanced: 'Equilibrio', quality: 'Lavorare bene' },
+  priorities: { cheap: 'Spendere poco', balanced: 'Equilibrio', quality: 'Risultati migliori' },
   tasks: {
     'small-changes': 'Piccole modifiche',
     bug: 'Correzione di bug',
@@ -379,7 +339,7 @@ const it: Catalog = {
     orderTitle: 'Ordine delle decisioni',
     order: [
       '<strong>Prima i modelli.</strong> Consideriamo solo modelli con una misura di qualità sul codice degli ultimi 7 giorni: il Coding Index di Artificial Analysis, scaricato a ogni aggiornamento e misurato con lo stesso metodo per tutti. Le misure più vecchie non vengono usate. Un modello senza una misura recente non può vincere.',
-      '<strong>La tua scelta cambia che cosa significa "il migliore".</strong> Con "spendere poco" ed "equilibrio" prendiamo il modello meno costoso che supera la soglia di qualità. Con "lavorare bene" prendiamo il punteggio più alto, e il prezzo decide solo fra modelli praticamente pari.',
+      '<strong>La tua scelta cambia che cosa significa "il migliore".</strong> Con "spendere poco" ed "equilibrio" prendiamo il modello meno costoso che supera la soglia di qualità. Con "risultati migliori" prendiamo il punteggio più alto, e il prezzo decide solo fra modelli praticamente pari.',
       '<strong>Poi i provider.</strong> Per ogni modello ammesso cerchiamo tutte le offerte monitorate e teniamo quelle di provider che sappiamo identificare.',
       '<strong>Infine la convenienza.</strong> Ogni offerta viene calcolata per intero, commissioni incluse, sullo stesso scenario di consumo.',
     ],
@@ -469,27 +429,13 @@ const en: Catalog = {
     noEveryday:
       'No model clears the quality bar with a verified price. We would rather name no winner than name one without evidence.',
     noHard: 'No model solves enough additional problems to justify a second one.',
-    customise: 'Compare with your model or your usage',
-    scenarioNote: (i, o, c) =>
-      `By default we price a month of work with a coding agent: ${i} input tokens, ${o} output, ${c} read from cache. It is a stated assumption, not a measurement of your usage.`,
     workType: 'Kind of work',
     priority: 'What matters most',
-    tokensIn: 'Input tokens per month',
-    tokensOut: 'Output tokens per month',
-    cacheRead: 'Cache reads per month',
-    cacheWrite: 'Cache writes per month',
-    currentModel: 'Model you use today',
-    notSet: 'Not set',
-    defaultValue: 'default',
-    recompute: 'Recalculate',
     comparison: (p, d, cheaper) =>
       `Compared with the <strong>lowest price we track</strong> for the model you named${p ? ` (${p})` : ''}, not with what you actually pay: <strong>${d} per month ${cheaper ? 'less' : 'more'}</strong> on the same usage.`,
     answer: (m, p) => `Today use ${m}, ${p} per month.`,
-    answerHard: (m, p) => `For hard problems keep ${m}, ${p} per month.`,
     answerNone: 'We cannot name a winner today: the available evidence is not enough.',
     updatedAt: (t2) => `updated at ${t2}`,
-    qualityBar: (s2) => `quality ${s2} out of 100`,
-    jumpHard: 'Go to the model for hard problems',
     detailsFor: (m) => `Commands, providers and prices for ${m}`,
     showPreview: 'See the text',
     currentTitle: 'The model you use today',
@@ -500,13 +446,6 @@ const en: Catalog = {
     currentNoPrice: (m) => `No monitored offer for ${m} has a complete price for this scenario: we never treat a missing price as zero, so we do not compute the comparison.`,
     currentUnknown: 'The model you named is not one we monitor.',
     showConfig: 'Show what you are copying',
-    bothTitle: 'Configure both in OpenCode',
-    bothIntro: (e, h) => `One opencode.json: ${e} as the default and ${h} ready to select.`,
-    bothPinned: 'The file pins the provider for both: the price you see is the price you pay.',
-    bothNotPinned: (m) =>
-      `Careful: for ${m} the file cannot pin the provider, because the cheapest offer goes through OpenRouter's automatic routing. OpenRouter may serve it from a different provider, at a different price.`,
-    bothSwitch: (h) => `To switch to the model for hard problems use /models inside OpenCode and choose ${h}. OpenCode does not switch models on its own.`,
-    download: 'Download opencode.json',
     whyThis: 'Why this one',
     theEvidence: (v, m, h, w) => `<strong>The evidence.</strong> ${v} on ${m} (${h}), index read on ${w}.`,
     evidenceNoDate:

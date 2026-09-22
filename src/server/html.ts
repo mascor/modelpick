@@ -1,17 +1,17 @@
 /**
- * Server-rendered pages, in both languages. The form is a plain GET form: the
+ * Server-rendered pages, in both languages. The controls are plain links: the
  * site works without JavaScript. Every user-facing string comes from the
  * catalogue in i18n.ts - none is written here.
  */
 import { SITE, THRESHOLDS, SOURCES } from '../config.js';
-import type { ModelRecord, Snapshot, SourceStatus } from '../types.js';
+import type { Snapshot, SourceStatus } from '../types.js';
 import type { OfferView, Pick, Recommendation, RecommendationRequest } from '../engine/recommend.js';
 import { formatScore, metricLabel } from '../engine/recommend.js';
 import type { Change } from '../engine/changes.js';
 import { SCENARIOS, TASK_IDS, PRIORITIES } from '../engine/scenarios.js';
 import { accountName, usabilityLabel } from '../engine/usability.js';
 import { signupUrl } from '../engine/signup.js';
-import { buildOpenCodeConfig, configFor } from '../engine/opencode.js';
+import { configFor } from '../engine/opencode.js';
 import { t, pagePath, otherLang, type Lang } from '../i18n.js';
 import type { RunStatus } from '../pipeline/store.js';
 import { readFileSync } from 'node:fs';
@@ -158,8 +158,6 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
 </html>`;
 }
 
-const option = (value: string, label: string, selected: string): string =>
-  `<option value="${esc(value)}"${value === selected ? ' selected' : ''}>${esc(label)}</option>`;
 
 /** The provider comparison: the answer to "where do I buy this". */
 function renderComparison(pick: Pick, role: string, lang: Lang): string {
@@ -302,86 +300,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
   </article>`;
 }
 
-/** What the buttons at the top cannot say: your own usage and the model you use today. */
-function renderYourUsage(req: RecommendationRequest, rec: Recommendation | null, models: ModelRecord[], lang: Lang): string {
-  const c = t(lang);
-  const modelOptions = models
-    .slice()
-    .sort((a, b) => modelName(a.displayName).localeCompare(modelName(b.displayName)))
-    .map((m) => option(m.key, modelName(m.displayName), req.currentModelKey ?? ''))
-    .join('');
-  return `<details class="details details--usage">
-    <summary>${esc(c.home.customise)}</summary>
-    <div class="details__body">
-      ${rec ? `<p class="meta">${esc(c.home.scenarioNote(tokens(rec.mix.input, lang), tokens(rec.mix.output, lang), tokens(rec.mix.cacheRead, lang)))}</p>` : ''}
-      <form class="form" method="get" action="${esc(pagePath(lang, 'home'))}">
-        <input type="hidden" name="task" value="${esc(req.task)}">
-        <input type="hidden" name="priority" value="${esc(req.priority)}">
-        <div class="form__rows">
-          <div class="field">
-            <label for="input">${esc(c.home.tokensIn)}</label>
-            <input id="input" name="input" type="number" min="0" step="1" value="${req.usage?.input ?? ''}" placeholder="${esc(c.home.defaultValue)}">
-          </div>
-          <div class="field">
-            <label for="output">${esc(c.home.tokensOut)}</label>
-            <input id="output" name="output" type="number" min="0" step="1" value="${req.usage?.output ?? ''}" placeholder="${esc(c.home.defaultValue)}">
-          </div>
-          <div class="field">
-            <label for="cacheRead">${esc(c.home.cacheRead)}</label>
-            <input id="cacheRead" name="cacheRead" type="number" min="0" step="1" value="${req.usage?.cacheRead ?? ''}" placeholder="${esc(c.home.defaultValue)}">
-          </div>
-          <div class="field">
-            <label for="cacheWrite">${esc(c.home.cacheWrite)}</label>
-            <input id="cacheWrite" name="cacheWrite" type="number" min="0" step="1" value="${req.usage?.cacheWrite ?? ''}" placeholder="${esc(c.home.defaultValue)}">
-          </div>
-          <div class="field">
-            <label for="currentModel">${esc(c.home.currentModel)}</label>
-            <select id="currentModel" name="currentModel">
-              <option value="">${esc(c.home.notSet)}</option>${modelOptions}
-            </select>
-          </div>
-        </div>
-        <div class="form__actions">
-          <button class="button button--small" type="submit">${esc(c.home.recompute)}</button>
-        </div>
-      </form>
-    </div>
-  </details>`;
-}
 
-/** One file that sets up both picks: no more copying one over the other. */
-function renderBoth(rec: Recommendation | null, lang: Lang): string {
-  const c = t(lang);
-  if (!rec?.everyday || !rec.hard) return '';
-  const config = buildOpenCodeConfig(
-    { model: rec.everyday.model, offer: rec.everyday.offer },
-    { model: rec.hard.model, offer: rec.hard.offer },
-  );
-  if (!config) return '';
-  const query = new URLSearchParams({ task: rec.request.task, priority: rec.request.priority, lang }).toString();
-  return `<div class="card both">
-    <h3>${esc(c.home.bothTitle)}</h3>
-    <p>${esc(c.home.bothIntro(config.everydayId, config.backupId ?? ''))}</p>
-    ${(() => {
-      const unpinned = [
-        config.pinned.everyday ? null : config.everydayId,
-        config.pinned.hard ? null : config.backupId,
-      ].filter(Boolean) as string[];
-      return unpinned.length
-        ? `<p class="alert">${esc(c.home.bothNotPinned(unpinned.join(', ')))}</p>`
-        : `<p class="meta">${esc(c.home.bothPinned)}</p>`;
-    })()}
-    <details class="preview preview--large">
-      <summary>${esc(c.home.showPreview)}</summary>
-      <pre class="code"><code id="config-both">${esc(config.json)}</code></pre>
-    </details>
-    <p class="form__actions">
-      <button class="button" type="button" data-copy="#config-both">${esc(c.home.copyConfig)}</button>
-      <a class="button button--outline" href="/opencode.json?${esc(query)}">${esc(c.home.download)}</a>
-    </p>
-    <p class="meta">${esc(c.home.bothSwitch(config.backupId ?? ''))}</p>
-  </div>`;
-}
 
 /** Whatever model the user declared, they get an answer about it. */
 function renderCurrentModel(rec: Recommendation | null, lang: Lang): string {
@@ -423,23 +342,12 @@ const withParams = (req: RecommendationRequest, lang: Lang, overrides: Record<st
 /** The answer first: what to use today, what it costs, and how the two compare. */
 function renderAnswer(rec: Recommendation | null, snapshot: Snapshot | null, req: RecommendationRequest, lang: Lang): string {
   const c = t(lang);
-  const bar = (p: Pick | null) =>
-    p
-      ? `<div class="bar-group">
-          <div class="bar" role="img" aria-label="${esc(c.home.qualityBar(formatScore(p.quality.value, p.quality.metric, 0)))}">
-            <span class="bar__fill" style="width:${Math.max(2, Math.min(100, p.quality.value))}%"></span>
-          </div>
-          <p class="bar__label">${esc(modelName(p.model.displayName))} · ${esc(formatScore(p.quality.value, p.quality.metric, 0))}</p>
-        </div>`
-      : '';
   const time = snapshot ? new Date(snapshot.generatedAt).toLocaleTimeString(lang === 'en' ? 'en-GB' : 'it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' }) : '';
   return `<section class="answer">
   <div class="container">
     <h1 class="answer__title">${esc(c.home.title)}</h1>
     ${rec?.everyday
-      ? `<p class="answer__line">${esc(c.home.answer(modelName(rec.everyday.model.displayName), usd(rec.everyday.cost.totalUsd, lang)))}
-         ${rec.hard ? `<span class="answer__line--second">${esc(c.home.answerHard(modelName(rec.hard.model.displayName), usd(rec.hard.cost.totalUsd, lang)))} <a href="#hard">${esc(c.home.jumpHard)}</a></span>` : ''}</p>
-         <div class="bars">${bar(rec.everyday)}${bar(rec.hard)}</div>`
+      ? `<p class="answer__line">${esc(c.home.answer(modelName(rec.everyday.model.displayName), usd(rec.everyday.cost.totalUsd, lang)))}</p>`
       : `<p class="answer__line">${esc(c.home.answerNone)}</p>`}
     <p class="answer__date">${snapshot ? esc(c.home.updatedAt(time)) : esc(c.home.noData)}</p>
     <div class="choices">
@@ -458,11 +366,10 @@ export function homePage(opts: {
   lang: Lang;
   rec: Recommendation | null;
   snapshot: Snapshot | null;
-  models: ModelRecord[];
   request: RecommendationRequest;
   changes: { everyday: Change | null; hard: Change | null };
 }): string {
-  const { lang, rec, snapshot, models, request, changes } = opts;
+  const { lang, rec, snapshot, request, changes } = opts;
   const c = t(lang);
   const stale = rec?.method.snapshotStale ?? false;
 
@@ -478,10 +385,6 @@ ${renderAnswer(rec, snapshot, request, lang)}
     <div class="results">
       ${renderPick(rec?.everyday ?? null, 'everyday', changes.everyday, lang, c.home.noEveryday, snapshot?.opencodeVersion ?? null)}
       ${renderPick(rec?.hard ?? null, 'hard', changes.hard, lang, c.home.noHard, snapshot?.opencodeVersion ?? null)}
-    </div>
-    ${renderBoth(rec, lang)}
-    <div class="tail">
-      ${renderYourUsage(request, rec, models, lang)}
     </div>
   </div>
 </section>

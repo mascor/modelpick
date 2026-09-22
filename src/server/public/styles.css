@@ -160,7 +160,7 @@ a { color: var(--cs-link); }
 .button--outline { background: none; border-color: var(--cs-border-strong); color: var(--cs-text); }
 .button--outline:hover { background: var(--cs-color-primary-soft); }
 .button--small { min-height: 38px; padding: 6px 14px; font-size: 14px; }
-.button:focus-visible, .field select:focus-visible, .field input:focus-visible, summary:focus-visible {
+.button:focus-visible, summary:focus-visible {
   /* The solid outline is the ring that is always visible; the coloured halo
      accompanies it where color-mix() is supported. Never the halo alone. */
   outline: 2px solid var(--cs-color-accent);
@@ -173,19 +173,6 @@ a:focus-visible { outline: 2px solid var(--cs-color-accent); outline-offset: 2px
 .button--copied, .button--copied:hover {
   background: var(--cs-success); border-color: var(--cs-success); color: #fff;
 }
-
-/* Form */
-.form { display: grid; gap: 20px; }
-.form__rows { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
-.field { display: flex; flex-direction: column; gap: 6px; font-family: var(--cs-font-ui); }
-.field label { font-size: 14px; font-weight: 600; }
-.field select, .field input {
-  font-family: var(--cs-font-ui); font-size: 15px; padding: 10px 12px; min-height: 44px;
-  border: 1px solid var(--cs-border-strong); border-radius: var(--cs-radius-md);
-  background: var(--cs-surface); color: var(--cs-text);
-}
-.field__help { font-size: 13px; color: var(--cs-text-muted); }
-.form__actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 
 /* Recommendation cards */
 .results { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); }
@@ -293,9 +280,6 @@ pre.code {
   font-family: var(--cs-font-ui); background: var(--cs-success-soft); color: var(--cs-text);
   border-radius: var(--cs-radius-md); padding: 14px 16px; margin-top: 20px;
 }
-.tail { margin-top: 24px; display: grid; gap: 4px; }
-.tail .details { background: var(--cs-surface); border: 1px solid var(--cs-border); border-radius: var(--cs-radius-md); padding: 14px 16px; }
-.details--usage summary { color: var(--cs-text); }
 
 /* Command to run: the card's main action */
 .config__purpose { font-family: var(--cs-font-ui); font-size: 13px; color: var(--cs-text-muted); margin: 10px 0 0; line-height: 1.6; }
@@ -417,8 +401,6 @@ pre.code {
 .step--config { counter-increment: none; display: block; }
 .step--config::before { content: none; }
 .comparison tr.config-row td { padding-top: 0; }
-.both { margin-top: 24px; font-family: var(--cs-font-ui); }
-.both pre.code { max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
 .savings__title { font-family: var(--cs-font-ui); font-weight: 700; margin: 0 0 4px; }
 .savings { margin: 0 0 20px; }
 .savings--no-seller, .savings--no-evidence, .savings--no-price, .savings--unknown-model {
@@ -429,7 +411,7 @@ pre.code {
   /* The configuration row takes the full width below the offer. */
   .comparison tr.config-row { display: block; padding: 0 10px 10px; border-bottom: 1px solid var(--cs-border); }
   .comparison tr.config-row td { display: block; }
-  .both pre.code, .details--copy pre.code { font-size: 12px; }
+  .details--copy pre.code { font-size: 12px; }
 }
 
 /* --- The answer, at the top --- */
@@ -439,17 +421,7 @@ pre.code {
 }
 .answer__title { font-size: clamp(22px, 3.4vw, 30px); margin: 0 0 10px; }
 .answer__line { font-size: clamp(18px, 2.4vw, 22px); line-height: 1.35; margin: 0 0 4px; font-weight: 600; }
-.answer__line--second { display: block; font-weight: 400; color: var(--cs-text-muted); font-size: .85em; margin-top: 4px; }
 .answer__date { font-size: 13px; color: var(--cs-text-muted); margin: 10px 0 14px; }
-
-.bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 10px 28px; margin-top: 12px; }
-.bar-group { min-width: 0; }
-.bar-group:nth-child(2) .bar__fill { background: var(--cs-warning); }
-.bar { height: 8px; border-radius: 999px; background: var(--cs-surface-alt); overflow: hidden; }
-.bar__fill { display: block; height: 100%; border-radius: 999px; background: var(--cs-success); }
-.bar__label { font-size: 13px; color: var(--cs-text-muted); margin: 5px 0 0; }
-.preview--large summary { font-size: 13px; }
-.preview--large pre.code { max-height: 340px; }
 
 /* Controls above the results: links that work without JavaScript. */
 .choices { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
