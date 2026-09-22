@@ -112,8 +112,9 @@ a { color: var(--cs-color-primary); }
   margin: 0 auto; padding: 0 var(--margine);
 }
 .marchio { display: flex; align-items: center; gap: 8px; min-height: 44px; text-decoration: none; color: var(--cs-text); }
-.marchio__nome { font-weight: 700; font-size: 18px; letter-spacing: .02em; }
-.marchio__di { color: var(--cs-text-muted); font-size: 13px; }
+.marchio__nome { font-weight: 700; font-size: 18px; letter-spacing: .02em; color: var(--cs-text); text-decoration: none; }
+.marchio__di { color: var(--cs-text-muted); font-size: 13px; text-decoration: none; }
+.marchio__di:hover { color: var(--cs-color-primary); text-decoration: underline; }
 .menu { display: flex; gap: 20px; font-size: 15px; }
 .menu a { color: var(--cs-text-muted); text-decoration: none; }
 .menu a:hover { color: var(--cs-color-primary); }

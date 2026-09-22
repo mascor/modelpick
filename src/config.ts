@@ -88,6 +88,8 @@ export interface SourceConfig {
   attribution: string;
   /** Explains a disabled source, shown verbatim on the sources page. */
   note: string | null;
+  /** The same three texts for the English pages. */
+  en: { licence: string; attribution: string; note: string | null };
 }
 
 /**
@@ -103,6 +105,11 @@ export const SOURCES: SourceConfig[] = [
     licence: 'API pubblica non autenticata',
     attribution: 'Prezzi per provider da openrouter.ai/api/v1',
     note: null,
+    en: {
+      licence: "Public unauthenticated API",
+      attribution: "Per-provider prices from openrouter.ai/api/v1",
+      note: null,
+    },
   },
   {
     id: 'modelsdev',
@@ -112,6 +119,11 @@ export const SOURCES: SourceConfig[] = [
     licence: 'Dataset aperto (models.dev/api.json)',
     attribution: 'Listini diretti e capacità dei modelli da models.dev',
     note: null,
+    en: {
+      licence: "Open dataset (models.dev/api.json)",
+      attribution: "Direct price lists and model capabilities from models.dev",
+      note: null,
+    },
   },
   {
     id: 'swebench',
@@ -122,6 +134,11 @@ export const SOURCES: SourceConfig[] = [
     attribution: 'Risultati SWE-bench Verified, repository SWE-bench/experiments',
     note:
       'Disattivata: le misure pubblicate hanno spesso mesi e usiamo solo prove di qualità di al massimo 7 giorni.',
+    en: {
+      licence: "No licence declared by the repository",
+      attribution: "SWE-bench Verified results, SWE-bench/experiments repository",
+      note: "Disabled: published measurements are often months old, and we only use quality evidence from the last 7 days.",
+    },
   },
   {
     id: 'aider',
@@ -131,6 +148,11 @@ export const SOURCES: SourceConfig[] = [
     licence: 'Apache-2.0',
     attribution: 'Aider polyglot leaderboard, repository Aider-AI/aider (Apache-2.0)',
     note: 'Disattivata: la classifica non viene aggiornata ogni settimana e usiamo solo prove di qualità di al massimo 7 giorni.',
+    en: {
+      licence: "Apache-2.0",
+      attribution: "Aider polyglot leaderboard, Aider-AI/aider repository (Apache-2.0)",
+      note: "Disabled: the leaderboard is not updated every week, and we only use quality evidence from the last 7 days.",
+    },
   },
   {
     id: 'infrabase',
@@ -140,6 +162,11 @@ export const SOURCES: SourceConfig[] = [
     licence: 'CC-BY-4.0',
     attribution: 'Dati sui provider da Infrabase.ai, licenza CC-BY-4.0',
     note: 'Directory curata a mano: sede legale, stato GDPR e sito ufficiale di ogni provider. Il robots.txt del sito indirizza esplicitamente gli agenti alla sua API pubblica.',
+    en: {
+      licence: "CC-BY-4.0",
+      attribution: "Provider data from Infrabase.ai, CC-BY-4.0 licence",
+      note: "Hand-curated directory: registered office, GDPR status and official website of each provider. The site's robots.txt explicitly points agents to its public API.",
+    },
   },
   {
     id: 'artificialanalysis',
@@ -150,6 +177,11 @@ export const SOURCES: SourceConfig[] = [
     attribution: 'Source: Artificial Analysis (artificialanalysis.ai)',
     note:
       "Fonte principale della qualità: Coding Index scaricato dall'API a ogni aggiornamento. Richiede una chiave (AA_API_KEY). I valori sono riportati come pubblicati; Artificial Analysis non ha verificato né approvato le scelte di ModelPick.",
+    en: {
+      licence: "Artificial Analysis Terms of Use and Data Platform Terms",
+      attribution: "Source: Artificial Analysis (artificialanalysis.ai)",
+      note: "Primary quality source: Coding Index downloaded from the API at every update. Requires a key (AA_API_KEY). Values are reported as published; Artificial Analysis has not reviewed or endorsed ModelPick's picks.",
+    },
   },
   {
     id: 'pricepertoken',
@@ -159,6 +191,11 @@ export const SOURCES: SourceConfig[] = [
     licence: 'Non dichiarata',
     attribution: 'pricepertoken.com',
     note: 'Disattivata: nessun termine di riuso pubblicato e nessuna API. Da usare solo come controllo manuale.',
+    en: {
+      licence: "Not declared",
+      attribution: "pricepertoken.com",
+      note: "Disabled: no published reuse terms and no API. Only for manual cross-checks.",
+    },
   },
   {
     id: 'cheaperinference',
@@ -168,6 +205,11 @@ export const SOURCES: SourceConfig[] = [
     licence: 'Da verificare (/legal/terms)',
     attribution: 'cheaperinference.com',
     note: 'Disattivata: robots.txt blocca /api/ e i termini non sono ancora stati letti integralmente.',
+    en: {
+      licence: "To be verified (/legal/terms)",
+      attribution: "cheaperinference.com",
+      note: "Disabled: robots.txt blocks /api/ and the terms have not yet been read in full.",
+    },
   },
   {
     id: 'llmprice',
@@ -178,6 +220,11 @@ export const SOURCES: SourceConfig[] = [
     attribution: 'llmprice.gitlab.io',
     note:
       'Non integrata di proposito: il sito dichiara di aggregare models.dev, che leggiamo già alla fonte. Evitiamo una copia di seconda mano.',
+    en: {
+      licence: "Redundant",
+      attribution: "llmprice.gitlab.io",
+      note: "Deliberately not integrated: the site states it aggregates models.dev, which we already read at the source. We avoid a second-hand copy.",
+    },
   },
 ];
 

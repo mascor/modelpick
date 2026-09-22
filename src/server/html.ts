@@ -25,6 +25,7 @@ const version = (file: string): string => {
     return 'dev';
   }
 };
+const CLOUDSALUS_URL = 'https://cloudsalus.com/';
 const ASSET_VERSION = { css: version('styles.css'), js: version('app.js') };
 
 export const esc = (v: unknown): string =>
@@ -119,10 +120,10 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
 <body>
 <header class="intestazione">
   <div class="intestazione__barra">
-    <a class="marchio" href="${esc(pagePath(opts.lang, 'home'))}">
-      <span class="marchio__nome">MODELPICK</span>
-      <span class="marchio__di">by CloudSalus</span>
-    </a>
+    <div class="marchio">
+      <a class="marchio__nome" href="${esc(pagePath(opts.lang, 'home'))}">MODELPICK</a>
+      <a class="marchio__di" href="${esc(CLOUDSALUS_URL)}" rel="noopener">by CloudSalus</a>
+    </div>
     <nav class="menu">
       ${nav.map(([id, label]) => `<a href="${esc(pagePath(opts.lang, id))}"${opts.active === id ? ' aria-current="page"' : ''}>${esc(label)}</a>`).join('')}
       <a href="${esc(SITE.repo)}" rel="noopener">${esc(c.nav.code)}</a>
@@ -134,7 +135,7 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
 <footer class="pie">
   <div class="contenitore pie__righe">
     <p class="meta">${esc(c.home.aaDisclaimer)} <a href="https://artificialanalysis.ai/" rel="noopener">artificialanalysis.ai</a></p>
-    <p class="meta"><strong>${esc(SITE.name)}</strong> by CloudSalus · <a href="${esc(pagePath(opts.lang, 'method'))}">${esc(c.nav.method)}</a> · <a href="${esc(pagePath(opts.lang, 'sources'))}">${esc(c.nav.sources)}</a> · <a href="${esc(pagePath(opts.lang, 'status'))}">${esc(c.nav.status)}</a> · MIT</p>
+    <p class="meta"><strong>${esc(SITE.name)}</strong> by <a href="${esc(CLOUDSALUS_URL)}" rel="noopener">CloudSalus</a> · <a href="${esc(pagePath(opts.lang, 'method'))}">${esc(c.nav.method)}</a> · <a href="${esc(pagePath(opts.lang, 'sources'))}">${esc(c.nav.sources)}</a> · <a href="${esc(pagePath(opts.lang, 'status'))}">${esc(c.nav.status)}</a> · MIT</p>
   </div>
 </footer>
 <script src="/static/app.js?v=${ASSET_VERSION.js}" defer></script>
@@ -414,11 +415,12 @@ export function sourcesPage(snapshot: Snapshot | null, lang: Lang): string {
           ? `<span class="etichetta etichetta--attenzione">${esc(c.sources.failed)}</span>`
           : `<span class="etichetta etichetta--info">${esc(c.sources.never)}</span>`;
     const [, colState, colLicence, colNote, colCount] = c.sources.cols;
+    const testi = lang === 'en' ? cfg.en : cfg;
     return `<tr>
       <td class="pila__titolo"><a href="${esc(cfg.url)}" rel="noopener">${esc(cfg.name)}</a></td>
       <td data-etichetta="${esc(colState)}">${state}</td>
-      <td data-etichetta="${esc(colLicence)}">${esc(cfg.licence)}</td>
-      <td data-etichetta="${esc(colNote)}">${esc(cfg.note ?? cfg.attribution)}</td>
+      <td data-etichetta="${esc(colLicence)}">${esc(testi.licence)}</td>
+      <td data-etichetta="${esc(colNote)}">${esc(testi.note ?? testi.attribution)}</td>
       <td class="num" data-etichetta="${esc(colCount)}">${esc(st ? f.n.format(st.itemCount) : '—')}</td>
     </tr>`;
   }).join('');
