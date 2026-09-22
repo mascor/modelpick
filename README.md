@@ -79,7 +79,7 @@ test/                test su calcoli, commissioni, normalizzazione, dati obsolet
 
 | Percorso | Risposta |
 |---|---|
-| `GET /api/raccomandazione?task=&priority=&country=&privacy=&access=` | le due raccomandazioni complete di motivazioni e fonti |
+| `GET /api/raccomandazione?task=&priority=` | le due raccomandazioni complete di motivazioni e fonti |
 | `GET /api/stato` | esito dell'ultimo aggiornamento |
 | `GET /api/fonti` | fonti monitorate, licenze e stato |
 | `GET /api/modelli` | modelli con misure di qualità |

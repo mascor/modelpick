@@ -3,10 +3,11 @@ import { join } from 'node:path';
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { SERVER, SITE, SOURCES } from '../config.js';
-import { recommend, type AccessNeed, type PrivacyNeed, type RecommendationRequest } from '../engine/recommend.js';
+import { recommend, type RecommendationRequest } from '../engine/recommend.js';
 import { buildOpenCodeConfig } from '../engine/opencode.js';
 import { SCENARIOS, TASK_IDS, PRIORITIES, type Priority, type TaskId } from '../engine/scenarios.js';
-import { priceHistory, listRuns } from '../pipeline/store.js';
+import { priceHistory, listRuns, previousRun } from '../pipeline/store.js';
+import { describeChange, type Change } from '../engine/changes.js';
 import { homePage, methodPage, sourcesPage, statusPage } from './html.js';
 import { currentSnapshot, currentStatus } from './snapshot.js';
 
@@ -21,10 +22,6 @@ const positive = (v: string | undefined): number | undefined => {
 export function parseRequest(q: Query): RecommendationRequest {
   const task = (TASK_IDS as string[]).includes(q['task'] ?? '') ? (q['task'] as TaskId) : 'bug';
   const priority = (PRIORITIES as string[]).includes(q['priority'] ?? '') ? (q['priority'] as Priority) : 'equilibrio';
-  const privacy: PrivacyNeed = ['nessuno', 'no-training', 'zero-retention'].includes(q['privacy'] ?? '')
-    ? (q['privacy'] as PrivacyNeed)
-    : 'nessuno';
-  const access: AccessNeed = q['access'] === 'solo-diretto' ? 'solo-diretto' : 'qualsiasi';
   const usage = {
     input: positive(q['input']),
     output: positive(q['output']),
@@ -35,9 +32,6 @@ export function parseRequest(q: Query): RecommendationRequest {
   return {
     task,
     priority,
-    country: (q['country'] ?? 'IT').toUpperCase().slice(0, 6),
-    privacy,
-    access,
     usage: hasUsage ? usage : null,
     currentModelKey: q['currentModel'] || null,
     currentOfferId: q['currentOffer'] || null,
@@ -57,7 +51,8 @@ export async function buildServer() {
   const compute = async (query: Query) => {
     const snapshot = await currentSnapshot();
     const request = parseRequest(query);
-    if (!snapshot) return { snapshot: null, request, rec: null, config: null, models: [] };
+    const noChanges: { everyday: Change | null; hard: Change | null } = { everyday: null, hard: null };
+    if (!snapshot) return { snapshot: null, request, rec: null, config: null, models: [], changes: noChanges };
     const rec = recommend(snapshot, request);
     const config = buildOpenCodeConfig(
       rec.everyday ? { model: rec.everyday.model, offer: rec.everyday.offer } : null,
@@ -68,13 +63,25 @@ export async function buildServer() {
     const withOffers = new Set(snapshot.offers.map((o) => o.modelKey));
     const measured = new Set(snapshot.evidence.map((e) => e.modelKey));
     const models = Object.values(snapshot.models).filter((m) => withOffers.has(m.key) && measured.has(m.key));
-    return { snapshot, request, rec, config, models };
+
+    // What moved since the previous published update: the reason to open the
+    // page in the morning at all.
+    let changes = noChanges;
+    const before = await previousRun(snapshot.runId);
+    if (before) {
+      const prima = recommend(before, request);
+      changes = {
+        everyday: describeChange(prima.everyday, rec.everyday),
+        hard: describeChange(prima.hard, rec.hard),
+      };
+    }
+    return { snapshot, request, rec, config, models, changes };
   };
 
   app.get('/', async (req, reply) => {
-    const { snapshot, request, rec, config, models } = await compute(req.query as Query);
+    const { snapshot, request, rec, config, models, changes } = await compute(req.query as Query);
     reply.type('text/html; charset=utf-8');
-    return homePage({ rec, snapshot, models, request, config });
+    return homePage({ rec, snapshot, models, request, config, changes });
   });
 
   app.get('/metodo', async (_req, reply) => {

@@ -4,8 +4,9 @@
  */
 import { SITE, THRESHOLDS, SOURCES } from '../config.js';
 import type { ModelRecord, Snapshot, SourceStatus } from '../types.js';
-import type { Pick, Recommendation, RecommendationRequest } from '../engine/recommend.js';
-import { SCENARIOS, TASK_IDS, PRIORITIES } from '../engine/scenarios.js';
+import type { OfferView, Pick, Recommendation, RecommendationRequest } from '../engine/recommend.js';
+import type { Change } from '../engine/changes.js';
+import { SCENARIOS, TASK_IDS, PRIORITIES, type Priority } from '../engine/scenarios.js';
 import type { OpenCodeConfigResult } from '../engine/opencode.js';
 import type { RunStatus } from '../pipeline/store.js';
 
@@ -21,7 +22,13 @@ const nf = new Intl.NumberFormat('it-IT');
 const nf2 = new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const nf4 = new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 
-const usd = (v: number | null): string => (v === null ? 'non disponibile' : `${v < 10 ? nf4.format(v) : nf2.format(v)} USD`);
+const usd = (v: number | null): string => (v === null ? 'non disponibile' : `${nf2.format(v)} USD`);
+
+/** "DeepSeek: DeepSeek V3.2" -> "DeepSeek V3.2": il fornitore e gia scritto accanto. */
+const nomeModello = (raw: string): string => {
+  const i = raw.indexOf(': ');
+  return i > 0 ? raw.slice(i + 2) : raw;
+};
 const tokens = (v: number): string => (v >= 1_000_000 ? `${nf.format(Math.round(v / 100_000) / 10)} M` : nf.format(v));
 
 const dateIt = (iso: string | null | undefined): string => {
@@ -87,204 +94,204 @@ export function layout(opts: { title: string; description: string; body: string;
 const option = (value: string, label: string, selected: string): string =>
   `<option value="${esc(value)}"${value === selected ? ' selected' : ''}>${esc(label)}</option>`;
 
-const COUNTRIES: [string, string][] = [
-  ['IT', 'Italia'], ['CH', 'Svizzera'], ['FR', 'Francia'], ['DE', 'Germania'], ['ES', 'Spagna'],
-  ['GB', 'Regno Unito'], ['US', 'Stati Uniti'], ['OTHER', 'Altro paese'],
-];
-
-function renderForm(req: RecommendationRequest, models: ModelRecord[]): string {
-  const modelOptions = models
-    .slice()
-    .sort((a, b) => a.displayName.localeCompare(b.displayName))
-    .map((m) => option(m.key, m.displayName, req.currentModelKey ?? ''))
-    .join('');
-  return `<form class="modulo" method="get" action="/">
-  <div class="modulo__righe">
-    <div class="campo">
-      <label for="task">Attività principale</label>
-      <select id="task" name="task">${TASK_IDS.map((t) => option(t, SCENARIOS[t].label, req.task)).join('')}</select>
-    </div>
-    <div class="campo">
-      <label for="priority">Priorità</label>
-      <select id="priority" name="priority">${PRIORITIES.map((p) => option(p, p === 'qualita' ? 'Qualità' : p[0]!.toUpperCase() + p.slice(1), req.priority)).join('')}</select>
-    </div>
-    <div class="campo">
-      <label for="country">Paese di utilizzo</label>
-      <select id="country" name="country">${COUNTRIES.map(([c, l]) => option(c, l, req.country)).join('')}</select>
-    </div>
-    <div class="campo">
-      <label for="access">Acquisto</label>
-      <select id="access" name="access">
-        ${option('qualsiasi', 'Diretto o tramite intermediario', req.access)}
-        ${option('solo-diretto', 'Solo diretto dal provider', req.access)}
-      </select>
-    </div>
-    <div class="campo">
-      <label for="privacy">Requisiti sui dati</label>
-      <select id="privacy" name="privacy">
-        ${option('nessuno', 'Nessun requisito particolare', req.privacy)}
-        ${option('no-training', 'Niente addestramento sui miei dati', req.privacy)}
-        ${option('zero-retention', 'Conservazione zero', req.privacy)}
-      </select>
-    </div>
-  </div>
-  <details class="dettagli" ${req.currentModelKey || req.usage ? 'open' : ''}>
-    <summary>Facoltativo: la tua configurazione attuale e i tuoi consumi</summary>
-    <div class="dettagli__corpo">
-      <div class="modulo__righe">
-        <div class="campo">
-          <label for="currentModel">Modello che usi oggi</label>
-          <select id="currentModel" name="currentModel">
-            <option value="">Non indicato</option>${modelOptions}
-          </select>
-          <span class="campo__aiuto">Serve solo per stimare il risparmio.</span>
-        </div>
-        <div class="campo">
-          <label for="input">Token di input al mese</label>
-          <input id="input" name="input" type="number" min="0" step="100000" value="${req.usage?.input ?? ''}" placeholder="scenario predefinito">
-        </div>
-        <div class="campo">
-          <label for="output">Token di output al mese</label>
-          <input id="output" name="output" type="number" min="0" step="10000" value="${req.usage?.output ?? ''}" placeholder="scenario predefinito">
-        </div>
-        <div class="campo">
-          <label for="cacheRead">Lettura cache al mese</label>
-          <input id="cacheRead" name="cacheRead" type="number" min="0" step="100000" value="${req.usage?.cacheRead ?? ''}" placeholder="scenario predefinito">
-        </div>
-        <div class="campo">
-          <label for="cacheWrite">Scrittura cache al mese</label>
-          <input id="cacheWrite" name="cacheWrite" type="number" min="0" step="100000" value="${req.usage?.cacheWrite ?? ''}" placeholder="scenario predefinito">
-        </div>
-      </div>
-      <p class="campo__aiuto">Lasciando i campi vuoti usiamo lo scenario dell\'attività scelta, che è un\'ipotesi dichiarata e non una misura dei tuoi consumi.</p>
-    </div>
-  </details>
-  <div class="modulo__azioni">
-    <button class="bottone bottone--gradiente" type="submit">Aggiorna la scelta</button>
-    <span class="meta">Nessuna registrazione, nessun account, nessuna chiave API.</span>
-  </div>
-</form>`;
+/** Rebuilds the page URL keeping every parameter except the one being changed. */
+function link(req: RecommendationRequest, override: Record<string, string>): string {
+  const params = new URLSearchParams();
+  params.set('task', req.task);
+  params.set('priority', req.priority);
+  if (req.usage?.input) params.set('input', String(req.usage.input));
+  if (req.usage?.output) params.set('output', String(req.usage.output));
+  if (req.usage?.cacheRead) params.set('cacheRead', String(req.usage.cacheRead));
+  if (req.usage?.cacheWrite) params.set('cacheWrite', String(req.usage.cacheWrite));
+  if (req.currentModelKey) params.set('currentModel', req.currentModelKey);
+  for (const [k, v] of Object.entries(override)) params.set(k, v);
+  return `/?${params.toString()}`;
 }
 
-function renderCost(pick: Pick): string {
-  const rows = pick.cost.lines
-    .filter((l) => l.tokens > 0)
-    .map(
-      (l) => `<div class="prezzi__riga">
-        <span class="prezzi__etichetta">${esc(l.label)} · ${esc(tokens(l.tokens))} token × ${l.usdPerMTok === null ? 'prezzo ignoto' : esc(nf4.format(l.usdPerMTok)) + ' USD/1M'}</span>
-        <span>${esc(usd(l.usd))}</span>
-      </div>`,
-    )
-    .join('');
-  const fees = pick.cost.feeNotes.map((n) => `<div class="prezzi__riga"><span class="prezzi__etichetta">${esc(n)}</span><span>${esc(usd(pick.cost.feesUsd))}</span></div>`).join('');
-  const unq = pick.cost.unquantifiedFees
-    .map((n) => `<div class="prezzi__riga"><span class="prezzi__etichetta">${esc(n)}</span><span class="etichetta etichetta--commissione">non quantificata</span></div>`)
-    .join('');
-  const assumptions = pick.cost.assumptions.length
-    ? `<p class="meta" style="margin:0">${pick.cost.assumptions.map(esc).join(' ')}</p>`
-    : '';
-  return `<div class="prezzi">
-    ${rows}${fees}${unq}
-    <div class="prezzi__riga prezzi__riga--totale"><span>Totale stimato al mese</span><span>${esc(usd(pick.cost.totalUsd))}</span></div>
-    ${assumptions}
+/**
+ * The only choice on the page: spend less versus work better. Three links, no
+ * form to fill in and nothing to submit.
+ */
+function renderChips(req: RecommendationRequest): string {
+  const labels: Record<Priority, [string, string]> = {
+    risparmio: ['Spendere poco', 'la scelta più economica che regge il lavoro'],
+    equilibrio: ['Equilibrio', 'buon risultato senza esagerare col costo'],
+    qualita: ['Lavorare bene', 'la qualità prima del prezzo'],
+  };
+  return `<nav class="scelte" aria-label="Che cosa conta di più per te">
+    ${PRIORITIES.map((p) => {
+      const [label, hint] = labels[p];
+      const attivo = p === req.priority;
+      return `<a class="scelta${attivo ? ' scelta--attiva' : ''}" href="${esc(link(req, { priority: p }))}"${attivo ? ' aria-current="true"' : ''}>
+        <span class="scelta__nome">${esc(label)}</span>
+        <span class="scelta__nota">${esc(hint)}</span>
+      </a>`;
+    }).join('')}
+  </nav>`;
+}
+
+/** The provider comparison, in full view: this is the answer to "where do I buy". */
+function renderConfronto(pick: Pick, role: string): string {
+  const riga = (o: OfferView, scelto: boolean) => `<tr${scelto ? ' class="scelto"' : ''}>
+      <td>
+        ${esc(o.offer.providerName)}
+        ${o.offer.access === 'intermediary' ? `<span class="meta">via ${esc(o.offer.broker ?? 'intermediario')}</span>` : '<span class="meta">diretto</span>'}
+      </td>
+      <td class="num">${o.offer.prices.inputPerMTok === null ? '—' : esc(nf4.format(o.offer.prices.inputPerMTok))}</td>
+      <td class="num">${o.offer.prices.outputPerMTok === null ? '—' : esc(nf4.format(o.offer.prices.outputPerMTok))}</td>
+      <td class="num"><strong>${esc(usd(o.cost.totalUsd))}</strong></td>
+      <td>${scelto ? '<span class="etichetta etichetta--ok">il più economico</span>' : ''}</td>
+    </tr>`;
+
+  const primi = pick.alternatives.slice(0, 4);
+  const restanti = pick.alternatives.slice(4);
+  const intestazione = `<thead><tr>
+      <th>Provider</th><th class="num">Input<br><span class="meta">USD/1M</span></th>
+      <th class="num">Output<br><span class="meta">USD/1M</span></th>
+      <th class="num">Al mese</th><th></th>
+    </tr></thead>`;
+
+  return `<div class="acquisto">
+    <h4 class="acquisto__titolo">Dove comprarlo, dal più economico</h4>
+    <table class="tabella confronto">
+      ${intestazione}
+      <tbody>
+        ${riga({ offer: pick.offer, cost: pick.cost }, true)}
+        ${primi.map((o) => riga(o, false)).join('')}
+      </tbody>
+    </table>
+    ${restanti.length ? `<details class="dettagli">
+      <summary>Altri ${esc(String(restanti.length))} provider confrontati</summary>
+      <div class="dettagli__corpo">
+        <table class="tabella confronto">${intestazione}<tbody>${restanti.map((o) => riga(o, false)).join('')}</tbody></table>
+      </div>
+    </details>` : ''}
+    <p class="meta acquisto__nota">Confrontati ${esc(String(pick.offersCompared))} provider per questo modello, ciascuno calcolato per intero sui propri prezzi. Il più economico tra i provider monitorati.</p>
   </div>`;
 }
 
-function renderPick(pick: Pick | null, role: 'quotidiano' | 'difficile', empty: string): string {
-  const title = role === 'quotidiano' ? '🟢 Modello per il lavoro quotidiano' : '🟠 Modello per i problemi difficili';
-  if (!pick) {
-    return `<article class="scheda pick pick--${role}">
-      <p class="pick__ruolo">${esc(title)}</p>
-      <div class="avviso avviso--neutro">${esc(empty)}</div>
-    </article>`;
-  }
+function renderDettagli(pick: Pick): string {
   const q = pick.quality;
-  const badges = [
-    pick.offer.access === 'direct'
-      ? '<span class="etichetta etichetta--ok">acquisto diretto</span>'
-      : `<span class="etichetta etichetta--info">tramite ${esc(pick.offer.broker ?? 'intermediario')}</span>`,
-    pick.provisional ? '<span class="etichetta etichetta--attenzione">raccomandazione provvisoria</span>' : '',
-    pick.offer.quantization ? `<span class="etichetta etichetta--info">quantizzazione ${esc(pick.offer.quantization)}</span>` : '',
-  ].join(' ');
+  const righe = pick.cost.lines
+    .filter((l) => l.tokens > 0)
+    .map((l) => `<div class="prezzi__riga">
+        <span class="prezzi__etichetta">${esc(l.label)} · ${esc(tokens(l.tokens))} token</span>
+        <span>${esc(usd(l.usd))}</span>
+      </div>`)
+    .join('');
+  const commissioni = [
+    ...pick.cost.feeNotes.map((n) => `<div class="prezzi__riga"><span class="prezzi__etichetta">${esc(n)}</span><span>${esc(usd(pick.cost.feesUsd))}</span></div>`),
+    ...pick.cost.unquantifiedFees.map((n) => `<div class="prezzi__riga"><span class="prezzi__etichetta">${esc(n)}</span><span class="etichetta etichetta--commissione">non quantificata</span></div>`),
+  ].join('');
 
-  const alternatives = pick.alternatives.length
-    ? `<table class="tabella">
-        <thead><tr><th>Altri provider monitorati</th><th class="num">Input USD/1M</th><th class="num">Output USD/1M</th><th class="num">Totale mese</th></tr></thead>
-        <tbody>${pick.alternatives
-          .map(
-            (a) => `<tr>
-              <td>${esc(a.offer.providerName)}${a.offer.access === 'intermediary' ? ` <span class="meta">(via ${esc(a.offer.broker ?? 'intermediario')})</span>` : ''}</td>
-              <td class="num">${a.offer.prices.inputPerMTok === null ? '—' : esc(nf4.format(a.offer.prices.inputPerMTok))}</td>
-              <td class="num">${a.offer.prices.outputPerMTok === null ? '—' : esc(nf4.format(a.offer.prices.outputPerMTok))}</td>
-              <td class="num">${esc(usd(a.cost.totalUsd))}</td>
-            </tr>`,
-          )
-          .join('')}</tbody>
-      </table>`
-    : '<p class="meta">Nessun altro provider monitorato soddisfa i requisiti per questo modello.</p>';
-
-  return `<article class="scheda pick pick--${role}">
-    <p class="pick__ruolo">${esc(title)}</p>
-    <h3 class="pick__modello">${esc(pick.model.displayName)}</h3>
-    <p class="pick__provider">Provider: <strong>${esc(pick.offer.providerName)}</strong> — il più economico tra i provider monitorati che soddisfano i tuoi requisiti.</p>
-    <p>${badges}</p>
-    <p class="pick__perche">${esc(pick.reason)}</p>
-    ${pick.whenToUse ? `<p class="pick__perche">${esc(pick.whenToUse)}</p>` : ''}
-    ${renderCost(pick)}
-    ${pick.provisional ? `<div class="avviso">Raccomandazione provvisoria: ${esc(pick.provisionalReasons.join('; '))}.</div>` : ''}
-    <p>
-      ${pick.model.officialUrl ? `<a class="bottone bottone--contorno bottone--piccolo" href="${esc(pick.model.officialUrl)}" rel="noopener">Pagina ufficiale</a>` : ''}
-      <a class="bottone bottone--contorno bottone--piccolo" href="#opencode">Configura in OpenCode</a>
-    </p>
-    <details class="dettagli">
-      <summary>Perché questa scelta?</summary>
-      <div class="dettagli__corpo">
-        <p><strong>Prova di qualità usata.</strong> ${esc(q.value.toFixed(1))}% di problemi risolti su ${q.metric === 'swebench_verified' ? 'SWE-bench Verified' : 'Aider polyglot'}, misurato con ${esc(q.harness)}, rilevazione del ${esc(dayIt(q.measuredAt))}. ${q.comparable ? 'Il punteggio appartiene al gruppo di confronto di riferimento.' : 'Attenzione: il punteggio viene da un banco di prova diverso da quello di riferimento, quindi non è direttamente confrontabile con gli altri.'} ${q.instanceCalls !== null ? `Media di ${esc(nf2.format(q.instanceCalls))} chiamate al modello per problema.` : ''} <a href="${esc(q.sourceUrl)}" rel="noopener">Fonte</a>.</p>
-        <p><strong>Come abbiamo calcolato il costo.</strong> Ogni offerta e calcolata per intero sul singolo provider: non mescoliamo mai il prezzo di input di un provider con quello di output di un altro. ${pick.cost.constraints.length ? `Vincoli dichiarati dal provider: ${esc(pick.cost.constraints.join('; '))}.` : ''}</p>
-        <p><strong>Contesto e capacità dell\'offerta.</strong> ${pick.offer.contextTokens ? `${esc(nf.format(pick.offer.contextTokens))} token di contesto` : 'contesto non dichiarato'}${pick.offer.maxOutputTokens ? `, fino a ${esc(nf.format(pick.offer.maxOutputTokens))} token di output` : ''}${pick.offer.uptime30m !== null ? `, disponibilità recente ${esc(nf2.format(pick.offer.uptime30m))}%` : ''}.</p>
-        <p><strong>Disponibilità geografica e trattamento dei dati.</strong> ${pick.offer.regions === null ? 'Non abbiamo dati verificati sulla disponibilità per paese di questa offerta, quindi non promettiamo che sia acquistabile ovunque.' : 'Disponibilità dichiarata: ' + esc(String(pick.offer.regions))}. ${pick.offer.dataPolicy.trainsOnData === null ? 'Il trattamento dei dati non è documentato nelle fonti che leggiamo: verificalo presso il provider.' : ''}</p>
-        <p><strong>Prezzo verificato il</strong> ${esc(dateIt(pick.offer.observedAt))} — <a href="${esc(pick.offer.sourceUrl)}" rel="noopener">fonte del prezzo</a>.</p>
-        ${alternatives}
-      </div>
-    </details>
-  </article>`;
-}
-
-function renderMethodBox(rec: Recommendation): string {
-  const m = rec.method;
   return `<details class="dettagli">
-    <summary>Come sono state prese queste due decisioni</summary>
+    <summary>Perché proprio questo</summary>
     <div class="dettagli__corpo">
-      <ul class="elenco">
-        <li>Prima i modelli, poi i provider: selezioniamo i modelli sulle prove di qualità nel codice, e solo dopo cerchiamo il provider meno costoso che soddisfa i tuoi requisiti.</li>
-        <li>Gruppo di confronto di riferimento: ${m.referenceHarness ? `${esc(m.referenceHarness)}, ${esc(String(m.referenceHarnessModels))} modelli misurati nelle stesse condizioni` : 'nessuno disponibile'}.</li>
-        <li>Soglia di qualità per la priorità scelta: ${esc(String(m.gate.everyday))}% per il quotidiano, ${esc(String(m.gate.hard))}% per i problemi difficili.</li>
-        <li>Modelli arrivati al confronto finale: ${esc(String(m.candidateModels))}.</li>
-        <li>Scenario di consumo: ${rec.usingCustomUsage ? 'i consumi che hai inserito' : 'lo scenario predefinito dell\'attività scelta'} — ${esc(tokens(rec.mix.input))} input, ${esc(tokens(rec.mix.output))} output, ${esc(tokens(rec.mix.cacheRead))} lettura cache, ${esc(tokens(rec.mix.cacheWrite))} scrittura cache al mese.</li>
-      </ul>
-      ${m.excluded.length ? `<p><strong>Esclusioni.</strong></p><ul class="elenco">${m.excluded.slice(0, 8).map((e) => `<li>${esc(String(e.count))} modelli: ${esc(e.reason)}.</li>`).join('')}</ul>` : ''}
-      <p class="meta">Non dividiamo il punteggio di qualità per il prezzo, non trattiamo le differenze di punteggio come percentuali di qualità e non confrontiamo misure ottenute con banchi di prova diversi. Il metodo completo e sulla <a href="/metodo">pagina del metodo</a>.</p>
+      <p>${esc(pick.reason)}</p>
+      <p><strong>La prova.</strong> ${esc(q.value.toFixed(1))}% di problemi risolti su ${q.metric === 'swebench_verified' ? 'SWE-bench Verified' : 'Aider polyglot'}, misurato con ${esc(q.harness)} il ${esc(dayIt(q.measuredAt))}. <a href="${esc(q.sourceUrl)}" rel="noopener">Vedi la misura</a>.</p>
+      <div class="prezzi">${righe}${commissioni}
+        <div class="prezzi__riga prezzi__riga--totale"><span>Totale stimato al mese</span><span>${esc(usd(pick.cost.totalUsd))}</span></div>
+      </div>
+      ${pick.cost.assumptions.length ? `<p class="meta">${pick.cost.assumptions.map(esc).join(' ')}</p>` : ''}
+      ${pick.provisional ? `<p class="meta">Raccomandazione provvisoria: ${esc(pick.provisionalReasons.join('; '))}.</p>` : ''}
+      <p class="meta">Prezzo verificato il ${esc(dateIt(pick.offer.observedAt))}. <a href="${esc(pick.offer.sourceUrl)}" rel="noopener">Fonte del prezzo</a>${pick.model.officialUrl ? ` · <a href="${esc(pick.model.officialUrl)}" rel="noopener">Pagina del modello</a>` : ''}.</p>
     </div>
   </details>`;
 }
 
-function renderOpenCode(config: OpenCodeConfigResult | null): string {
-  if (!config) return '';
-  return `<section class="sezione sezione--alt" id="opencode">
-    <div class="contenitore">
-      <h2>Configura in OpenCode</h2>
-      <p>Configurazione pronta per i modelli scelti. Le chiavi restano tue: qui trovi solo il nome della variabile d ambiente da impostare.</p>
-      <div class="scheda">
-        <pre class="codice" id="opencode-json">${esc(config.json)}</pre>
-        <p>
-          <button class="bottone bottone--piccolo" type="button" data-copia="#opencode-json">Copia la configurazione</button>
-          <a class="bottone bottone--contorno bottone--piccolo" href="/opencode.json${config.everydayId ? `?model=${encodeURIComponent(config.everydayId)}` : ''}" download="opencode.json">Scarica opencode.json</a>
-          <a class="bottone bottone--contorno bottone--piccolo" href="https://opencode.ai/docs/config/" rel="noopener">Documentazione OpenCode</a>
-        </p>
-        <ul class="elenco">${config.instructions.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>
+function renderPick(
+  pick: Pick | null,
+  role: 'quotidiano' | 'difficile',
+  change: Change | null,
+  configId: string | null,
+  empty: string,
+): string {
+  const titolo = role === 'quotidiano' ? '🟢 Ogni giorno' : '🟠 Quando si blocca';
+  if (!pick) {
+    return `<article class="scheda pick pick--${role}">
+      <p class="pick__ruolo">${esc(titolo)}</p>
+      <div class="avviso avviso--neutro">${esc(empty)}</div>
+    </article>`;
+  }
+  return `<article class="scheda pick pick--${role}">
+    <p class="pick__ruolo">${esc(titolo)}</p>
+    <h3 class="pick__modello">${esc(nomeModello(pick.model.displayName))}</h3>
+    <p class="pick__sintesi">
+      <strong>${esc(usd(pick.cost.totalUsd))}</strong> al mese da <strong>${esc(pick.offer.providerName)}</strong>
+      · risolve il <strong>${esc(pick.quality.value.toFixed(0))}%</strong> dei problemi di codice
+    </p>
+    ${change ? `<p class="pick__cambio${change.moved ? ' pick__cambio--mosso' : ''}">${esc(change.text)}</p>` : ''}
+    ${role === 'difficile' && pick.whenToUse ? `<p class="pick__quando">${esc(pick.whenToUse)}</p>` : ''}
+    ${configId ? `<div class="config">
+      <span class="config__etichetta">Riga da incollare in OpenCode</span>
+      <div class="config__riga">
+        <code id="config-${esc(role)}">${esc(configId)}</code>
+        <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">Copia</button>
       </div>
+    </div>` : ''}
+    ${renderConfronto(pick, role)}
+    ${renderDettagli(pick)}
+  </article>`;
+}
+
+/** Everything that used to be a question, tucked away for whoever wants it. */
+function renderIpotesi(req: RecommendationRequest, rec: Recommendation | null, models: ModelRecord[]): string {
+  const modelOptions = models
+    .slice()
+    .sort((a, b) => nomeModello(a.displayName).localeCompare(nomeModello(b.displayName)))
+    .map((m) => option(m.key, nomeModello(m.displayName), req.currentModelKey ?? ''))
+    .join('');
+  return `<details class="dettagli dettagli--ipotesi">
+    <summary>Cambia il tipo di lavoro o i tuoi consumi</summary>
+    <div class="dettagli__corpo">
+      <p class="meta">Di base stimiamo i costi su un mese di lavoro con un agente di codice: ${rec ? `${esc(tokens(rec.mix.input))} token di input, ${esc(tokens(rec.mix.output))} di output, ${esc(tokens(rec.mix.cacheRead))} letti dalla cache. È un'ipotesi dichiarata, non una misura dei tuoi consumi.` : ''}</p>
+      <form class="modulo" method="get" action="/">
+        <input type="hidden" name="priority" value="${esc(req.priority)}">
+        <div class="modulo__righe">
+          <div class="campo">
+            <label for="task">Tipo di lavoro</label>
+            <select id="task" name="task">${TASK_IDS.map((t) => option(t, SCENARIOS[t].label, req.task)).join('')}</select>
+          </div>
+          <div class="campo">
+            <label for="input">Token di input al mese</label>
+            <input id="input" name="input" type="number" min="0" step="100000" value="${req.usage?.input ?? ''}" placeholder="predefinito">
+          </div>
+          <div class="campo">
+            <label for="output">Token di output al mese</label>
+            <input id="output" name="output" type="number" min="0" step="10000" value="${req.usage?.output ?? ''}" placeholder="predefinito">
+          </div>
+          <div class="campo">
+            <label for="cacheRead">Lettura cache al mese</label>
+            <input id="cacheRead" name="cacheRead" type="number" min="0" step="100000" value="${req.usage?.cacheRead ?? ''}" placeholder="predefinito">
+          </div>
+          <div class="campo">
+            <label for="cacheWrite">Scrittura cache al mese</label>
+            <input id="cacheWrite" name="cacheWrite" type="number" min="0" step="100000" value="${req.usage?.cacheWrite ?? ''}" placeholder="predefinito">
+          </div>
+          <div class="campo">
+            <label for="currentModel">Modello che usi oggi</label>
+            <select id="currentModel" name="currentModel">
+              <option value="">Non indicato</option>${modelOptions}
+            </select>
+          </div>
+        </div>
+        <div class="modulo__azioni">
+          <button class="bottone bottone--piccolo" type="submit">Ricalcola</button>
+        </div>
+      </form>
     </div>
-  </section>`;
+  </details>`;
+}
+
+function renderMetodoBreve(rec: Recommendation): string {
+  const m = rec.method;
+  return `<details class="dettagli">
+    <summary>Come scegliamo</summary>
+    <div class="dettagli__corpo">
+      <p>Prima i modelli, poi i provider. Entra nel confronto solo un modello con una misura di qualità sul codice ottenuta nelle stesse condizioni degli altri${m.referenceHarness ? ` (${esc(m.referenceHarness)}, ${esc(String(m.referenceHarnessModels))} modelli)` : ''}. Fra quelli che superano la soglia di ${esc(String(m.gate.everyday))}%, scegliamo il più economico. Il secondo modello deve risolvere almeno 3 punti in più, misurati allo stesso modo.</p>
+      <p class="meta">Modelli arrivati al confronto: ${esc(String(m.candidateModels))}.${m.excluded.length ? ` Esclusi: ${m.excluded.slice(0, 3).map((e) => `${esc(String(e.count))} per ${esc(e.reason)}`).join(', ')}.` : ''} Il metodo completo è su <a href="/metodo">/metodo</a>, le fonti su <a href="/fonti">/fonti</a>.</p>
+    </div>
+  </details>`;
 }
 
 export function homePage(opts: {
@@ -293,53 +300,53 @@ export function homePage(opts: {
   models: ModelRecord[];
   request: RecommendationRequest;
   config: OpenCodeConfigResult | null;
+  changes: { everyday: Change | null; hard: Change | null };
 }): string {
-  const { rec, snapshot, models, request, config } = opts;
-  const verified = snapshot ? dateIt(snapshot.generatedAt) : null;
+  const { rec, snapshot, models, request, config, changes } = opts;
   const stale = rec?.method.snapshotStale ?? false;
 
   const body = `
-<section class="hero">
+<section class="hero hero--compatto">
   <div class="contenitore">
-    <p class="hero__sopratitolo">${esc(SITE.tagline)}</p>
-    <h1>Quale modello uso oggi, e da chi conviene comprarlo?</h1>
-    <p class="hero__testo">Due scelte, non una classifica: un modello per il lavoro quotidiano e uno per i problemi difficili, con il provider meno costoso tra quelli monitorati che soddisfano i tuoi requisiti. Prima versione dedicata alla programmazione con OpenCode.</p>
+    <p class="hero__sopratitolo">${snapshot ? `Verificato il ${esc(dateIt(snapshot.generatedAt))}` : 'Nessun dato verificato'}</p>
+    <h1>Che modello usi oggi</h1>
+    <p class="hero__testo">Uno per il lavoro di tutti i giorni, uno per quando si blocca, con il provider più economico che li vende.</p>
   </div>
 </section>
 
 <section class="sezione">
   <div class="contenitore">
-    <div class="scheda">${renderForm(request, models)}</div>
-  </div>
-</section>
-
-<section class="sezione sezione--alt">
-  <div class="contenitore">
-    ${!snapshot ? '<div class="avviso avviso--errore">Non e ancora stato pubblicato nessun aggiornamento verificato: le raccomandazioni compariranno dopo la prima raccolta dati riuscita.</div>' : ''}
-    ${stale ? `<div class="avviso">I dati pubblicati hanno più di ${esc(String(THRESHOLDS.snapshotStaleHours))} ore. Li mostriamo lo stesso, ma con la loro data reale: non diciamo "aggiornato oggi" per dati non verificati oggi.</div>` : ''}
+    ${renderChips(request)}
+    ${!snapshot ? '<div class="avviso avviso--errore">Non è ancora stato pubblicato nessun aggiornamento verificato.</div>' : ''}
+    ${stale ? '<div class="avviso">Questi dati non sono stati verificati oggi: la data reale è qui sopra.</div>' : ''}
     ${rec?.notes.map((n) => `<div class="avviso">${esc(n)}</div>`).join('') ?? ''}
     <div class="risultati">
-      ${renderPick(rec?.everyday ?? null, 'quotidiano', 'Nessun modello soddisfa insieme la soglia di qualità e i requisiti indicati. Preferiamo non indicare un vincitore piuttosto che indicarne uno senza prove.')}
-      ${renderPick(rec?.hard ?? null, 'difficile', 'Nessun modello documenta una capacità superiore sufficiente a giustificare un secondo modello.')}
+      ${renderPick(rec?.everyday ?? null, 'quotidiano', changes.everyday, config?.everydayId ?? null, 'Nessun modello supera la soglia di qualità con un prezzo verificato. Preferiamo non indicare un vincitore piuttosto che indicarne uno senza prove.')}
+      ${renderPick(rec?.hard ?? null, 'difficile', changes.hard, config?.backupId ?? null, 'Nessun modello risolve abbastanza più problemi da giustificarne un secondo.')}
     </div>
-    ${rec?.savings ? `<div class="scheda" style="margin-top:20px">
-      <h3>Confronto con la tua configurazione attuale</h3>
-      <p>${rec.savings.currentTotalUsd === null ? esc(rec.savings.note) : `Sullo stesso scenario la tua configurazione attuale costa ${esc(usd(rec.savings.currentTotalUsd))} al mese, quella consigliata ${esc(usd(rec.savings.recommendedTotalUsd))}. Differenza stimata: ${esc(usd(rec.savings.deltaUsd))}.`}</p>
-      <p class="meta">${esc(rec.savings.note)}</p>
-    </div>` : ''}
-    <div class="scheda" style="margin-top:20px">
-      <p class="meta">Ultima verifica dei dati: <strong>${esc(verified ?? 'mai')}</strong>${snapshot ? ` · ${esc(nf.format(snapshot.stats.offerCount))} offerte da ${esc(nf.format(snapshot.stats.modelCount))} modelli · ${esc(nf.format(snapshot.stats.evidenceCount))} misure di qualità` : ''}</p>
-      ${rec ? renderMethodBox(rec) : ''}
+    ${rec?.savings && rec.savings.deltaUsd !== null ? `<p class="risparmio">Rispetto a quello che usi oggi: ${rec.savings.deltaUsd > 0 ? `<strong>risparmi ${esc(usd(rec.savings.deltaUsd))} al mese</strong>` : `<strong>spendi ${esc(usd(Math.abs(rec.savings.deltaUsd)))} in più al mese</strong>`}, sugli stessi consumi. Stima, non misura.</p>` : ''}
+    <div class="coda">
+      ${renderIpotesi(request, rec, models)}
+      ${rec ? renderMetodoBreve(rec) : ''}
+      ${config ? `<details class="dettagli">
+        <summary>File di configurazione completo</summary>
+        <div class="dettagli__corpo">
+          <pre class="codice" id="opencode-json">${esc(config.json)}</pre>
+          <p>
+            <button class="bottone bottone--piccolo" type="button" data-copia="#opencode-json">Copia</button>
+            <a class="bottone bottone--contorno bottone--piccolo" href="/opencode.json?task=${esc(request.task)}&priority=${esc(request.priority)}" download="opencode.json">Scarica</a>
+          </p>
+          <ul class="elenco">${config.instructions.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>
+        </div>
+      </details>` : ''}
     </div>
   </div>
 </section>
-
-${renderOpenCode(config)}
 `;
   return layout({
     title: `${SITE.name} — ${SITE.tagline}`,
     description:
-      'Quale modello AI usare per programmare ogni giorno, quale tenere per i problemi difficili e da quale provider conviene comprarlo oggi. Dati verificati e aggiornati ogni giorno.',
+      'Quale modello AI usare oggi per programmare, quale tenere per i problemi difficili e da quale provider conviene comprarlo. Prezzi verificati ogni giorno.',
     body,
     active: 'home',
   });

@@ -90,6 +90,6 @@ Una raccomandazione è marcata **provvisoria** quando almeno una di queste condi
 ## 8. Limiti dichiarati
 
 - Copriamo i provider monitorati dalle fonti abilitate, non tutto il mercato. La formula usata sul sito è sempre: *"il più economico tra i provider monitorati che soddisfano i tuoi requisiti"*.
-- La disponibilità per paese e il trattamento dei dati raramente sono pubblicati in forma strutturata: quando non li conosciamo lo scriviamo, invece di indovinare. Di conseguenza un requisito di conservazione zero oggi esclude quasi tutte le offerte, ed è corretto così.
+- **Non chiediamo il paese di utilizzo né requisiti sul trattamento dei dati.** Nessuna fonte che leggiamo pubblica la disponibilità geografica o la politica sui dati in forma strutturata: erano domande che non cambiavano il risultato, e una domanda senza effetto è peggio di nessuna domanda. Chi ha vincoli di questo tipo deve verificarli sul sito del provider prima di acquistare.
 - I banchi di prova pubblici misurano un agente su compiti standard: sono un indizio serio, non una garanzia sul tuo repository.
 - OpenCode non passa automaticamente a un modello di riserva: il secondo modello va selezionato a mano.

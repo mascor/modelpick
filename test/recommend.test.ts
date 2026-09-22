@@ -6,9 +6,6 @@ import { evidence, model, now, offer, snapshot } from './fixtures.js';
 const req = (over: Partial<RecommendationRequest> = {}): RecommendationRequest => ({
   task: 'bug',
   priority: 'equilibrio',
-  country: 'IT',
-  privacy: 'nessuno',
-  access: 'qualsiasi',
   usage: null,
   currentModelKey: null,
   currentOfferId: null,
@@ -142,20 +139,16 @@ test('un prezzo di cache non pubblicato viene conteggiato al prezzo di input, ma
   assert.ok(alt!.cost.assumptions.length > 0, 'l ipotesi prudenziale viene dichiarata');
 });
 
-test('il requisito di conservazione zero esclude chi non lo documenta', () => {
-  const r = recommend(base(), req({ privacy: 'zero-retention' }));
-  assert.equal(r.everyday, null);
-  assert.ok(r.method.excluded.some((e) => /conservazione zero/.test(e.reason)));
-});
-
-test('il vincolo di acquisto diretto esclude gli intermediari', () => {
+test('un intermediario e un provider diretto competono sullo stesso prezzo totale', () => {
   const s = snapshot(
     [model('v/a')],
-    [offer({ id: 'a', modelKey: 'v/a', providerId: 'broker', access: 'intermediary', broker: 'OpenRouter' })],
+    [
+      offer({ id: 'diretto', modelKey: 'v/a', providerId: 'diretto', prices: { inputPerMTok: 2, outputPerMTok: 6, cacheReadPerMTok: 0.2, cacheWritePerMTok: 2 } }),
+      offer({ id: 'broker', modelKey: 'v/a', providerId: 'broker', access: 'intermediary', broker: 'OpenRouter', prices: { inputPerMTok: 1, outputPerMTok: 3, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1 } }),
+    ],
     [evidence('v/a', 70)],
   );
-  assert.equal(recommend(s, req({ access: 'solo-diretto' })).everyday, null);
-  assert.equal(recommend(s, req({ access: 'qualsiasi' })).everyday?.offer.providerId, 'broker');
+  assert.equal(recommend(s, req()).everyday?.offer.providerId, 'broker');
 });
 
 test('i consumi indicati dall utente sostituiscono lo scenario', () => {

@@ -53,6 +53,20 @@ export async function listRuns(limit = 60): Promise<string[]> {
   }
 }
 
+/** The newest stored run that is not the one currently published. */
+export async function previousRun(currentRunId: string | null): Promise<Snapshot | null> {
+  const runs = await listRuns(5); // newest first
+  for (const runId of runs) {
+    if (runId === currentRunId) continue;
+    try {
+      return JSON.parse(await readFile(join(PATHS.runs, `${runId}.json`), 'utf8')) as Snapshot;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
 /** Cheapest complete price seen for a model in each stored run. */
 export async function priceHistory(modelKey: string, limit = 60): Promise<{ at: string; usdPerMTokInput: number | null; offerCount: number }[]> {
   const runs = (await listRuns(limit)).reverse();

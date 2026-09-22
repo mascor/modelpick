@@ -12,15 +12,10 @@ import type { ModelRecord, Offer, QualityEvidence, Snapshot } from '../types.js'
 import { costOf, type CostBreakdown } from './cost.js';
 import { QUALITY_GATE, SCENARIOS, type Priority, type TaskId, type TokenMix } from './scenarios.js';
 
-export type PrivacyNeed = 'nessuno' | 'no-training' | 'zero-retention';
-export type AccessNeed = 'qualsiasi' | 'solo-diretto';
 
 export interface RecommendationRequest {
   task: TaskId;
   priority: Priority;
-  country: string;
-  privacy: PrivacyNeed;
-  access: AccessNeed;
   /** Real usage supplied by the user; replaces the scenario when present. */
   usage?: Partial<TokenMix> | null;
   currentModelKey?: string | null;
@@ -53,6 +48,8 @@ export interface Pick {
   reason: string;
   whenToUse: string | null;
   alternatives: OfferView[];
+  /** How many provider offers were compared for this model. */
+  offersCompared: number;
   provisional: boolean;
   provisionalReasons: string[];
 }
@@ -149,13 +146,6 @@ function offerBlocker(offer: Offer, req: RecommendationRequest, minContext: numb
   if (offer.supportsTools === false) return 'non supporta gli strumenti richiesti da un agente di codice';
   if (offer.contextTokens !== null && offer.contextTokens < minContext) return 'contesto insufficiente per questa attività';
   if (offer.uptime30m !== null && offer.uptime30m < THRESHOLDS.minUptime30m) return 'disponibilità recente troppo bassa';
-  if (req.access === 'solo-diretto' && offer.access !== 'direct') return 'acquisto solo diretto richiesto';
-  if (req.privacy === 'no-training' && offer.dataPolicy.trainsOnData !== false) {
-    return 'nessuna garanzia documentata sul non addestramento';
-  }
-  if (req.privacy === 'zero-retention' && offer.dataPolicy.zeroRetention !== true) {
-    return 'nessuna conservazione zero documentata';
-  }
   return null;
 }
 
@@ -267,8 +257,8 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     const whenToUse =
       role === 'hard'
         ? other
-          ? `Usalo quando il modello quotidiano si blocca: bug che non si riproducono, refactoring che tocca molti file, codice che il quotidiano continua a sbagliare. Costa ${fmtUsd(price)} al mese contro ${fmtUsd(other.offers[0]!.cost.totalUsd!)} sullo stesso scenario, quindi conviene tenerlo per i casi difficili.`
-          : 'Usalo quando il modello quotidiano non arriva a una soluzione.'
+          ? 'Tienilo per i bug che non si riproducono, i refactoring su molti file e il codice che il modello di ogni giorno continua a sbagliare.'
+          : 'Usalo quando il modello di ogni giorno non arriva a una soluzione.'
         : null;
 
     return {
@@ -278,7 +268,8 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
       quality: c.quality,
       reason,
       whenToUse,
-      alternatives: c.offers.slice(1, 6),
+      alternatives: c.offers.slice(1, 20),
+      offersCompared: c.offers.length,
       provisional: provisionalReasons.length > 0,
       provisionalReasons,
     };
