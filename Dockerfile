@@ -8,10 +8,9 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-# OpenCode accetta solo gli identificativi che conosce: li estraiamo da lui
-# stesso, cosi' il sito non puo' pubblicare un comando che non parte. Le chiavi
-# sono finte e servono solo a fargli elencare i provider: non viene fatta
-# nessuna chiamata a un modello.
+# OpenCode only accepts the identifiers it knows: we extract them from OpenCode
+# itself, so the site cannot publish a command that would not run. The keys are
+# dummies and only make it list the providers: no call is made to any model.
 FROM node:22-alpine AS opencode
 RUN npm install -g opencode-ai@1.18.32
 ENV DEEPINFRA_API_KEY=x OPENROUTER_API_KEY=x ANTHROPIC_API_KEY=x OPENAI_API_KEY=x \

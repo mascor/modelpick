@@ -1,94 +1,94 @@
 # ModelPick
 
-**Il modello giusto. Il provider più conveniente.**
+**The right model. The cheapest provider.**
 
-> **In English.** ModelPick answers three questions, without signing up: which AI model to use for everyday coding, which one to keep for hard problems, and the cheapest monitored provider selling each. Prices are collected daily from public APIs; coding quality comes from the Artificial Analysis Coding Index, downloaded at every update; no quality measurement older than 7 days is ever used. The site is bilingual: [/en](https://modelpick.cloudsalus.com/en) in English for everyone, Italian at [modelpick.cloudsalus.com](https://modelpick.cloudsalus.com) for browsers whose first language is Italian. The documentation below is in Italian; the [method](METHODOLOGY.md) is also summarised in English at [/en/method](https://modelpick.cloudsalus.com/en/method).
+Open source web app that answers three questions, with no sign-up:
 
-Applicazione web open source che risponde a tre domande, senza registrazione:
+> Which model do I use for everyday work? Which one for hard problems? Which provider should I buy from today?
 
-> Quale modello uso per il lavoro quotidiano? Quale per i problemi difficili? Da quale provider mi conviene acquistare oggi?
+The first version is dedicated to **coding with [OpenCode](https://opencode.ai)**. The architecture is built to add writing, document analysis and automations later: the source connectors, the history store and the recommendation engine are modules separate from the interface.
 
-La prima versione è dedicata alla **programmazione con [OpenCode](https://opencode.ai)**. L'architettura è pensata per aggiungere in seguito scrittura, analisi di documenti e automazioni: i connettori delle fonti, l'archivio storico e il motore di raccomandazione sono moduli separati dall'interfaccia.
+Site: <https://modelpick.cloudsalus.com> — English by default, Italian for browsers whose first language is Italian.
 
-Sito: <https://modelpick.cloudsalus.com>
+## How it works
 
-## Come funziona
+1. **Collection** — one connector per source downloads models, per-provider prices and coding-quality measurements.
+2. **Normalisation** — names, versions and units are mapped to a canonical key. Different versions, quantisations and modes stay separate offers.
+3. **Validation** — out-of-range prices are discarded, abnormal changes quarantined, required fields checked. A missing price never becomes zero.
+4. **History** — every run is stored in full in `data/runs/`, with the provenance of the data.
+5. **Recommendation** — models first, on quality evidence; then the cheapest provider that meets the requirements; then the total, fees included.
+6. **Command verification** — every model-provider pair is checked against the list of identifiers OpenCode actually accepts, extracted from OpenCode itself when the image is built. An offer OpenCode cannot address is neither recommended nor shown.
+7. **Atomic publish** — `data/current.json` is replaced with `rename()`: readers never see an intermediate state.
 
-1. **Raccolta** — un connettore per fonte scarica modelli, prezzi per provider e misure di qualità sul codice.
-2. **Normalizzazione** — nomi, versioni e unità vengono ricondotti a una chiave canonica. Versioni, quantizzazioni e modalità diverse restano offerte distinte.
-3. **Validazione** — prezzi fuori scala scartati, variazioni anomale messe in quarantena, campi obbligatori verificati. Un prezzo mancante non diventa mai zero.
-4. **Storico** — ogni esecuzione è salvata per intero in `data/runs/` con la provenienza dei dati.
-5. **Raccomandazione** — prima i modelli sulle prove di qualità, poi il provider meno costoso che soddisfa i requisiti, infine il totale con le commissioni.
-6. **Verifica dei comandi** — ogni coppia modello-provider viene confrontata con l'elenco degli identificativi che OpenCode accetta davvero, estratto da OpenCode stesso durante la build dell'immagine. Un'offerta che OpenCode non sa indirizzare non viene né consigliata né mostrata.
-7. **Pubblicazione atomica** — `data/current.json` viene sostituito con `rename()`: chi legge non vede mai uno stato intermedio.
+The full rules and thresholds are at [`/en/method`](https://modelpick.cloudsalus.com/en/method) and in [METHODOLOGY.md](METHODOLOGY.md).
 
-Le regole complete e le soglie sono su [`/metodo`](https://modelpick.cloudsalus.com/metodo) e in [METHODOLOGY.md](METHODOLOGY.md).
+## Sources
 
-## Fonti
-
-| Fonte | Stato | Perché |
+| Source | State | Why |
 |---|---|---|
-| [OpenRouter API](https://openrouter.ai/models) | attiva | API pubblica non autenticata, un'offerta per provider con prezzi, quantizzazione e disponibilità |
-| [Models.dev](https://models.dev) | attiva | listini diretti dei provider e capacità dichiarate; è anche il registro che usa OpenCode |
-| [Artificial Analysis](https://artificialanalysis.ai/) | attiva, **fonte principale della qualità** | Coding Index dall'API (tier gratuito, chiave in `AA_API_KEY`), scaricato una volta per aggiornamento; attribuzione e dichiarazione di non approvazione in ogni pagina |
-| [SWE-bench Verified](https://github.com/SWE-bench/experiments) | **spenta** | le misure pubblicate hanno spesso mesi: usiamo solo prove di qualità degli ultimi 7 giorni |
-| [Aider polyglot](https://aider.chat/docs/leaderboards/) | **spenta** | classifica non aggiornata ogni settimana |
-| pricepertoken.com | **spenta** | nessun termine di riuso pubblicato, nessuna API |
-| cheaperinference.com | **spenta** | `robots.txt` blocca `/api/`, termini non ancora letti integralmente |
-| llmprice.gitlab.io | non integrata | dichiara di aggregare models.dev, che leggiamo già alla fonte |
+| [OpenRouter API](https://openrouter.ai/models) | active | public unauthenticated API, one offer per provider with prices, quantisation and availability |
+| [Models.dev](https://models.dev) | active | providers' own price lists and declared capabilities; also the registry OpenCode uses |
+| [Artificial Analysis](https://artificialanalysis.ai/) | active, **primary quality source** | Coding Index from the API (free tier, key in `AA_API_KEY`), downloaded once per update; attribution and non-endorsement statement on every page |
+| [SWE-bench Verified](https://github.com/SWE-bench/experiments) | **off** | published measurements are often months old, and we only use quality evidence from the last 7 days |
+| [Aider polyglot](https://aider.chat/docs/leaderboards/) | **off** | the leaderboard is not updated every week |
+| pricepertoken.com | **off** | no published reuse terms, no API |
+| cheaperinference.com | **off** | `robots.txt` blocks `/api/`, terms not yet read in full |
+| llmprice.gitlab.io | not integrated | states it aggregates models.dev, which we already read at the source |
 
-Una fonte resta spenta finché non ne abbiamo letto per intero le condizioni di riuso. **La licenza MIT di questo codice non si applica ai dati di terzi.**
+A source stays off until we have read its reuse terms in full. **The MIT licence of this code does not extend to third-party data.**
 
-## Avvio rapido
+## Quick start
 
 ```bash
 cp .env.example .env
-docker compose up -d          # web su 127.0.0.1:8031 + scheduler quotidiano
-docker compose run --rm web node dist/pipeline/run.js   # prima raccolta dati
+docker compose up -d          # web on 127.0.0.1:8031 + daily scheduler
+docker compose run --rm web node dist/pipeline/run.js   # first data collection
 ```
 
-Senza Docker (serve Node 22+):
+Without Docker (needs Node 22+):
 
 ```bash
 npm install
 npm run build
-npm run update     # una raccolta dati
+npm run update     # one data collection
 npm start          # server
-npm run scheduler  # aggiornamento quotidiano
+npm run scheduler  # daily update
 ```
 
-Nessun segreto è necessario: le quattro fonti attive sono API pubbliche non autenticate.
+One secret is needed: `AA_API_KEY`, a free Artificial Analysis API key, which is the primary quality source. The other active sources are public unauthenticated APIs. Without that key the site still runs, on whichever other quality source is enabled.
 
-## Aggiornamento quotidiano
+## Daily update
 
-Il servizio `scheduler` esegue la raccolta ogni giorno alle **06:30 Europe/Rome**, indipendentemente dalle visite al sito, e recupera da solo se all'avvio trova dati più vecchi di 24 ore. Orario e fuso si cambiano con `MODELPICK_RUN_HOUR`, `MODELPICK_RUN_MINUTE`, `MODELPICK_TZ`.
+The `scheduler` service runs the collection every day at **06:30 Europe/Rome**, regardless of site traffic, and catches up on its own if it finds data older than 24 hours at startup. Time and zone are set with `MODELPICK_RUN_HOUR`, `MODELPICK_RUN_MINUTE`, `MODELPICK_TZ`.
 
-Lo stato di ogni esecuzione, per fonte, è visibile su [`/stato`](https://modelpick.cloudsalus.com/stato) e in `data/last-run.json`.
+The outcome of each run, per source, is visible at [`/en/status`](https://modelpick.cloudsalus.com/en/status) and in `data/last-run.json`.
 
-## Struttura
+## Layout
 
 ```
 src/
-  config.ts          soglie, fonti, regole in un unico posto
-  lib/               http con timeout e ritentativi, scrittura atomica, normalizzazione
-  sources/           un connettore per fonte, abilitabile singolarmente
-  pipeline/          raccolta, validazione, archivio, esecuzione
-  engine/            scenari, costi, raccomandazione, configurazione OpenCode
-  server/            pagine rese lato server e API JSON
-test/                test su calcoli, commissioni, normalizzazione, dati obsoleti, raccomandazioni
+  config.ts          thresholds, sources and rules in one place
+  lib/               http with timeouts and retries, atomic writes, normalisation
+  sources/           one connector per source, each enabled on its own
+  pipeline/          collection, validation, store, run
+  engine/            scenarios, costs, recommendation, OpenCode config
+  server/            server-rendered pages and JSON API
+test/                tests on costs, fees, normalisation, stale data, recommendations
 ```
 
 ## API
 
-| Percorso | Risposta |
+The paths are in Italian, the site's first language, and are kept unchanged so existing callers keep working.
+
+| Path | Response |
 |---|---|
-| `GET /api/raccomandazione?task=&priority=` | le due raccomandazioni complete di motivazioni e fonti |
-| `GET /api/stato` | esito dell'ultimo aggiornamento |
-| `GET /api/fonti` | fonti monitorate, licenze e stato |
-| `GET /api/modelli` | modelli con misure di qualità |
-| `GET /api/storico?model=` | serie storica del prezzo minimo |
+| `GET /api/raccomandazione?task=&priority=` | both recommendations, with their reasons and sources |
+| `GET /api/stato` | outcome of the last update |
+| `GET /api/fonti` | monitored sources, licences and state |
+| `GET /api/modelli` | models with quality measurements |
+| `GET /api/storico?model=` | history of the lowest price |
 | `GET /salute` | health check |
 
-## Licenza
+## Licence
 
-Codice: [MIT](LICENSE). I dati di terze parti restano dei rispettivi titolari, con le attribuzioni indicate su `/fonti`.
+Code: [MIT](LICENSE). Third-party data remains the property of its owners, with the attributions listed at [`/en/sources`](https://modelpick.cloudsalus.com/en/sources).

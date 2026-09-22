@@ -1,115 +1,115 @@
-# Metodo di selezione
+# Selection method
 
-Questo documento descrive le regole con cui ModelPick sceglie due modelli e un provider per ciascuno. Le stesse regole sono riassunte, in forma leggibile, sulla pagina `/metodo` del sito.
+This document describes the rules ModelPick uses to pick two models and one provider for each. The same rules are summarised, in plain language, on the site's `/en/method` page.
 
-## 1. Ordine delle decisioni
+## 1. Order of decisions
 
-**Prima i modelli, poi i provider, infine la convenienza complessiva.**
+**Models first, then providers, then the total cost.**
 
-1. Un modello entra nel confronto solo se esiste una **misura di qualità sul codice degli ultimi 7 giorni** che lo riguarda. Un modello senza una misura recente non può vincere.
-2. Per ogni modello ammesso si raccolgono tutte le offerte monitorate e si tengono quelle che soddisfano i requisiti dell'utente.
-3. Ogni offerta viene calcolata per intero sullo stesso scenario di consumo, commissioni incluse.
+1. A model enters the comparison only if there is a **coding-quality measurement from the last 7 days** for it. A model without a recent measurement cannot win.
+2. For every eligible model we collect all monitored offers and keep the ones that meet the user's requirements.
+3. Every offer is priced in full on the same usage scenario, fees included.
 
-## 2. Comparabilità delle prove
+## 2. Comparability of the evidence
 
-Il problema principale dei benchmark pubblici non è trovarli: è non confrontare cose diverse.
+The main problem with public benchmarks is not finding them: it is not comparing different things.
 
-Ogni misura porta con sé un **gruppo di confronto** (`harnessKey`) composto da: nome dell'agente, sua versione, numero di tentativi consentiti, livello di sforzo di ragionamento. Due misure appartengono allo stesso gruppo solo se questi quattro elementi coincidono.
+Every measurement carries a **comparability group** (`harnessKey`) made of: agent name, its version, number of attempts allowed, reasoning effort. Two measurements belong to the same group only if all four match.
 
-**Fonte principale: Artificial Analysis Coding Index.** Viene scaricato dall'API di Artificial Analysis a ogni aggiornamento (una sola volta: lo scaricamento resta in cache per 20 ore, così rieseguire l'aggiornamento non consuma chiamate). Tutti i modelli sono misurati dalla stessa organizzazione con lo stesso metodo, quindi formano un unico gruppo di confronto (`aa-coding-index|<versione dell'indice>`). Quando lo stesso modello è pubblicato in più varianti di sforzo di ragionamento, teniamo la variante con il punteggio più alto e la indichiamo in pagina. I valori sono riportati come pubblicati, con l'attribuzione "Source: Artificial Analysis (artificialanalysis.ai)" e la dichiarazione che le scelte sono di ModelPick e non di Artificial Analysis.
+**Primary source: the Artificial Analysis Coding Index.** It is downloaded from the Artificial Analysis API at every update (once only: the download is cached for 20 hours, so rerunning the update spends no calls). Every model is measured by the same organisation with the same method, so they form a single comparability group (`aa-coding-index|<index version>`). When the same model is published in several reasoning-effort variants, we keep the highest-scoring variant and name it on the page. Values are reported as published, with the attribution "Source: Artificial Analysis (artificialanalysis.ai)" and a statement that the picks are ModelPick's and not Artificial Analysis'.
 
-**Solo dati recenti.** Una misura di qualità più vecchia di **7 giorni** non viene usata, in nessun caso. Per Artificial Analysis la data è quella dello scaricamento; se l'API non risponde si riusano i valori dell'ultimo scaricamento riuscito finché hanno meno di 7 giorni, poi il modello esce dal confronto. SWE-bench e Aider sono spenti per questo motivo: le loro misure hanno spesso mesi.
+**Recent data only.** A quality measurement older than **7 days** is never used, under any circumstances. For Artificial Analysis the date is the date of the download; if the API does not respond we reuse the values from the last successful download while they are less than 7 days old, after which the model leaves the comparison. SWE-bench and Aider are off for this reason: their measurements are often months old.
 
-Il **gruppo di riferimento** è Artificial Analysis quando presente; in sua assenza, il gruppo SWE-bench che ha misurato più modelli. Solo i modelli presenti nel gruppo di riferimento entrano nel confronto: un modello misurato altrove viene escluso con motivazione esplicita, non convertito né riscalato.
+The **reference group** is Artificial Analysis when present; failing that, the SWE-bench group that measured the most models. Only models in the reference group enter the comparison: a model measured elsewhere is excluded with an explicit reason, never converted or rescaled.
 
-## 3. Soglie di qualità
+## 3. Quality thresholds
 
-La priorità scelta dall'utente determina il punteggio minimo sul Coding Index di Artificial Analysis. Le soglie mantengono all'incirca la selettività che avevano su SWE-bench: il quotidiano deve stare nella metà, nel 35% o nel 25% migliore dei modelli misurati.
+The priority chosen by the user sets the minimum score on the Artificial Analysis Coding Index. The thresholds keep roughly the selectivity they had on SWE-bench: the everyday pick must be in the best half, best 35% or best 25% of measured models.
 
-| Priorità | Quotidiano | Problemi difficili |
+| Priority | Everyday | Hard problems |
 |---|---|---|
-| Risparmio | 45 | 68 |
-| Equilibrio | 55 | 72 |
-| Qualità | 65 | 75 |
+| Spend less | 45 | 68 |
+| Balanced | 55 | 72 |
+| Best results | 65 | 75 |
 
-Se il riferimento torna a essere SWE-bench (Artificial Analysis non disponibile), valgono le soglie in percentuale di problemi risolti: 45/62, 55/68, 64/72.
+If the reference falls back to SWE-bench (Artificial Analysis unavailable), the thresholds are percentages of problems solved: 45/62, 55/68, 64/72.
 
-Il significato di "il migliore" dipende dalla priorità scelta, ed è l'unica domanda che il sito pone:
+What "best" means depends on the chosen priority, and that is the only question the site asks:
 
-- con **spendere poco** ed **equilibrio**, il modello quotidiano è la combinazione modello-provider **meno costosa fra quelle che superano la soglia**: una scelta economica che raggiunge una qualità adeguata, non la più economica in assoluto;
-- con **lavorare bene**, è il **punteggio più alto** disponibile; il prezzo interviene solo come spareggio fra modelli che stanno entro 2 punti dal massimo, dove la differenza non è significativa.
-- Il **modello per i problemi difficili** deve superare il quotidiano di almeno **3 punti** misurati nello stesso gruppo di confronto. All'interno di una fascia di 2 punti dal punteggio massimo si preferisce il più economico: sotto quella soglia la differenza non è significativa e non vale il costo.
-- Se nessun modello soddisfa queste condizioni, **non si assegna un vincitore** e il sito lo dichiara.
+- with **spend less** and **balanced**, the everyday model is the **cheapest model-provider pair among those clearing the threshold**: an economical choice that reaches adequate quality, not the cheapest one outright;
+- with **best results**, it is the **highest score** available; price only breaks ties between models within 2 points of the maximum, where the difference is not meaningful.
+- The **model for hard problems** must beat the everyday pick by at least **3 points** measured in the same comparability group. Within 2 points of the top score the cheaper one is preferred: below that gap the difference is not meaningful and not worth the cost.
+- If no model meets these conditions, **no winner is named** and the site says so.
 
-## 4. Che cosa non facciamo
+## 4. What we do not do
 
-- Non dividiamo il punteggio di qualità per il prezzo.
-- Non trattiamo la differenza fra due punteggi come una percentuale di qualità.
-- Non confrontiamo misure ottenute con banchi di prova, versioni o condizioni diverse.
-- Non equipariamo versioni, quantizzazioni o modalità diverse dello stesso modello.
-- Non assumiamo che il prezzo di un intermediario valga anche acquistando direttamente dal provider.
-- Non inventiamo consumi, percentuali di cache o tassi di riuscita.
-- Non promettiamo copertura mondiale né sicurezza garantita.
+- We do not divide a quality score by a price.
+- We do not treat the gap between two scores as a percentage of quality.
+- We do not compare measurements taken with different harnesses, versions or conditions.
+- We do not treat different versions, quantisations or modes of a model as the same product.
+- We do not assume a broker's price also applies when buying straight from the provider.
+- We do not invent usage figures, cache ratios or success rates.
+- We do not promise worldwide coverage or guaranteed security.
 
-## 4-bis. Comandi verificati
+## 4-bis. Verified commands
 
-Il sito pubblica comandi che le persone incollano in un terminale, quindi non basta che un identificativo sembri corretto.
+The site publishes commands that people paste into a terminal, so an identifier looking correct is not enough.
 
-Durante la build dell'immagine installiamo OpenCode e gli chiediamo l'elenco dei modelli che accetta (`opencode models`, con chiavi finte che servono solo a fargli elencare i provider: nessuna chiamata a un modello). L'elenco finisce nell'immagine e la raccolta dati lo confronta con ogni offerta.
+While the image is built we install OpenCode and ask it for the list of models it accepts (`opencode models`, with dummy keys that only make it list the providers: no call to any model). The list goes into the image, and the data collection checks every offer against it.
 
-Un'offerta il cui identificativo non è in quell'elenco **non viene né consigliata né mostrata**: il comando non partirebbe. Nell'ultimo aggiornamento questo esclude circa 6.600 offerte su 7.700.
+An offer whose identifier is not on that list is **neither recommended nor shown**: the command would not run. In the latest update this excludes about 6,600 offers out of 7,700.
 
-La versione di OpenCode con cui la verifica è stata fatta è indicata sotto ogni raccomandazione.
+The version of OpenCode the check was made with is stated under every recommendation.
 
-Per le offerte instradate da un intermediario il comando da solo non sceglie il provider: si copia la configurazione che lo fissa. Vedi la sezione 1.
+For offers routed through a broker the command alone does not pick the provider: you copy the configuration that pins it. See section 1.
 
-## 5. Calcolo dei costi
+## 5. Cost calculation
 
-Ogni offerta è calcolata **per intero sul singolo provider**: è strutturalmente impossibile combinare il prezzo di input di un provider con quello di output di un altro, perché il calcolo parte da un unico oggetto offerta.
+Every offer is priced **entirely on a single provider**: it is structurally impossible to combine one provider's input price with another's output price, because the calculation starts from a single offer object.
 
-Si sommano input, output, lettura e scrittura della cache, ciascuno al prezzo di quel provider, poi le commissioni applicabili.
+Input, output, cache reads and cache writes are added up, each at that provider's price, then the applicable fees.
 
-Gestione dei dati mancanti:
+Handling of missing data:
 
-| Situazione | Comportamento |
+| Situation | Behaviour |
 |---|---|
-| Prezzo assente e necessario allo scenario | l'offerta è esclusa dal confronto, mai trattata come gratuita |
-| Prezzo di cache non pubblicato | i token di cache sono conteggiati **al prezzo di input**, che è un limite superiore, e l'ipotesi è dichiarata in pagina |
-| Nessun prezzo per token (piano forfettario o livello gratuito) | l'offerta non partecipa al confronto sul prezzo: il costo reale non è pubblicato per token |
-| Commissione certa ma di importo non verificabile | dichiarata come "non quantificata" e mostrata, mai stimata |
-| Ricarica minima o abbonamento obbligatorio | mostrati come vincolo dell'offerta |
+| Price missing and needed by the scenario | the offer is excluded from the comparison, never treated as free |
+| Cache price not published | cache tokens are billed **at the input price**, which is an upper bound, and the assumption is stated on the page |
+| No per-token price (flat plan or free tier) | the offer does not take part in the price comparison: its real cost is not published per token |
+| Fee certain but its amount not verifiable | declared as "not quantified" and shown, never estimated |
+| Minimum top-up or mandatory subscription | shown as a constraint of the offer |
 
-Gli scenari di consumo predefiniti sono **ipotesi dichiarate e modificabili**, non misure. L'utente può sostituirle con i propri consumi.
+The default usage scenarios are **stated, editable assumptions**, not measurements. Users can replace them with their own usage.
 
-Il risparmio viene calcolato solo rispetto a una configurazione che l'utente ha dichiarato, ed è sempre etichettato come stima.
+Savings are only calculated against a configuration the user has declared, and are always labelled as an estimate.
 
-## 6. Soglie operative
+## 6. Operating thresholds
 
-| Regola | Valore | Effetto |
+| Rule | Value | Effect |
 |---|---|---|
-| Prezzo non verificato da più di | 48 ore | non può vincere il confronto |
-| Snapshot più vecchio di | 36 ore | segnalato come obsoleto in pagina |
-| Misura di qualità più vecchia di | 7 giorni | non viene usata |
-| Misura di qualità più vecchia di | 2 giorni | rende la raccomandazione provvisoria |
-| Variazione di prezzo oltre un fattore | 5× | offerta in quarantena, esclusa dalla vittoria |
-| Prezzo superiore a | 2000 USD/1M token | scartato come probabile errore di unità |
-| Disponibilità recente sotto | 90% | offerta esclusa |
-| Contesto minimo | 100k token, o più secondo l'attività | offerta esclusa |
+| Price not checked for more than | 48 hours | cannot win the comparison |
+| Snapshot older than | 36 hours | flagged as out of date on the page |
+| Quality measurement older than | 7 days | not used |
+| Quality measurement older than | 2 days | makes the recommendation provisional |
+| Price change beyond a factor of | 5× | offer quarantined, cannot win |
+| Price above | 2000 USD/1M tokens | discarded as a likely unit error |
+| Recent availability below | 90% | offer excluded |
+| Minimum context | 100k tokens, or more depending on the task | offer excluded |
 
-Tutti i valori sono configurabili via variabili d'ambiente (vedi `.env.example`) e documentati in `src/config.ts`.
+Every value is configurable through environment variables (see `.env.example`) and documented in `src/config.ts`.
 
-## 7. Raccomandazione provvisoria
+## 7. Provisional recommendation
 
-Una raccomandazione è marcata **provvisoria** quando almeno una di queste condizioni è vera:
+A recommendation is marked **provisional** when at least one of these is true:
 
-- la misura di qualità ha più di 2 giorni (per esempio perché Artificial Analysis non ha risposto);
-- una commissione applicabile non è quantificabile automaticamente;
-- il costo usa l'ipotesi prudenziale sui prezzi di cache non pubblicati;
-- un solo provider monitorato soddisfa i requisiti.
+- the quality measurement is more than 2 days old (for example because Artificial Analysis did not respond);
+- an applicable fee cannot be quantified automatically;
+- the cost relies on the conservative assumption about unpublished cache prices;
+- only one monitored provider meets the requirements.
 
-## 8. Limiti dichiarati
+## 8. Stated limits
 
-- Copriamo i provider monitorati dalle fonti abilitate, non tutto il mercato. La formula usata sul sito è sempre: *"il più economico tra i provider monitorati che soddisfano i tuoi requisiti"*.
-- **Non chiediamo il paese di utilizzo né requisiti sul trattamento dei dati.** Nessuna fonte che leggiamo pubblica la disponibilità geografica o la politica sui dati in forma strutturata: erano domande che non cambiavano il risultato, e una domanda senza effetto è peggio di nessuna domanda. Chi ha vincoli di questo tipo deve verificarli sul sito del provider prima di acquistare.
-- I banchi di prova pubblici misurano un agente su compiti standard: sono un indizio serio, non una garanzia sul tuo repository.
-- OpenCode non passa automaticamente a un modello di riserva: il secondo modello va selezionato a mano.
+- We cover the providers monitored by the enabled sources, not the whole market. The wording used on the site is always: *"the cheapest among the monitored providers that meet your requirements"*.
+- **We do not ask for your country or data-handling requirements.** No source we read publishes geographic availability or data policy in structured form: those questions did not change the result, and a question with no effect is worse than no question. Anyone with constraints of that kind has to check them on the provider's site before buying.
+- Public benchmarks measure an agent on standard tasks: a serious signal, not a guarantee about your repository.
+- OpenCode does not fall back to a backup model automatically: the second model has to be selected by hand.

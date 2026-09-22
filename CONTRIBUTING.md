@@ -1,61 +1,65 @@
-# Contribuire a ModelPick
+# Contributing to ModelPick
 
-Grazie. Questo progetto vive di dati verificabili, quindi la regola principale è una sola: **ogni affermazione deve avere una fonte controllabile.**
+Thank you. This project lives on verifiable data, so there is one main rule: **every claim must have a source anyone can check.**
 
-## Segnalare un errore nei dati
+## Reporting a data error
 
-Apri una issue con:
+Open an issue with:
 
-- che cosa mostra il sito (schermata o URL con i parametri);
-- che cosa dovrebbe mostrare;
-- la fonte che lo dimostra (pagina prezzi ufficiale, documentazione, risposta dell'API);
-- data e ora della verifica.
+- what the site shows (screenshot, or URL with its parameters);
+- what it should show;
+- the source that proves it (official pricing page, documentation, API response);
+- the date and time you checked.
 
-Gli errori sui prezzi hanno priorità: un prezzo sbagliato produce una raccomandazione sbagliata.
+Price errors come first: a wrong price produces a wrong recommendation.
 
-## Aggiungere un provider o una fonte
+## Adding a provider or a source
 
-Prima del codice serve la parte legale:
+Before the code comes the legal part:
 
-1. Leggi **per intero** le condizioni di accesso e riuso della fonte e riportale nella issue.
-2. Verifica `robots.txt` e l'esistenza di un'API ufficiale: preferiamo sempre dati strutturati allo scraping.
-3. Indica quale attribuzione richiede la fonte.
+1. Read the source's access and reuse terms **in full** and quote them in the issue.
+2. Check `robots.txt` and whether an official API exists: we always prefer structured data over scraping.
+3. State which attribution the source requires.
 
-Solo dopo:
+Only then:
 
-4. Aggiungi la voce in `SOURCES` dentro `src/config.ts`, con licenza, attribuzione e nota. **Le fonti nuove nascono disattivate** (`enabled: false`).
-5. Scrivi il connettore in `src/sources/<nome>.ts`. Deve restituire `Offer[]` o `QualityEvidence[]` e non deve mai inventare un valore mancante.
-6. Aggancialo in `src/pipeline/collect.ts` con il proprio blocco `try/catch` e il fallback ai dati precedenti.
-7. Aggiungi test su almeno un caso reale di risposta.
+4. Add the entry to `SOURCES` in `src/config.ts`, with its licence, attribution and note, in Italian and in English. **New sources start disabled** (`enabled: false`).
+5. Write the connector in `src/sources/<name>.ts`. It must return `Offer[]` or `QualityEvidence[]`, and must never invent a missing value.
+6. Wire it into `src/pipeline/collect.ts` with its own `try/catch` and a fallback to the previous data.
+7. Add tests covering at least one real response.
 
-Una fonte viene attivata solo quando i suoi termini di riuso sono chiari.
+A source is only enabled once its reuse terms are clear.
 
-## Modificare il metodo
+## Changing the method
 
-Soglie e regole stanno in `src/config.ts` e `src/engine/scenarios.ts`. Una modifica al metodo richiede:
+Thresholds and rules live in `src/config.ts` and `src/engine/scenarios.ts`. A change to the method requires:
 
-- la motivazione nella pull request;
-- l'aggiornamento di `METHODOLOGY.md` e della pagina `/metodo`;
-- i test che coprono il nuovo comportamento.
+- the reasoning in the pull request;
+- an update to `METHODOLOGY.md` and to the `/en/method` and `/metodo` pages;
+- tests covering the new behaviour.
 
-Cambiare una soglia cambia le raccomandazioni pubbliche: non è una modifica cosmetica.
+Changing a threshold changes public recommendations: it is not a cosmetic change.
 
-## Sviluppo
+## Development
 
 ```bash
 npm install
-npm test          # 41 test su calcoli, commissioni, normalizzazione, dati obsoleti, raccomandazioni
+npm test          # tests on costs, fees, normalisation, stale data, language, recommendations
 npm run typecheck
-npm run dev       # server in ricarica automatica
-npm run dev:update  # una raccolta dati senza build
+npm run dev       # server with auto-reload
+npm run dev:update  # one data collection without building
 ```
 
-Prima di aprire una pull request: `npm run typecheck && npm test`.
+Before opening a pull request: `npm run typecheck && npm test`.
 
-## Principi che non si negoziano
+## Non-negotiable principles
 
-- Un prezzo mancante non diventa zero.
-- Misure ottenute in condizioni diverse non si confrontano.
-- Versioni, quantizzazioni e modalità diverse sono offerte diverse.
-- Se le prove non bastano, si dichiara "raccomandazione provvisoria" o non si assegna un vincitore.
-- Sponsorizzazioni e affiliazioni, se mai esisteranno, vanno dichiarate e non influenzano l'ordine.
+- A missing price never becomes zero.
+- Measurements taken under different conditions are not compared.
+- Different versions, quantisations and modes are different offers.
+- If the evidence is not enough, we say "provisional recommendation", or name no winner.
+- Sponsorships and affiliate deals, should they ever exist, are declared and do not affect the ordering.
+
+## Language
+
+The user interface is bilingual (Italian and English, in `src/i18n.ts`) and every source carries its texts in both languages. This documentation is in English. Issues and pull requests are welcome in either language.
