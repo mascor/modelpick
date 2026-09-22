@@ -264,6 +264,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
     <h3 class="pick__model">${esc(modelName(pick.model.displayName))}</h3>
     <p class="pick__summary">${esc(c.home.perMonth('\u0000')).replace('\u0000', `<strong class="pick__price">${esc(usd(pick.cost.totalUsd, lang))}</strong>`)}</p>
     <p class="pick__evidence">${esc(c.home.benchmark(formatScore(pick.quality.value, pick.quality.metric), pick.quality.metric === 'aa_coding_index' ? 'Coding Index' : metricLabel(pick.quality.metric), dateShort(pick.quality.measuredAt, lang)))}${pick.quality.metric === 'aa_coding_index' ? ` · <a href="${esc(pick.quality.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>` : ''}</p>
+    ${pick.successor ? `<p class="alert">${esc(c.home.successor(modelName(pick.successor.name)))}</p>` : ''}
     ${pick.cost.unquantifiedFees.length ? `<p class="alert">${esc(c.home.incompleteEstimate)}</p>` : ''}
     ${change?.moved ? `<p class="pick__change pick__change--moved">${esc(change.text)}</p>` : ''}
     <p class="pick__why">${esc(pick.reason)}</p>
@@ -382,6 +383,7 @@ ${renderAnswer(rec, snapshot, request, lang)}
     ${!snapshot ? `<div class="notice notice--error">${esc(c.home.noData)}</div>` : ''}
     ${stale ? `<div class="notice">${esc(c.home.stale)}</div>` : ''}
     ${rec?.notes.map((n) => `<div class="notice">${esc(n)}</div>`).join('') ?? ''}
+    ${rec?.replacements.map((r) => `<p class="alert">${esc(c.home.replaced(modelName(r.retiredName), modelName(r.successorName)))}</p>`).join('') ?? ''}
     ${renderCurrentModel(rec, lang)}
     <div class="results">
       ${renderPick(rec?.everyday ?? null, 'everyday', changes.everyday, lang, c.home.noEveryday, snapshot?.opencodeVersion ?? null)}

@@ -60,6 +60,8 @@ interface MdModel {
   family?: string;
   release_date?: string;
   last_updated?: string;
+  /** 'deprecated' or 'beta' when the seller says so. */
+  status?: string;
   tool_call?: boolean;
   reasoning?: boolean;
   open_weights?: boolean;
@@ -83,7 +85,28 @@ export interface ModelsDevResult {
   offers: Offer[];
   /** provider id -> display name, for the sources page. */
   providers: Map<string, string>;
+  /** Models their own maker lists as deprecated. */
+  deprecated: string[];
+  /** Offers left out because the seller lists them as deprecated. */
+  deprecatedOffers: number;
 }
+
+/**
+ * Providers that are the maker of the models they list, by the vendor part of
+ * our keys: when one of them marks a model deprecated, the model is retired.
+ */
+const MAKERS: Record<string, string> = {
+  deepseek: 'deepseek',
+  openai: 'openai',
+  anthropic: 'anthropic',
+  google: 'google',
+  mistral: 'mistralai',
+  xai: 'x-ai',
+  alibaba: 'qwen',
+  moonshotai: 'moonshot',
+  zai: 'z-ai',
+  minimax: 'minimax',
+};
 
 /**
  * @param knownKeys canonical keys already discovered elsewhere, indexed by
@@ -94,6 +117,8 @@ export async function fetchModelsDev(observedAt: string, knownKeys: Map<string, 
   const models = new Map<string, ModelRecord>();
   const offers: Offer[] = [];
   const providers = new Map<string, string>();
+  const deprecated = new Set<string>();
+  let deprecatedOffers = 0;
 
   for (const [providerId, provider] of Object.entries(body)) {
     providers.set(providerId, provider.name ?? providerId);
@@ -101,9 +126,18 @@ export async function fetchModelsDev(observedAt: string, knownKeys: Map<string, 
       const vendor = guessVendor(modelId, providerId);
       const { slug: bareSlug } = splitVendor(modelId);
       const fallbackKey = canonicalKey(vendor, bareSlug);
-      const key = knownKeys.get(matchForm(bareSlug)) ?? fallbackKey;
+      // The maker's own id can differ from everyone else's ("deepseek-flash" is
+      // DeepSeek V4.1 Flash): the published name is the second way to find it.
+      const key =
+        knownKeys.get(matchForm(bareSlug)) ??
+        (model.name ? knownKeys.get(matchForm(`${vendor} ${model.name}`)) : undefined) ??
+        fallbackKey;
+      if (model.status === 'deprecated' && MAKERS[providerId] === key.slice(0, key.indexOf('/'))) deprecated.add(key);
 
-      if (!models.has(key)) {
+      // Every seller's id for the model is a spelling other sources may use.
+      const seen = models.get(key);
+      if (seen && !seen.aliases.includes(modelId)) seen.aliases.push(modelId);
+      if (!seen) {
         models.set(key, {
           key,
           displayName: model.name ?? modelId,
@@ -124,6 +158,10 @@ export async function fetchModelsDev(observedAt: string, knownKeys: Map<string, 
       const cost = model.cost;
       // No price block at all means "not sold here", not "free".
       if (!cost || (cost.input === undefined && cost.output === undefined)) continue;
+      if (model.status === 'deprecated') {
+        deprecatedOffers++;
+        continue;
+      }
 
       const isBroker = BROKERS.has(providerId);
       offers.push({
@@ -166,5 +204,5 @@ export async function fetchModelsDev(observedAt: string, knownKeys: Map<string, 
     }
   }
 
-  return { models: [...models.values()], offers, providers };
+  return { models: [...models.values()], offers, providers, deprecated: [...deprecated], deprecatedOffers };
 }

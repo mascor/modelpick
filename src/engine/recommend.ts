@@ -8,9 +8,10 @@
  */
 import { THRESHOLDS } from '../config.js';
 import { hoursSince } from '../lib/normalize.js';
-import type { ModelRecord, Offer, QualityEvidence, Snapshot } from '../types.js';
+import type { ModelRecord, Offer, QualityEvidence, Replacement, Snapshot } from '../types.js';
 import { costOf, type CostBreakdown } from './cost.js';
 import { isIdentified, providerKey, usabilityOf, type Usability } from './usability.js';
+import { successorOf } from './lineage.js';
 import { gateFor, SCENARIOS, type Priority, type TaskId, type TokenMix } from './scenarios.js';
 import { t, type Lang, type ReasonCode } from '../i18n.js';
 
@@ -59,6 +60,8 @@ export interface Pick {
   offersCompared: number;
   provisional: boolean;
   provisionalReasons: string[];
+  /** A newer version of the same line, on sale but not yet measured on code. */
+  successor: { key: string; name: string; releaseDate: string | null } | null;
 }
 
 export interface Recommendation {
@@ -68,6 +71,8 @@ export interface Recommendation {
   usingCustomUsage: boolean;
   everyday: Pick | null;
   hard: Pick | null;
+  /** Retired models that would have competed, whose newer version is not measured yet. */
+  replacements: Replacement[];
   /** Human-readable account of what was excluded and why. */
   method: {
     referenceHarness: string | null;
@@ -282,6 +287,13 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     offersByModel.set(o.modelKey, list);
   }
 
+  // Models someone sells in a usable way but nobody has measured on code yet:
+  // they cannot win, but a newer version of a pick must not go unmentioned.
+  const measured = new Set(snapshot.evidence.map((e) => e.modelKey));
+  const unmeasured = [...offersByModel.entries()]
+    .filter(([key, list]) => !measured.has(key) && list.some((o) => offerBlocker(o, req, minContext, now) === null))
+    .map(([key]) => key);
+
   const excluded = new Map<ReasonCode, number>();
   const bump = (reason: ReasonCode) => excluded.set(reason, (excluded.get(reason) ?? 0) + 1);
 
@@ -368,6 +380,11 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
       offersCompared: cand.offers.length,
       provisional: provisionalReasons.length > 0,
       provisionalReasons,
+      successor: (() => {
+        const key = successorOf(cand.model.key, unmeasured);
+        const m = key ? snapshot.models[key] : undefined;
+        return m ? { key: m.key, name: m.displayName, releaseDate: m.releaseDate } : null;
+      })(),
     };
   };
 
@@ -457,6 +474,13 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     usingCustomUsage,
     everyday,
     hard,
+    replacements: (snapshot.replacements ?? []).filter(
+      (r) =>
+        r.retiredMetric === ref.metric &&
+        r.retiredScore >= gate.everyday &&
+        r.successorKey !== everyday?.successor?.key &&
+        r.successorKey !== hard?.successor?.key,
+    ),
     method: {
       referenceHarness: ref.label,
       referenceHarnessModels: ref.size,

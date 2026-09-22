@@ -20,6 +20,10 @@ Every measurement carries a **comparability group** (`harnessKey`) made of: agen
 
 **One model, one build.** A dated snapshot is part of a model's identity: "V4 Flash 0423" and "V4 Flash 0731" are different products. When the name on the source and the name in our catalogue both carry a date and the dates disagree, the score goes to our model with the source's date in its name (a score for "V4 Pro 0813" goes to `deepseek-v4-pro-0813`); if we sell no build with that date, the score is dropped rather than attached to another build, and the run says how many scores that cost.
 
+**Retired models are never shown.** A model is retired when its maker lists it as deprecated on its own price list in models.dev, or when OpenRouter gives it a retirement date. The model goes with its dated builds and the variants resellers publish under it ("-0731", ":thinking", "-flex", "@eu"), but not with a different version ("gpt-4" retired does not touch GPT-4.1). An offer a seller lists as deprecated is left out too.
+
+**A newer version is always mentioned.** A model on sale that nobody has measured on code cannot win, because we do not estimate scores. But when a pick has a newer version of the same line on sale (DeepSeek V4 Flash → V4.1 Flash), its card says so; and when a retired model would have cleared the bar, the page names its newer version and says it is not measured yet.
+
 **One spelling, one model.** Scores are matched after every price source is in. When several of our models share a spelling, the score goes to the one sold by the most providers, so a single provider's private copy of a model never takes the score of the model everyone else sells. Pairs the rules miss are corrected by hand in `data/curated/aliases.json`, each with its reason; the file also lists the pairs we deliberately leave unmatched.
 
 **The date we can prove.** Artificial Analysis does not publish when it ran a measurement, so what we show is the date we read the index, worded as such. Where a source does publish a measurement date, such as SWE-bench, that date is shown instead.

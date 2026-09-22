@@ -158,6 +158,17 @@ export interface ProviderProfile {
   updatedAt: Iso | null;
 }
 
+/** A retired model whose newer version is on sale but not yet measured on code. */
+export interface Replacement {
+  retiredKey: string;
+  retiredName: string;
+  /** The retired model's last score, to know whether it would have competed. */
+  retiredScore: number;
+  retiredMetric: QualityEvidence['metric'];
+  successorKey: string;
+  successorName: string;
+}
+
 export interface Snapshot {
   version: 1;
   runId: string;
@@ -171,6 +182,7 @@ export interface Snapshot {
   warnings: string[];
   /** Which OpenCode version the commands were verified against. */
   opencodeVersion?: string | null;
+  replacements?: Replacement[];
   stats: {
     modelCount: number;
     offerCount: number;

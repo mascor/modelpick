@@ -45,6 +45,7 @@ export async function runUpdate(): Promise<RunStatus> {
       sources: collected.statuses,
       warnings,
       opencodeVersion: collected.opencodeVersion,
+      replacements: collected.replacements,
       stats: {
         modelCount: collected.models.size,
         offerCount: validation.kept.length,

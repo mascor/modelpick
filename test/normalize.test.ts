@@ -53,3 +53,9 @@ test('a model sold by a reseller stays with its maker', async () => {
   assert.equal(canonicalKey('anthropic', 'claude-sonnet-4-5-20250929'), 'anthropic/claude-sonnet-4-5-20250929');
   assert.notEqual(canonicalKey('tempr', 'claude-sonnet-4-5-20250929'), 'anthropic/claude-sonnet-4-5-20250929');
 });
+
+test('Claude names match whichever order the version comes in', () => {
+  assert.equal(matchForm('Claude 4.5 Haiku'), matchForm('claude-haiku-4-5'));
+  assert.equal(matchForm('claude-4-sonnet'), matchForm('anthropic/claude-sonnet-4'));
+  assert.notEqual(matchForm('Claude 4 Sonnet'), matchForm('Claude Sonnet 4.5'));
+});

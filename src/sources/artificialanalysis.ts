@@ -166,6 +166,7 @@ export function aaEvidence(
   const best = new Map<string, { m: AaModel; value: number }>();
   const unmatched: string[] = [];
   const wrongSnapshot: string[] = [];
+  const ourKeys = new Set(knownKeys.values());
   for (const m of download.models) {
     const value = m.evaluations?.artificial_analysis_coding_index;
     if (typeof value !== 'number') continue;
@@ -174,6 +175,9 @@ export function aaEvidence(
       unmatched.push(m.slug);
       continue;
     }
+    // "claude-sonnet-4:thinking" is a mode of claude-sonnet-4: the score goes to the model.
+    const base = key.split(':')[0]!;
+    if (base !== key && ourKeys.has(base)) key = base;
     // Better no score than the score of another build of the model.
     if (differentSnapshot(`${m.name} ${m.slug}`, displayNameOf(key))) {
       const sibling = datedSibling(m, key, knownKeys, displayNameOf);

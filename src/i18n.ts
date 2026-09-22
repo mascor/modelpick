@@ -63,6 +63,8 @@ export interface Catalog {
     benchmark: (value: string, metric: string, when: string) => string;
     evidenceNoDate: string;
     incompleteEstimate: string;
+    successor: (name: string) => string;
+    replaced: (retired: string, successor: string) => string;
     getKey: (account: string) => string;
     open: string;
     copy: string;
@@ -203,6 +205,8 @@ const it: Catalog = {
     hard: '🟠 Per i problemi difficili',
     perMonth: (a) => `${a} stimati al mese a consumo`,
     benchmark: (v, m, w) => `${m} ${v} · letto il ${w}`,
+    replaced: (o, n) => `${o} è stato ritirato dal produttore. La versione nuova, ${n}, non è ancora misurata sul codice da Artificial Analysis: per questo non possiamo ancora confrontarla.`,
+    successor: (n) => `È uscito ${n}: Artificial Analysis non l'ha ancora misurato sul codice, per questo non possiamo confrontarlo.`,
     incompleteEstimate:
       'Stima incompleta: una commissione applicabile non è quantificabile, il confronto fra provider vicini può ribaltarsi.',
     getKey: (a) => `Prendi la chiave su ${a}`,
@@ -354,6 +358,7 @@ const it: Catalog = {
     costNote: "Token al mese per una persona che usa un agente di codice ogni giorno. Sono ipotesi dichiarate, non misure dei tuoi consumi. Un prezzo mancante non diventa mai zero: se manca il prezzo della cache, quei token costano come l'input.",
     excludedTitle: "Quando un'offerta è esclusa",
     excluded: (t) => [
+      'Il produttore ha ritirato il modello: non lo mostriamo più, neanche nelle sue versioni datate o nelle varianti dei rivenditori. Se ne esiste una versione nuova non ancora misurata, la pagina lo dice.',
       `Il prezzo ha più di ${t.offerHours} ore.`,
       `Il provider è stato disponibile meno del ${t.uptime} delle volte nell'ultima mezz'ora.`,
       'Il contesto è troppo piccolo per il tipo di lavoro scelto.',
@@ -415,6 +420,8 @@ const en: Catalog = {
     hard: '🟠 For hard problems',
     perMonth: (a) => `${a} estimated per month, pay as you go`,
     benchmark: (v, m, w) => `${m} ${v} · read on ${w}`,
+    replaced: (o, n) => `${o} has been retired by its maker. Its newer version, ${n}, is not yet measured on code by Artificial Analysis, so we cannot compare it yet.`,
+    successor: (n) => `${n} is out: Artificial Analysis has not measured it on code yet, so we cannot compare it.`,
     incompleteEstimate:
       'Incomplete estimate: one applicable fee cannot be quantified, so a close call between providers could flip.',
     getKey: (a) => `Get your key from ${a}`,
@@ -564,6 +571,7 @@ const en: Catalog = {
     costNote: 'Tokens per month for one person using a coding agent every day. They are stated assumptions, not measurements of your usage. A missing price never becomes zero: if the cache price is missing, those tokens cost as much as input.',
     excludedTitle: 'When an offer is excluded',
     excluded: (t) => [
+      'The maker has retired the model: we no longer show it, nor its dated builds or resellers\' variants. If a newer version exists but is not measured yet, the page says so.',
       `The price is more than ${t.offerHours} hours old.`,
       `The provider was available less than ${t.uptime} of the time in the last half hour.`,
       'The context is too small for the chosen kind of work.',

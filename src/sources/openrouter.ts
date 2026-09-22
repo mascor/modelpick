@@ -45,6 +45,8 @@ interface OrModel {
   architecture?: { output_modalities?: string[]; input_modalities?: string[] };
   top_provider?: { context_length?: number | null; max_completion_tokens?: number | null };
   supported_parameters?: string[];
+  /** Set when the model is scheduled for retirement. */
+  expiration_date?: string | null;
 }
 
 interface OrEndpoint {
@@ -68,6 +70,8 @@ export interface OpenRouterCatalogue {
   agentCapableKeys: string[];
   /** canonical key -> OpenRouter path, needed to ask for its endpoints. */
   pathByKey: Map<string, string>;
+  /** Models with a retirement date: deprecated, even before the date. */
+  deprecated: string[];
 }
 
 export async function fetchCatalogue(observedAt: string): Promise<OpenRouterCatalogue> {
@@ -75,6 +79,7 @@ export async function fetchCatalogue(observedAt: string): Promise<OpenRouterCata
   const models: ModelRecord[] = [];
   const agentCapableKeys: string[] = [];
   const pathByKey = new Map<string, string>();
+  const deprecated: string[] = [];
 
   for (const m of body.data ?? []) {
     const { key, floating } = keyFromPath(m.id);
@@ -101,10 +106,11 @@ export async function fetchCatalogue(observedAt: string): Promise<OpenRouterCata
       officialUrl: `https://openrouter.ai/${m.id}`,
     });
     pathByKey.set(key, m.id);
+    if (m.expiration_date) deprecated.push(key);
     if (tools && textOut) agentCapableKeys.push(key);
   }
   void observedAt;
-  return { models, agentCapableKeys, pathByKey };
+  return { models, agentCapableKeys, pathByKey, deprecated };
 }
 
 /**

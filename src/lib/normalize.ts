@@ -81,6 +81,8 @@ export function matchForm(raw: string): string {
   s = s.replace(/[^a-z0-9]+/g, '-');
   s = s.replace(/-(latest|stable|default|high|medium|low|minimal)\b/g, '');
   s = s.replace(/^(anthropic|openai|google|googledeepmind|deepseek|qwen|alibaba|moonshot|moonshotai|zai|z-ai|xai|x-ai|meta|meta-llama|mistral|mistralai|minimax)-/, '');
+  // Anthropic has used both orders: "Claude 4.5 Haiku" and "Claude Haiku 4.5" are one model.
+  s = s.replace(/^claude-(\d+(?:-\d+)?)-(sonnet|opus|haiku)\b/, 'claude-$2-$1');
   return s.replace(/-{2,}/g, '-').replace(/^-|-$/g, '');
 }
 

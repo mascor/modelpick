@@ -6,8 +6,9 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PATHS, SOURCES, sourceById } from '../config.js';
+import { deprecatedKeys, successorOf } from '../engine/lineage.js';
 import { matchForm, hoursSince } from '../lib/normalize.js';
-import type { ModelRecord, Offer, ProviderProfile, QualityEvidence, Snapshot, SourceStatus } from '../types.js';
+import type { ModelRecord, Offer, ProviderProfile, QualityEvidence, Replacement, Snapshot, SourceStatus } from '../types.js';
 import { fetchCatalogue, fetchOffers } from '../sources/openrouter.js';
 import { fetchModelsDev } from '../sources/modelsdev.js';
 import { fetchSweBench } from '../sources/swebench.js';
@@ -25,6 +26,7 @@ export interface Collected {
   evidence: QualityEvidence[];
   statuses: SourceStatus[];
   warnings: string[];
+  replacements: Replacement[];
 }
 
 const baseStatus = (id: string): SourceStatus => {
@@ -90,6 +92,8 @@ const mergeModel = (into: Map<string, ModelRecord>, m: ModelRecord) => {
 };
 
 export async function collect(previous: Snapshot | null, observedAt: string): Promise<Collected> {
+  // Models their maker has deprecated: never shown, whoever still sells them.
+  const retired = new Set<string>();
   const models = new Map<string, ModelRecord>();
   const providers = new Map<string, ProviderProfile>();
   const offers: Offer[] = [];
@@ -112,6 +116,7 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     try {
       const cat = await fetchCatalogue(observedAt);
       for (const m of cat.models) mergeModel(models, m);
+      for (const k of cat.deprecated) retired.add(k);
       pathByKey = cat.pathByKey;
       agentCapableKeys = cat.agentCapableKeys;
       statuses.push(finish(st, cat.models.length));
@@ -164,6 +169,8 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
         mergeModel(models, m);
         indexModel(m);
       }
+      for (const k of res.deprecated) retired.add(k);
+      if (res.deprecatedOffers) warnings.push(`${res.deprecatedOffers} offers left out: the seller lists them as deprecated.`);
       offers.push(...res.offers);
       statuses.push(finish(st, res.offers.length));
     } catch (err) {
@@ -177,17 +184,21 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
   // 3. Quality evidence.
   // Scores are matched once every price source is in, so the result does not
   // depend on the order the sources list their models: a spelling shared by
-  // several models goes to the one most providers sell (a provider's private
-  // copy never takes the score of the model everyone else sells), and a manual
-  // alias can point at a model that only models.dev knows.
+  // several models goes to the maker's canonical model, then to the one most
+  // providers sell (a provider's private copy never takes the score of the
+  // model everyone else sells), and a manual alias can point at a model that
+  // only models.dev knows.
   const qualityKeys = new Map<string, string>();
   {
     const sellers = new Map<string, number>();
     for (const o of offers) sellers.set(o.modelKey, (sellers.get(o.modelKey) ?? 0) + 1);
     const sold = (key: string) => sellers.get(key) ?? 0;
+    // OpenRouter's catalogue uses the maker's canonical names: a model it lists
+    // is the real one, a same-named model only models.dev knows is a seller's copy.
+    const canonical = (key: string) => (models.get(key)?.sourceIds.includes('openrouter') ? 1 : 0);
     for (const [form, keys] of formKeys) {
       // Stable sort: on a tie the first model to claim the spelling keeps it.
-      const best = [...keys].sort((a, b) => sold(b) - sold(a))[0];
+      const best = [...keys].sort((a, b) => canonical(b) - canonical(a) || sold(b) - sold(a))[0];
       if (best) qualityKeys.set(form, best);
     }
     for (const [foreign, key] of manualAliases) {
@@ -318,6 +329,23 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     // The list is optional.
   }
 
+  // A deprecated model goes with its dated builds and the variants sellers
+  // publish under it, from every source and from yesterday's fallback data.
+  let gone = new Set<string>();
+  // The last score of each retired model: its newer version may deserve a mention.
+  const retiredScores = new Map<string, QualityEvidence>();
+  if (retired.size) {
+    gone = deprecatedKeys(retired, models.keys());
+    for (const e of evidence) {
+      const prev = retiredScores.get(e.modelKey);
+      if (gone.has(e.modelKey) && (!prev || e.value > prev.value)) retiredScores.set(e.modelKey, e);
+    }
+    const before = offers.length;
+    offers.splice(0, offers.length, ...offers.filter((o) => !gone.has(o.modelKey)));
+    evidence.splice(0, evidence.length, ...evidence.filter((e) => !gone.has(e.modelKey)));
+    warnings.push(`${gone.size} deprecated models hidden with ${before - offers.length} offers (e.g. ${[...retired].slice(0, 3).join(', ')}).`);
+  }
+
   // Last step: which commands OpenCode actually accepts.
   const registry = await loadRegistry();
   const result = applyRegistry(offers, registry);
@@ -327,5 +355,27 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     warnings.push(`${result.rejected} offers excluded: OpenCode does not recognise that model-provider pair.`);
   }
 
-  return { opencodeVersion: registry?.version ?? null, models, providers, offers, evidence, statuses, warnings };
+  // A retired model that scored, whose newer version is on sale in a usable way
+  // but has no measurement yet: the page says so instead of staying silent.
+  const measured = new Set(evidence.map((e) => e.modelKey));
+  const onSale = new Set(offers.filter((o) => o.opencodeVerified !== false && !o.blockedReason).map((o) => o.modelKey));
+  const unmeasured = [...onSale].filter((k) => !measured.has(k));
+  const replacements: Replacement[] = [];
+  for (const [key, e] of retiredScores) {
+    const next = successorOf(key, unmeasured);
+    if (!next || replacements.some((r) => r.successorKey === next && r.retiredScore >= e.value)) continue;
+    const i = replacements.findIndex((r) => r.successorKey === next);
+    const row: Replacement = {
+      retiredKey: key,
+      retiredName: models.get(key)?.displayName ?? key,
+      retiredScore: e.value,
+      retiredMetric: e.metric,
+      successorKey: next,
+      successorName: models.get(next)?.displayName ?? next,
+    };
+    if (i >= 0) replacements[i] = row;
+    else replacements.push(row);
+  }
+
+  return { opencodeVersion: registry?.version ?? null, models, providers, offers, evidence, statuses, warnings, replacements };
 }
