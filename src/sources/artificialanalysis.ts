@@ -113,6 +113,25 @@ export function differentSnapshot(aaName: string, ourName: string): boolean {
   return !theirs.some((tag) => ours.includes(tag));
 }
 
+/**
+ * The name matched an older build of ours, but the build AA measured may be on
+ * sale under its dated name: "DeepSeek V4 Pro 0813" is our "deepseek-v4-pro-0813".
+ */
+function datedSibling(
+  m: AaModel,
+  key: string,
+  knownKeys: Map<string, string>,
+  displayNameOf: (modelKey: string) => string,
+): string | null {
+  const theirs = `${m.name} ${m.slug}`;
+  const base = key.slice(key.indexOf('/') + 1);
+  for (const tag of DATE_TAGS(theirs)) {
+    const sibling = knownKeys.get(matchForm(`${base}-${tag}`));
+    if (sibling && sibling !== key && !differentSnapshot(theirs, displayNameOf(sibling))) return sibling;
+  }
+  return null;
+}
+
 /** Reasoning-effort variants are published as suffixed slugs of the same model. */
 const VARIANT = /-(max|xhigh|high|medium|low|minimal|non-reasoning|reasoning|thinking|adaptive)$/;
 
@@ -150,15 +169,19 @@ export function aaEvidence(
   for (const m of download.models) {
     const value = m.evaluations?.artificial_analysis_coding_index;
     if (typeof value !== 'number') continue;
-    const key = aaModelKey(m, knownKeys);
+    let key = aaModelKey(m, knownKeys);
     if (!key) {
       unmatched.push(m.slug);
       continue;
     }
     // Better no score than the score of another build of the model.
     if (differentSnapshot(`${m.name} ${m.slug}`, displayNameOf(key))) {
-      wrongSnapshot.push(`${m.slug} \u2260 ${displayNameOf(key)}`);
-      continue;
+      const sibling = datedSibling(m, key, knownKeys, displayNameOf);
+      if (!sibling) {
+        wrongSnapshot.push(`${m.slug} \u2260 ${displayNameOf(key)}`);
+        continue;
+      }
+      key = sibling;
     }
     const prev = best.get(key);
     if (!prev || value > prev.value) best.set(key, { m, value });

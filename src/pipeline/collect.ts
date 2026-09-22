@@ -125,28 +125,35 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
   }
 
   /** Comparison index: any foreign spelling of a model resolves to our key. */
-  const knownKeys = new Map<string, string>();
-  const indexModel = (m: ModelRecord) => {
+  const formsOf = (m: ModelRecord): string[] => {
     const slug = m.key.slice(m.key.indexOf('/') + 1);
-    for (const form of [matchForm(slug), matchForm(m.displayName), ...m.aliases.map(matchForm)]) {
-      if (form && !knownKeys.has(form)) knownKeys.set(form, m.key);
+    return [matchForm(slug), matchForm(m.displayName), ...m.aliases.map(matchForm)].filter(Boolean);
+  };
+  const knownKeys = new Map<string, string>();
+  // Every model each spelling has pointed at, from every source record, in
+  // arrival order: the quality index below picks among them.
+  const formKeys = new Map<string, string[]>();
+  const indexModel = (m: ModelRecord) => {
+    for (const form of formsOf(m)) {
+      if (!knownKeys.has(form)) knownKeys.set(form, m.key);
+      const keys = formKeys.get(form) ?? [];
+      if (!keys.includes(m.key)) formKeys.set(form, [...keys, m.key]);
     }
   };
   for (const m of models.values()) indexModel(m);
 
   // Hand-curated corrections win over automatic matching: they exist precisely
   // because the automatic rule got something wrong.
+  let manualAliases: [string, string][] = [];
   try {
     const file = JSON.parse(await readFile(join(PATHS.curated, 'aliases.json'), 'utf8')) as {
       alias?: Record<string, string>;
     };
-    for (const [foreign, key] of Object.entries(file.alias ?? {})) {
-      if (models.has(key)) knownKeys.set(matchForm(foreign), key);
-      else warnings.push(`Alias manuale ignorato: "${foreign}" punta a un modello sconosciuto (${key}).`);
-    }
+    manualAliases = Object.entries(file.alias ?? {});
   } catch {
     // The file is optional.
   }
+  for (const [foreign, key] of manualAliases) if (models.has(key)) knownKeys.set(matchForm(foreign), key);
 
   // 2. Direct provider prices and declared capabilities.
   if (enabled.has('modelsdev')) {
@@ -168,10 +175,30 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
   }
 
   // 3. Quality evidence.
+  // Scores are matched once every price source is in, so the result does not
+  // depend on the order the sources list their models: a spelling shared by
+  // several models goes to the one most providers sell (a provider's private
+  // copy never takes the score of the model everyone else sells), and a manual
+  // alias can point at a model that only models.dev knows.
+  const qualityKeys = new Map<string, string>();
+  {
+    const sellers = new Map<string, number>();
+    for (const o of offers) sellers.set(o.modelKey, (sellers.get(o.modelKey) ?? 0) + 1);
+    const sold = (key: string) => sellers.get(key) ?? 0;
+    for (const [form, keys] of formKeys) {
+      // Stable sort: on a tie the first model to claim the spelling keeps it.
+      const best = [...keys].sort((a, b) => sold(b) - sold(a))[0];
+      if (best) qualityKeys.set(form, best);
+    }
+    for (const [foreign, key] of manualAliases) {
+      if (models.has(key)) qualityKeys.set(matchForm(foreign), key);
+      else warnings.push(`Alias manuale ignorato: "${foreign}" punta a un modello sconosciuto (${key}).`);
+    }
+  }
   if (enabled.has('swebench')) {
     const st = baseStatus('swebench');
     try {
-      const res = await fetchSweBench(observedAt, knownKeys);
+      const res = await fetchSweBench(observedAt, qualityKeys);
       evidence.push(...res.evidence);
       statuses.push(finish(st, res.evidence.length));
       if (res.unmatched.length) {
@@ -188,7 +215,7 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
   if (enabled.has('aider')) {
     const st = baseStatus('aider');
     try {
-      const res = await fetchAider(observedAt, knownKeys);
+      const res = await fetchAider(observedAt, qualityKeys);
       evidence.push(...res.evidence);
       statuses.push(finish(st, res.evidence.length));
     } catch (err) {
@@ -204,7 +231,7 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     const st = baseStatus('artificialanalysis');
     try {
       const dl = await downloadAa();
-      const res = aaEvidence(dl, knownKeys, observedAt, (key) => models.get(key)?.displayName ?? '');
+      const res = aaEvidence(dl, qualityKeys, observedAt, (key) => models.get(key)?.displayName ?? '');
       evidence.push(...res.evidence);
       statuses.push({ ...finish(st, res.evidence.length), servedFromCache: dl.fromCache, dataAgeHours: hoursSince(dl.fetchedAt) });
       if (!dl.fromCache) warnings.push(`Artificial Analysis: ${dl.models.length} modelli scaricati con ${dl.calls} chiamate.`);

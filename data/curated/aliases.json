@@ -1,4 +1,43 @@
 {
-  "_commento": "Correzioni manuali: nome come appare nella fonte -> chiave canonica del modello. Serve quando un risultato di benchmark non viene associato automaticamente. Ogni voce dovrebbe citare in revisione la fonte da cui viene la corrispondenza.",
-  "alias": {}
+  "_comment": "Manual corrections: a name as the source publishes it -> our canonical model key. Only for pairs the automatic matching misses. Every entry is justified in _why (same name, same release date, only candidate on sale). Use the source's full display name, not its short slug: a short slug can collide with another seller's id on models.dev.",
+  "alias": {
+    "DeepSeek V4 Flash Vision (Reasoning, Max Effort)": "deepseek/deepseek-v4-flash-vision-exp",
+    "Muse Glimmer (high)": "meta-llama/muse-glimmer-30b",
+    "DiffusionGemma 26B A4B": "google/diffusiongemma-26b-a4b-it",
+    "Gemma 4 12B (Reasoning)": "google/gemma-4-12b-it",
+    "Gemma 4 E4B (Reasoning)": "google/gemma-4-e4b-it",
+    "Gemma 3n E4B Instruct": "google/gemma-3n-e4b-it",
+    "Qwen3 8B (Reasoning)": "qwen/qwen3-8b",
+    "Qwen3 32B (Reasoning)": "qwen/qwen3-32b",
+    "DeepSeek R1 (Jan '25)": "deepseek/deepseek-r1",
+    "Gemini 2.5 Pro Preview (Mar' 25)": "google/gemini-2-5-pro-preview-03-25",
+    "Gemini 2.0 Pro Experimental (Feb '25)": "google/gemini-2-0-pro-exp-02-05",
+    "Claude 3.5 Sonnet (Oct '24)": "anthropic/claude-3-5-sonnet-v2"
+  },
+  "_why": {
+    "DeepSeek V4 Flash Vision (Reasoning, Max Effort)": "Both released 2026-08-21; the only Flash Vision build on sale is the -exp one.",
+    "Muse Glimmer (high)": "Released 2026-08-10 on both sides; Muse Glimmer ships in one size, 30B.",
+    "DiffusionGemma 26B A4B": "Same size and architecture; providers sell the instruction-tuned (IT) weights.",
+    "Gemma 4 12B (Reasoning)": "Same model; providers sell the instruction-tuned (IT) weights.",
+    "Gemma 4 E4B (Reasoning)": "Same model; providers sell the instruction-tuned (IT) weights.",
+    "Gemma 3n E4B Instruct": "AA measures the Instruct build, which is the -it model on sale.",
+    "Qwen3 8B (Reasoning)": "Qwen3 8B is one hybrid model with a thinking mode; both released 2025-04-28.",
+    "Qwen3 32B (Reasoning)": "Qwen3 32B is one hybrid model with a thinking mode; both released 2025-04-28.",
+    "DeepSeek R1 (Jan '25)": "Original R1, released 2025-01-20 on both sides; R1 0528 is a separate model of ours.",
+    "Gemini 2.5 Pro Preview (Mar' 25)": "Same dated preview, 03-25.",
+    "Gemini 2.0 Pro Experimental (Feb '25)": "Same dated experimental build, 02-05.",
+    "Claude 3.5 Sonnet (Oct '24)": "The October 2024 Claude 3.5 Sonnet is the one sold as v2 (released 2024-10-22)."
+  },
+  "_not_matched_on_purpose": {
+    "motif-0714": "Motif 3 (Beta) is not the Motif 3 on sale, which already has its own score.",
+    "grok-build-0-1-06-16": "Measured on the 06-16 build; the one on sale is dated 2026-05-20.",
+    "gpt-5-5-instant-06-26": "Measured on the June 2026 update; the one on sale was released 2026-05-05.",
+    "deepseek-v4-pro-0424, deepseek-v4-flash-0420": "Dates differ by one to three days from our 0423 builds; not provably the same build.",
+    "magistral-medium-2509": "Our Magistral Medium is a floating 'latest' alias dated 2025-03: no fixed version to pin.",
+    "nova-2-0-pro, nova-2-0-lite-reasoning": "AA measured the preview (Oct-Nov 2025); the one on sale is the December 2025 release.",
+    "k2-think-v2": "V2 is not the K2-Think (V1) on sale.",
+    "muse-spark": "Ambiguous: we sell 1.1, 1.2 and 1.3, which already have their own scores.",
+    "claude-35-sonnet-june-24": "Our candidates are provider-specific copies with conflicting dates.",
+    "granite-4-2-*, agnes-2-5-pro-beta, and about 20 others": "No build of that model is sold by anyone we track."
+  }
 }

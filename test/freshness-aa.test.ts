@@ -118,6 +118,26 @@ test('un punteggio misurato su un altra versione datata non viene usato', () => 
   assert.equal(params.evidence.length, 1);
 });
 
+test('a score for a dated build goes to the dated model we sell, not the older one', () => {
+  const known = new Map([
+    [matchForm('deepseek-v4-pro'), 'deepseek/deepseek-v4-pro'],
+    [matchForm('deepseek-v4-pro-0813'), 'deepseek/deepseek-v4-pro-0813'],
+  ]);
+  const names = new Map([
+    ['deepseek/deepseek-v4-pro', 'DeepSeek: DeepSeek V4 Pro 0423'],
+    ['deepseek/deepseek-v4-pro-0813', 'DeepSeek: DeepSeek V4 Pro 0813'],
+  ]);
+  const r = aaEvidence(
+    { fetchedAt: new Date().toISOString(), indexVersion: 4.3, calls: 1, models: [{
+      id: 'x', slug: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro 0813 (Reasoning, Max Effort)', release_date: null, model_creator: null,
+      evaluations: { artificial_analysis_intelligence_index: null, artificial_analysis_coding_index: 68.8, artificial_analysis_agentic_index: null },
+    }] },
+    known, new Date().toISOString(), (k) => names.get(k) ?? '',
+  );
+  assert.deepEqual(r.evidence.map((e) => [e.modelKey, e.value]), [['deepseek/deepseek-v4-pro-0813', 68.8]]);
+  assert.equal(r.wrongSnapshot.length, 0);
+});
+
 test('il modello indicato dall utente riceve sempre una risposta', () => {
   const s = two([aa('v/a', 70), aa('v/b', 60)]);
   const consigliato = recommend(s, req({ currentModelKey: 'v/a', priority: 'qualita' }));
