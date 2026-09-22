@@ -9,7 +9,7 @@
  */
 import { fetchJson, pooled } from '../lib/http.js';
 import { keyFromPath, perMillion } from '../lib/normalize.js';
-import type { ModelRecord, Offer } from '../types.js';
+import type { Fee, ModelRecord, Offer } from '../types.js';
 
 const BASE = 'https://openrouter.ai/api/v1';
 
@@ -23,6 +23,18 @@ const CREDIT_FEE_PERCENT = process.env.OPENROUTER_CREDIT_FEE_PERCENT
   ? Number(process.env.OPENROUTER_CREDIT_FEE_PERCENT)
   : undefined;
 const CREDIT_FEE_URL = 'https://openrouter.ai/docs/faq';
+
+/**
+ * The fee belongs to the seller, not to the source that described the offer:
+ * buying through OpenRouter costs the same whether models.dev or OpenRouter's
+ * own API told us the per-token price. Both connectors use this.
+ */
+export const openRouterCreditFee = (): Fee => ({
+  kind: 'credit_fee',
+  ...(CREDIT_FEE_PERCENT !== undefined && Number.isFinite(CREDIT_FEE_PERCENT) ? { percent: CREDIT_FEE_PERCENT } : {}),
+  note: 'OPENROUTER_CREDIT_FEE',
+  sourceUrl: CREDIT_FEE_URL,
+});
 
 interface OrModel {
   id: string;
@@ -139,16 +151,7 @@ export async function fetchOffers(
           cacheWritePerMTok: perMillion(p['input_cache_write']),
         },
         currency: 'USD',
-        fees: [
-          {
-            kind: 'credit_fee',
-            ...(CREDIT_FEE_PERCENT !== undefined && Number.isFinite(CREDIT_FEE_PERCENT)
-              ? { percent: CREDIT_FEE_PERCENT }
-              : {}),
-            note: 'OPENROUTER_CREDIT_FEE',
-            sourceUrl: CREDIT_FEE_URL,
-          },
-        ],
+        fees: [openRouterCreditFee()],
         contextTokens: ep.context_length ?? null,
         maxOutputTokens: ep.max_completion_tokens ?? null,
         supportsTools: (ep.supported_parameters ?? []).includes('tools'),

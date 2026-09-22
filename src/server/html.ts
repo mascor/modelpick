@@ -366,6 +366,15 @@ function renderEntrambi(rec: Recommendation | null, lang: Lang): string {
   return `<div class="scheda entrambi">
     <h3>${esc(c.home.bothTitle)}</h3>
     <p>${esc(c.home.bothIntro(config.everydayId, config.backupId ?? ''))}</p>
+    ${(() => {
+      const senzaPin = [
+        config.pinned.everyday ? null : config.everydayId,
+        config.pinned.hard ? null : config.backupId,
+      ].filter(Boolean) as string[];
+      return senzaPin.length
+        ? `<p class="allerta">${esc(c.home.bothNotPinned(senzaPin.join(', ')))}</p>`
+        : `<p class="meta">${esc(c.home.bothPinned)}</p>`;
+    })()}
     <pre class="codice"><code id="config-entrambi">${esc(config.json)}</code></pre>
     <p class="modulo__azioni">
       <button class="bottone" type="button" data-copia="#config-entrambi">${esc(c.home.copyConfig)}</button>

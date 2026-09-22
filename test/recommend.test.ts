@@ -227,3 +227,17 @@ test('ogni offerta consigliata porta un id che OpenCode accetta', () => {
     assert.notEqual(p.offer.opencodeVerified, false, `${p.offer.providerId} deve essere verificato`);
   }
 });
+
+test('a parita di prezzo vince l offerta con il provider fissabile', () => {
+  const s = snapshot(
+    [model('v/a')],
+    [
+      // Stessa spesa: una passa dall'instradamento automatico, l'altra fissa il provider.
+      offer({ id: 'libero', modelKey: 'v/a', providerId: 'openrouter', providerName: 'OpenRouter', sourceId: 'modelsdev', prices: { inputPerMTok: 1, outputPerMTok: 3, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1 } }),
+      offer({ id: 'fissato', modelKey: 'v/a', providerId: 'deepinfra', providerName: 'DeepInfra', sourceId: 'openrouter', routingSlug: 'deepinfra', prices: { inputPerMTok: 1, outputPerMTok: 3, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1 } }),
+    ],
+    [evidence('v/a', 70, { metric: 'aa_coding_index', harnessKey: 'aa-coding-index|v4.3' })],
+  );
+  const r = recommend(s, req({ priority: 'equilibrio' }));
+  assert.equal(r.everyday?.offer.id, 'fissato');
+});

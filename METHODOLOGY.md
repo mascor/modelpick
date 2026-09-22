@@ -40,6 +40,7 @@ If the reference falls back to SWE-bench (Artificial Analysis unavailable), the 
 
 What "best" means depends on the chosen priority, and that is the only question the site asks:
 
+- at the same total price we prefer the offer whose provider the configuration can hold: an unpinned broker route may be served by anyone, at another price;
 - with **spend less** and **balanced**, the everyday model is the **cheapest model-provider pair among those clearing the threshold**: an economical choice that reaches adequate quality, not the cheapest one outright;
 - with **best results**, it is the **highest score** available; price only breaks ties between models within 2 points of the maximum, where the difference is not meaningful.
 - The **model for hard problems** must beat the everyday pick by at least **3 points** measured in the same comparability group. Within 2 points of the top score the cheaper one is preferred: below that gap the difference is not meaningful and not worth the cost.
@@ -81,6 +82,7 @@ Handling of missing data:
 | Cache price not published | cache tokens are billed **at the input price**, which is an upper bound, and the assumption is stated on the page |
 | No per-token price (flat plan or free tier) | the offer does not take part in the price comparison: its real cost is not published per token |
 | Fee certain but its amount not verifiable | declared as "not quantified" and shown, never estimated |
+| Seller's own fees | applied by who sells, not by which source described the offer: an OpenRouter price carries OpenRouter's fee whether it came from their API or from models.dev |
 | OpenRouter credit purchase fee | 5.5% by card, 0.80 USD minimum per top-up, 5% by crypto, as declared in their FAQ; the percentage is applied to the total, the minimum is stated as a condition |
 | Minimum top-up or mandatory subscription | shown as a constraint of the offer |
 
@@ -114,7 +116,7 @@ A recommendation is marked **provisional** when at least one of these is true:
 
 ## 8. Stated limits
 
-- **Who has to be identifiable.** When buying direct, we only recommend a provider a curated directory describes: sending someone to open an account with a company we cannot name is not a recommendation. When the offer is routed through OpenRouter, the account and the invoice are OpenRouter's, and the provider behind it only supplies the machines, so no directory entry is required; the page always states who runs the model and who bills you.
+- **Who has to be identifiable.** A third party we cannot name is not a recommendation: for a direct purchase from a reseller we require an entry in a curated directory. Two cases need no entry. The company that made the model, selling its own model (Anthropic for Claude, OpenAI for GPT), is identified by definition. And when the offer is routed through OpenRouter, the account and the invoice are OpenRouter's, while the provider behind it only supplies the machines; the page always states who runs the model and who bills you.
 - We cover the providers monitored by the enabled sources, not the whole market. The wording used on the site is always: *"the cheapest among the monitored providers that meet your requirements"*.
 - **We do not ask for your country or data-handling requirements.** No source we read publishes geographic availability or data policy in structured form: those questions did not change the result, and a question with no effect is worse than no question. Anyone with constraints of that kind has to check them on the provider's site before buying.
 - Public benchmarks measure an agent on standard tasks: a serious signal, not a guarantee about your repository.

@@ -229,7 +229,15 @@ function rankOffers(
     }
     usable.push({ offer, cost, usability: usabilityOf(offer, modelVendor, known) });
   }
-  usable.sort((a, b) => (a.cost.totalUsd! - b.cost.totalUsd!) || a.offer.providerName.localeCompare(b.offer.providerName));
+  // At the same price prefer the offer whose provider we can actually hold:
+  // an unpinned broker route may be served by anyone, at another price.
+  const pinnable = (o: Offer) => (o.providerId === 'openrouter' ? Boolean(o.routingSlug) : true);
+  usable.sort(
+    (a, b) =>
+      a.cost.totalUsd! - b.cost.totalUsd! ||
+      Number(pinnable(b.offer)) - Number(pinnable(a.offer)) ||
+      a.offer.providerName.localeCompare(b.offer.providerName),
+  );
   // Offers you can use straight away come first; the others stay visible with
   // their price, clearly marked as requiring a new account.
   // Only providers we can actually describe are eligible to be recommended.
@@ -241,7 +249,15 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   const now = Date.now();
   const c = t(req.lang);
   // Providers a curated directory lists, plus their own first-party sellers.
-  const known = new Set(Object.values(snapshot.providers ?? {}).map((p) => providerKey(p.name)));
+  // The directory writes a company with its product ("Anthropic Claude") where
+  // our offers carry the company alone, so the first word counts as a name too,
+  // but only when it belongs to exactly one entry.
+  const directory = Object.values(snapshot.providers ?? {});
+  const known = new Set(directory.map((p) => providerKey(p.name)));
+  const firstWords = directory.map((p) => providerKey(p.name.split(/\s+/)[0] ?? ''));
+  for (const word of firstWords) {
+    if (word && firstWords.filter((w) => w === word).length === 1) known.add(word);
+  }
   const scenario = SCENARIOS[req.task];
   const mix: TokenMix = {
     input: req.usage?.input ?? scenario.monthly.input,

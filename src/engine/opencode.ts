@@ -27,6 +27,8 @@ export interface PickConfig {
 
 export interface OpenCodeConfigResult {
   json: string;
+  /** Whether the file really holds the provider we quoted, per pick. */
+  pinned: { everyday: boolean; hard: boolean };
   everydayId: string;
   backupId: string | null;
   everydayCommand: string;
@@ -130,6 +132,11 @@ export function buildOpenCodeConfig(
   ];
 
   return {
+    // Buying direct needs no pin: the model id already names who bills you.
+    pinned: {
+      everyday: Boolean(eConf.config) || eConf.commandIsExact,
+      hard: hConf ? Boolean(hConf.config) || hConf.commandIsExact : true,
+    },
     json: JSON.stringify(config, null, 2),
     everydayId: eConf.modelId,
     backupId: hConf?.modelId ?? null,

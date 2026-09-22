@@ -3,6 +3,7 @@
  * Gives us what OpenRouter cannot: the price of buying straight from the
  * provider's own API, plus declared capabilities (tools, context, reasoning).
  */
+import { openRouterCreditFee } from './openrouter.js';
 import { fetchJson } from '../lib/http.js';
 import { asPerMillion, canonicalKey, matchForm, normalizeSlug } from '../lib/normalize.js';
 import type { ModelRecord, Offer } from '../types.js';
@@ -141,7 +142,9 @@ export async function fetchModelsDev(observedAt: string, knownKeys: Map<string, 
           cacheWritePerMTok: asPerMillion(cost.cache_write),
         },
         currency: 'USD',
-        fees: [],
+        // Same seller, same purchase conditions: buying through OpenRouter carries
+        // its credit fee whichever source described the price.
+        fees: providerId === 'openrouter' ? [openRouterCreditFee()] : [],
         contextTokens: model.limit?.context ?? null,
         maxOutputTokens: model.limit?.output ?? null,
         supportsTools: model.tool_call ?? null,

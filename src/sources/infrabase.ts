@@ -50,6 +50,22 @@ interface Row {
 export const providerKey = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]+/g, '');
 
 /**
+ * The directory writes a company's name with its product ("Anthropic Claude",
+ * "Google Gemini API") where our offers carry the company alone. We accept a
+ * prefix match only when exactly one entry matches, so "OpenAI" can never be
+ * attached to a hypothetical "OpenAI Router" while both exist.
+ */
+export function findProfile<T extends { key: string }>(profiles: Iterable<T>, providerName: string): T | null {
+  const key = providerKey(providerName);
+  if (!key) return null;
+  const all = [...profiles];
+  const exact = all.find((p) => p.key === key);
+  if (exact) return exact;
+  const near = all.filter((p) => p.key.startsWith(key) || key.startsWith(p.key));
+  return near.length === 1 ? near[0]! : null;
+}
+
+/**
  * @param lookFor provider names seen in our offers. The directory caps a query
  *        at 50 rows with no pagination, so the broad sweeps above are followed
  *        by one targeted search per provider we actually quote.

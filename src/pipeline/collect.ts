@@ -13,7 +13,7 @@ import { fetchModelsDev } from '../sources/modelsdev.js';
 import { fetchSweBench } from '../sources/swebench.js';
 import { fetchAider } from '../sources/aider.js';
 import { aaEvidence, downloadAa } from '../sources/artificialanalysis.js';
-import { fetchInfrabase, providerKey } from '../sources/infrabase.js';
+import { fetchInfrabase, findProfile } from '../sources/infrabase.js';
 import { pendingStatus } from '../sources/pending.js';
 import { applyRegistry, loadRegistry } from './opencode-registry.js';
 
@@ -253,7 +253,7 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
       // Ogni offerta porta con se' chi e' il provider, cosi' la scheda puo'
       // dirlo senza dover risalire alla directory.
       for (const offer of offers) {
-        const profilo = providers.get(providerKey(offer.providerName));
+        const profilo = findProfile(providers.values(), offer.providerName);
         offer.profile = profilo
           ? {
               siteUrl: profilo.siteUrl,

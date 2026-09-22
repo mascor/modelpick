@@ -99,6 +99,8 @@ export interface Catalog {
     showConfig: string;
     bothTitle: string;
     bothIntro: (everyday: string, hard: string) => string;
+    bothPinned: string;
+    bothNotPinned: (models: string) => string;
     bothSwitch: (hard: string) => string;
     download: string;
     whyThis: string;
@@ -247,7 +249,10 @@ const it: Catalog = {
     currentUnknown: 'Il modello indicato non è fra quelli che monitoriamo.',
     showConfig: 'Mostra quello che copi',
     bothTitle: 'Configura entrambi in OpenCode',
-    bothIntro: (e, h) => `Un unico opencode.json: ${e} come predefinito e ${h} già pronto, ciascuno con il suo provider fissato.`,
+    bothIntro: (e, h) => `Un unico opencode.json: ${e} come predefinito e ${h} pronto da selezionare.`,
+    bothPinned: 'Il file fissa il provider di entrambi: il prezzo che vedi è quello che pagherai.',
+    bothNotPinned: (m) =>
+      `Attenzione: per ${m} il file non può fissare il provider, perché l'offerta più economica passa dall'instradamento automatico di OpenRouter. OpenRouter può servirla da un provider diverso, a un prezzo diverso da quello indicato.`,
     bothSwitch: (h) => `Per passare al modello dei problemi difficili usa /models dentro OpenCode e scegli ${h}. OpenCode non cambia modello da solo.`,
     download: 'Scarica opencode.json',
     whyThis: 'Perché proprio questo',
@@ -472,7 +477,10 @@ const en: Catalog = {
     currentUnknown: 'The model you named is not one we monitor.',
     showConfig: 'Show what you are copying',
     bothTitle: 'Configure both in OpenCode',
-    bothIntro: (e, h) => `One opencode.json: ${e} as the default and ${h} ready to use, each with its provider pinned.`,
+    bothIntro: (e, h) => `One opencode.json: ${e} as the default and ${h} ready to select.`,
+    bothPinned: 'The file pins the provider for both: the price you see is the price you pay.',
+    bothNotPinned: (m) =>
+      `Careful: for ${m} the file cannot pin the provider, because the cheapest offer goes through OpenRouter's automatic routing. OpenRouter may serve it from a different provider, at a different price.`,
     bothSwitch: (h) => `To switch to the model for hard problems use /models inside OpenCode and choose ${h}. OpenCode does not switch models on its own.`,
     download: 'Download opencode.json',
     whyThis: 'Why this one',
