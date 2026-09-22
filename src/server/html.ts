@@ -14,6 +14,18 @@ import { signupUrl } from '../engine/signup.js';
 import { configFor } from '../engine/opencode.js';
 import { t, pagePath, otherLang, type Lang } from '../i18n.js';
 import type { RunStatus } from '../pipeline/store.js';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+
+/** Content hash of a static file, so a changed file is never served from a stale browser cache. */
+const version = (file: string): string => {
+  try {
+    return createHash('sha1').update(readFileSync(new URL(`./public/${file}`, import.meta.url))).digest('hex').slice(0, 8);
+  } catch {
+    return 'dev';
+  }
+};
+const ASSET_VERSION = { css: version('styles.css'), js: version('app.js') };
 
 export const esc = (v: unknown): string =>
   String(v ?? '')
@@ -99,7 +111,7 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Courier+Prime:wght@400;700&display=swap">
-<link rel="stylesheet" href="/static/styles.css">
+<link rel="stylesheet" href="/static/styles.css?v=${ASSET_VERSION.css}">
 </head>
 <body>
 <header class="intestazione">
@@ -122,7 +134,7 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
     <p class="meta"><strong>${esc(SITE.name)}</strong> by CloudSalus · <a href="${esc(pagePath(opts.lang, 'method'))}">${esc(c.nav.method)}</a> · <a href="${esc(pagePath(opts.lang, 'sources'))}">${esc(c.nav.sources)}</a> · <a href="${esc(pagePath(opts.lang, 'status'))}">${esc(c.nav.status)}</a> · MIT</p>
   </div>
 </footer>
-<script src="/static/app.js" defer></script>
+<script src="/static/app.js?v=${ASSET_VERSION.js}" defer></script>
 </body>
 </html>`;
 }
