@@ -1,0 +1,9 @@
+node_modules/
+dist/
+data/cache/
+data/runs/
+data/current.json
+data/current.json.tmp
+.env
+*.log
+data/last-run.json

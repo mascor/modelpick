@@ -1,0 +1,21 @@
+services:
+  web:
+    build: .
+    image: modelpick:latest
+    container_name: modelpick-web
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      PORT: 8031
+    # Bound to loopback only: nginx on the host terminates TLS and proxies here.
+    ports: ["127.0.0.1:8031:8031"]
+    volumes: ["./data:/app/data"]
+
+  scheduler:
+    build: .
+    image: modelpick:latest
+    container_name: modelpick-scheduler
+    restart: unless-stopped
+    env_file: [.env]
+    command: ["node", "dist/scheduler.js"]
+    volumes: ["./data:/app/data"]

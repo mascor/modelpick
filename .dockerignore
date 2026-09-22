@@ -1,0 +1,8 @@
+node_modules
+dist
+data/cache
+data/runs
+data/current.json
+data/last-run.json
+.git
+*.log

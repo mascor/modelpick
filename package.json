@@ -1,0 +1,29 @@
+{
+  "name": "modelpick",
+  "version": "0.1.0",
+  "description": "Il modello giusto. Il provider piu conveniente.",
+  "license": "MIT",
+  "private": false,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && cp -r src/server/public dist/server/public",
+    "start": "node dist/server/server.js",
+    "scheduler": "node dist/scheduler.js",
+    "update": "node dist/pipeline/run.js",
+    "dev": "tsx watch src/server/server.ts",
+    "dev:update": "tsx src/pipeline/run.ts",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "fastify": "^5.2.1",
+    "@fastify/static": "^8.0.4",
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.6",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
