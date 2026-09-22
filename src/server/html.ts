@@ -361,7 +361,8 @@ export function methodPage(): string {
     <div class="scheda" style="margin-bottom:20px">
       <h2>Ordine delle decisioni</h2>
       <ol class="elenco">
-        <li><strong>Prima i modelli.</strong> Consideriamo solo modelli con una misura pubblicata di qualità sul codice. Un modello senza prove non può vincere.</li>
+        <li><strong>Prima i modelli.</strong> Consideriamo solo modelli con una misura pubblicata di qualità sul codice, ottenuta nelle stesse condizioni degli altri. Un modello senza prove confrontabili non può vincere.</li>
+        <li><strong>La tua scelta cambia che cosa significa "il migliore".</strong> Con "spendere poco" ed "equilibrio" prendiamo il modello meno costoso che supera la soglia di qualità. Con "lavorare bene" prendiamo il punteggio più alto, e il prezzo decide solo fra modelli praticamente pari.</li>
         <li><strong>Poi i provider.</strong> Per ogni modello ammesso cerchiamo tutte le offerte monitorate e teniamo quelle che soddisfano i requisiti indicati.</li>
         <li><strong>Infine la convenienza.</strong> Ogni offerta viene calcolata per intero, commissioni incluse, sullo stesso scenario di consumo.</li>
       </ol>

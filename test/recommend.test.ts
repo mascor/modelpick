@@ -42,9 +42,25 @@ test('un modello sotto soglia non vince nemmeno se costa pochissimo', () => {
   assert.notEqual(r.everyday?.model.key, 'v/scarso');
 });
 
-test('la priorita qualita alza la soglia e cambia la scelta', () => {
-  const r = recommend(base(), req({ priority: 'qualita' }));
-  assert.equal(r.everyday?.model.key, 'v/bravo'); // 60 non basta piu, 78 si
+test('"lavorare bene" sceglie il punteggio piu alto, non il piu economico sopra soglia', () => {
+  const economico = recommend(base(), req({ priority: 'risparmio' }));
+  const qualita = recommend(base(), req({ priority: 'qualita' }));
+  assert.equal(economico.everyday?.model.key, 'v/economico');
+  assert.equal(qualita.everyday?.model.key, 'v/bravo');
+  // le tre scelte non possono dare tutte la stessa risposta
+  assert.notEqual(economico.everyday?.model.key, qualita.everyday?.model.key);
+});
+
+test('a parita di punteggio "lavorare bene" preferisce comunque il meno costoso', () => {
+  const s = snapshot(
+    [model('v/caro'), model('v/conveniente')],
+    [
+      offer({ id: 'caro', modelKey: 'v/caro', providerId: 'caro', prices: { inputPerMTok: 10, outputPerMTok: 30, cacheReadPerMTok: 1, cacheWritePerMTok: 10 } }),
+      offer({ id: 'conv', modelKey: 'v/conveniente', providerId: 'conveniente', prices: { inputPerMTok: 1, outputPerMTok: 3, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1 } }),
+    ],
+    [evidence('v/caro', 80), evidence('v/conveniente', 79)],
+  );
+  assert.equal(recommend(s, req({ priority: 'qualita' })).everyday?.model.key, 'v/conveniente');
 });
 
 test('i dati dimostrativi non entrano mai nelle raccomandazioni pubbliche', () => {

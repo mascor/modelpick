@@ -251,7 +251,9 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     const metricLabel = c.quality.metric === 'swebench_verified' ? 'SWE-bench Verified' : 'Aider polyglot';
     const reason =
       role === 'everyday'
-        ? `Risolve il ${c.quality.value.toFixed(1)}% dei problemi su ${metricLabel}, sopra la soglia di ${gate.everyday}% richiesta per la priorità "${req.priority}", ed è la combinazione modello-provider meno costosa fra quelle che ci riescono (${fmtUsd(price)} al mese sullo scenario scelto).`
+        ? req.priority === 'qualita'
+          ? `È il punteggio più alto fra i modelli misurati nelle stesse condizioni (${c.quality.value.toFixed(1)}% su ${metricLabel}), e fra quelli che stanno in questa fascia è il meno costoso: ${fmtUsd(price)} al mese sullo scenario scelto.`
+          : `Risolve il ${c.quality.value.toFixed(1)}% dei problemi su ${metricLabel}, sopra la soglia di ${gate.everyday}% richiesta per questa priorità, ed è la combinazione modello-provider meno costosa fra quelle che ci riescono (${fmtUsd(price)} al mese sullo scenario scelto).`
         : `Risolve il ${c.quality.value.toFixed(1)}% dei problemi su ${metricLabel}${other ? `, ${(c.quality.value - other.quality.value).toFixed(1)} punti percentuali sopra il modello quotidiano, misurati nelle stesse condizioni` : ''}: la capacità superiore è documentata, non dedotta dal prezzo.`;
 
     const whenToUse =
@@ -275,10 +277,23 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     };
   };
 
-  // Everyday: the cheapest model that clears the quality gate for this priority.
+  /**
+   * The user's single choice changes what "best" means, which is the whole point
+   * of asking it:
+   * - spend less / balanced: the cheapest model that clears the quality gate;
+   * - work well: the highest measured score, with price only breaking ties
+   *   inside a band where the score difference is not meaningful.
+   */
   const everydayPool = candidates.filter((c) => c.quality.value >= gate.everyday);
-  everydayPool.sort((a, b) => a.offers[0]!.cost.totalUsd! - b.offers[0]!.cost.totalUsd!);
-  const everydayCandidate = everydayPool[0] ?? null;
+  const byPrice = (a: Candidate, b: Candidate) => a.offers[0]!.cost.totalUsd! - b.offers[0]!.cost.totalUsd!;
+  let everydayCandidate: Candidate | null;
+  if (req.priority === 'qualita') {
+    const top = everydayPool.reduce((max, c) => Math.max(max, c.quality.value), 0);
+    const band = everydayPool.filter((c) => c.quality.value >= top - 2).sort(byPrice);
+    everydayCandidate = band[0] ?? null;
+  } else {
+    everydayCandidate = [...everydayPool].sort(byPrice)[0] ?? null;
+  }
 
   // Backup: documented superior capability, not merely a higher price.
   const minHard = Math.max(
@@ -304,7 +319,9 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   }
   if (everyday && !hard) {
     notes.push(
-      `Nessun modello documenta una capacità superiore di almeno ${THRESHOLDS.backupQualityGapPoints} punti rispetto al quotidiano: preferiamo non indicare un backup piuttosto che indicarne uno senza prove.`,
+      req.priority === 'qualita'
+        ? 'Con questa priorità il modello di ogni giorno è già il migliore misurato: un secondo modello non aggiungerebbe niente.'
+        : `Nessun modello documenta una capacità superiore di almeno ${THRESHOLDS.backupQualityGapPoints} punti rispetto al quotidiano: preferiamo non indicare un backup piuttosto che indicarne uno senza prove.`,
     );
   }
 

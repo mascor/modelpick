@@ -30,7 +30,10 @@ La priorità scelta dall'utente determina la percentuale minima di problemi riso
 | Equilibrio | 55% | 68% |
 | Qualità | 64% | 72% |
 
-- Il **modello quotidiano** è, fra quelli che superano la soglia, la combinazione modello-provider **meno costosa**. È una scelta economica che raggiunge una qualità adeguata, non la più economica in assoluto.
+Il significato di "il migliore" dipende dalla priorità scelta, ed è l'unica domanda che il sito pone:
+
+- con **spendere poco** ed **equilibrio**, il modello quotidiano è la combinazione modello-provider **meno costosa fra quelle che superano la soglia**: una scelta economica che raggiunge una qualità adeguata, non la più economica in assoluto;
+- con **lavorare bene**, è il **punteggio più alto** disponibile; il prezzo interviene solo come spareggio fra modelli che stanno entro 2 punti dal massimo, dove la differenza non è significativa.
 - Il **modello per i problemi difficili** deve superare il quotidiano di almeno **3 punti percentuali** misurati nello stesso gruppo di confronto. All'interno di una fascia di 2 punti dal punteggio massimo si preferisce il più economico: sotto quella soglia la differenza non è significativa e non vale il costo.
 - Se nessun modello soddisfa queste condizioni, **non si assegna un vincitore** e il sito lo dichiara.
 
