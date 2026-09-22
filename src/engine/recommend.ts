@@ -241,8 +241,8 @@ function rankOffers(
   // Offers you can use straight away come first; the others stay visible with
   // their price, clearly marked as requiring a new account.
   // Only providers we can actually describe are eligible to be recommended.
-  const pronte = usable.filter((o) => isIdentified(o.usability));
-  return { usable, pronte, blocked };
+  const ready = usable.filter((o) => isIdentified(o.usability));
+  return { usable, ready, blocked };
 }
 
 export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recommendation {
@@ -291,7 +291,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     /** Every usable offer, cheapest first. */
     offers: OfferView[];
     /** The subset that needs no new account. */
-    pronte: OfferView[];
+    ready: OfferView[];
   }
   const candidates: Candidate[] = [];
 
@@ -318,29 +318,29 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
       bump('no-seller');
       continue;
     }
-    const { usable, pronte, blocked } = rankOffers(offers, mix, req, minContext, now, model.vendor, known);
+    const { usable, ready, blocked } = rankOffers(offers, mix, req, minContext, now, model.vendor, known);
     if (!usable.length) {
       bump(blocked[0] ?? 'no-usable-offer');
       continue;
     }
-    candidates.push({ model, quality, offers: usable, pronte });
+    candidates.push({ model, quality, offers: usable, ready });
   }
 
   /**
    * The cheapest offer among providers we can identify. Needing an account is
    * normal and simply stated; being unable to say who the company is, is not.
    */
-  const sceltaDi = (c: Candidate): OfferView => c.pronte[0] ?? c.offers[0]!;
+  const choiceOf = (c: Candidate): OfferView => c.ready[0] ?? c.offers[0]!;
 
   const toPick = (cand: Candidate, role: 'everyday' | 'hard', other: Candidate | null): Pick => {
-    const best = sceltaDi(cand);
+    const best = choiceOf(cand);
     const provisionalReasons: string[] = [];
     if (!cand.quality.comparable) provisionalReasons.push(c.engine.provisionalCrossHarness);
     if (cand.quality.stale) provisionalReasons.push(c.engine.provisionalStale(String(THRESHOLDS.evidenceFreshDays)));
     if (best.cost.unquantifiedFees.length) provisionalReasons.push(c.engine.provisionalFee);
     if (best.cost.assumptions.length) provisionalReasons.push(c.engine.provisionalCacheAssumption);
     if (cand.offers.length === 1) provisionalReasons.push(c.engine.provisionalSingle);
-    if (!cand.pronte.length) provisionalReasons.push(c.engine.provisionalUnidentified);
+    if (!cand.ready.length) provisionalReasons.push(c.engine.provisionalUnidentified);
 
     const price = fmtUsd(best.cost.totalUsd!);
     const label = metricLabel(cand.quality.metric);
@@ -379,7 +379,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
    *   inside a band where the score difference is not meaningful.
    */
   const everydayPool = candidates.filter((c) => c.quality.value >= gate.everyday);
-  const byPrice = (a: Candidate, b: Candidate) => sceltaDi(a).cost.totalUsd! - sceltaDi(b).cost.totalUsd!;
+  const byPrice = (a: Candidate, b: Candidate) => choiceOf(a).cost.totalUsd! - choiceOf(b).cost.totalUsd!;
   let everydayCandidate: Candidate | null;
   if (req.priority === 'quality') {
     const top = everydayPool.reduce((max, c) => Math.max(max, c.quality.value), 0);

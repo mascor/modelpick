@@ -16,8 +16,8 @@ test('the API answers in English and the legacy Italian paths still work', async
 
     const status = (await app.inject({ url: '/api/status' })).json();
     assert.ok('updatedAt' in status && 'lastRun' in status && 'storedRuns' in status);
-    const stato = (await app.inject({ url: '/api/stato' })).json();
-    assert.ok('aggiornatoIl' in stato && 'ultimaEsecuzione' in stato);
+    const legacyStatus = (await app.inject({ url: '/api/stato' })).json();
+    assert.ok('aggiornatoIl' in legacyStatus && 'ultimaEsecuzione' in legacyStatus);
 
     const sources = (await app.inject({ url: '/api/sources' })).json() as { state: string }[];
     assert.ok(sources.length > 0 && sources.every((s) => typeof s.state === 'string'));

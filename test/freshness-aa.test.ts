@@ -56,7 +56,7 @@ test('AA effort variants map to the model and the best one is kept', () => {
     { fetchedAt: new Date().toISOString(), indexVersion: 4.3, calls: 4, models: [
       m('claude-opus-5-medium', 'Claude Opus 5 (Medium Effort)', 74.3),
       m('claude-opus-5', 'Claude Opus 5 (Max Effort)', 78),
-      m('ignoto-1', 'Ignoto', 50),
+      m('unknown-1', 'Unknown', 50),
     ] },
     known,
     new Date().toISOString(),
@@ -64,7 +64,7 @@ test('AA effort variants map to the model and the best one is kept', () => {
   assert.equal(ev.length, 1);
   assert.equal(ev[0]!.value, 78);
   assert.equal(ev[0]!.reasoningEffort, 'Max Effort');
-  assert.deepEqual(unmatched, ['ignoto-1']);
+  assert.deepEqual(unmatched, ['unknown-1']);
 });
 
 test('a recent AA download is reused without calling the API', async () => {
@@ -88,7 +88,7 @@ test('a recent AA download is reused without calling the API', async () => {
 
 test('a score measured on another dated build is not used', () => {
   const known = new Map([[matchForm('deepseek-v4-flash'), 'deepseek/deepseek-v4-flash']]);
-  const nostri = new Map([['deepseek/deepseek-v4-flash', 'DeepSeek: DeepSeek V4 Flash 0423']]);
+  const ourNames = new Map([['deepseek/deepseek-v4-flash', 'DeepSeek: DeepSeek V4 Flash 0423']]);
   const m = (slug: string, name: string): AaModel => ({
     id: slug, name, slug, release_date: null, model_creator: null,
     evaluations: { artificial_analysis_intelligence_index: null, artificial_analysis_coding_index: 69.1, artificial_analysis_agentic_index: null },
@@ -98,22 +98,22 @@ test('a score measured on another dated build is not used', () => {
       { fetchedAt: new Date().toISOString(), indexVersion: 4.3, calls: 1, models: [m('deepseek-v4-flash', name)] },
       known,
       new Date().toISOString(),
-      (k) => nostri.get(k) ?? '',
+      (k) => ourNames.get(k) ?? '',
     );
 
-  const diversa = run('DeepSeek V4 Flash 0731 (Reasoning, Max Effort)');
-  assert.equal(diversa.evidence.length, 0);
-  assert.equal(diversa.wrongSnapshot.length, 1);
+  const otherBuild = run('DeepSeek V4 Flash 0731 (Reasoning, Max Effort)');
+  assert.equal(otherBuild.evidence.length, 0);
+  assert.equal(otherBuild.wrongSnapshot.length, 1);
 
-  const stessa = run('DeepSeek V4 Flash 0423 (Reasoning, Max Effort)');
-  assert.equal(stessa.evidence.length, 1);
+  const sameBuild = run('DeepSeek V4 Flash 0423 (Reasoning, Max Effort)');
+  assert.equal(sameBuild.evidence.length, 1);
 
   // A parameter count is not a date: it must not block the match.
   const known2 = new Map([[matchForm('qwen3-8-2-4t-a95b'), 'qwen/qwen3-8-2-4t-a95b']]);
-  const nostri2 = new Map([['qwen/qwen3-8-2-4t-a95b', 'Qwen3.8 2.4T A95B']]);
+  const ourNames2 = new Map([['qwen/qwen3-8-2-4t-a95b', 'Qwen3.8 2.4T A95B']]);
   const params = aaEvidence(
     { fetchedAt: new Date().toISOString(), indexVersion: 4.3, calls: 1, models: [m('qwen3-8-2-4t-a95b', 'Qwen3.8 2.4T A95B')] },
-    known2, new Date().toISOString(), (k) => nostri2.get(k) ?? '',
+    known2, new Date().toISOString(), (k) => ourNames2.get(k) ?? '',
   );
   assert.equal(params.evidence.length, 1);
 });
@@ -140,13 +140,13 @@ test('a score for a dated build goes to the dated model we sell, not the older o
 
 test('the model the user declared always gets an answer', () => {
   const s = two([aa('v/a', 70), aa('v/b', 60)]);
-  const consigliato = recommend(s, req({ currentModelKey: 'v/a', priority: 'quality' }));
-  assert.equal(consigliato.savings?.outcome, 'already-recommended');
+  const recommended = recommend(s, req({ currentModelKey: 'v/a', priority: 'quality' }));
+  assert.equal(recommended.savings?.outcome, 'already-recommended');
 
-  const ignoto = recommend(s, req({ currentModelKey: 'v/ignoto' }));
-  assert.equal(ignoto.savings?.outcome, 'unknown-model');
+  const unknownModel = recommend(s, req({ currentModelKey: 'v/unknown' }));
+  assert.equal(unknownModel.savings?.outcome, 'unknown-model');
 
-  const senzaProva = snapshot(
+  const withoutEvidence = snapshot(
     [model('v/a'), model('v/b'), model('v/c')],
     [
       offer({ id: 'a', modelKey: 'v/a', providerId: 'alfa', prices: { inputPerMTok: 1, outputPerMTok: 3, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1 } }),
@@ -154,6 +154,6 @@ test('the model the user declared always gets an answer', () => {
     ],
     [aa('v/a', 70)],
   );
-  assert.equal(recommend(senzaProva, req({ currentModelKey: 'v/c' })).savings?.outcome, 'compared');
-  assert.equal(recommend(senzaProva, req({ currentModelKey: 'v/b' })).savings?.outcome, 'no-seller');
+  assert.equal(recommend(withoutEvidence, req({ currentModelKey: 'v/c' })).savings?.outcome, 'compared');
+  assert.equal(recommend(withoutEvidence, req({ currentModelKey: 'v/b' })).savings?.outcome, 'no-seller');
 });

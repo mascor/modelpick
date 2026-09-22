@@ -13,7 +13,7 @@ export interface Change {
 }
 
 const usd = (v: number) => `${v.toFixed(2)} USD`;
-const nome = (raw: string) => {
+const shortName = (raw: string) => {
   const i = raw.indexOf(': ');
   return i > 0 ? raw.slice(i + 2) : raw;
 };
@@ -24,7 +24,7 @@ export function describeChange(before: Pick | null, now: Pick | null, lang: Lang
   if (!before) return { text: c.newPick, moved: true };
 
   if (before.model.key !== now.model.key) {
-    return { text: c.modelChanged(nome(before.model.displayName), before.offer.providerName), moved: true };
+    return { text: c.modelChanged(shortName(before.model.displayName), before.offer.providerName), moved: true };
   }
   if (before.offer.providerId !== now.offer.providerId) {
     return { text: c.providerChanged(before.offer.providerName, usd(before.cost.totalUsd!)), moved: true };

@@ -84,10 +84,10 @@ export async function buildServer() {
     let changes = noChanges;
     const before = await previousRun(snapshot.runId);
     if (before) {
-      const prima = recommend(before, request);
+      const earlier = recommend(before, request);
       changes = {
-        everyday: describeChange(prima.everyday, rec.everyday, lang),
-        hard: describeChange(prima.hard, rec.hard, lang),
+        everyday: describeChange(earlier.everyday, rec.everyday, lang),
+        hard: describeChange(earlier.hard, rec.hard, lang),
       };
     }
     return { snapshot, request, rec, config, models, changes };

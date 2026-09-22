@@ -32,18 +32,18 @@ test('Italian pages redirect to English anyone who did not ask for Italian', asy
     assert.equal(it.statusCode, 200);
 
     // Chosen from the menu: it holds even with an English browser, and is remembered.
-    const scelta = await app.inject({ url: '/metodo?lang=it', headers: { 'accept-language': 'en' } });
-    assert.equal(scelta.statusCode, 200);
-    assert.match(String(scelta.headers['set-cookie']), /mp_lang=it/);
-    const dopo = await app.inject({ url: '/metodo', headers: { 'accept-language': 'en', cookie: 'mp_lang=it' } });
-    assert.equal(dopo.statusCode, 200);
+    const picked = await app.inject({ url: '/metodo?lang=it', headers: { 'accept-language': 'en' } });
+    assert.equal(picked.statusCode, 200);
+    assert.match(String(picked.headers['set-cookie']), /mp_lang=it/);
+    const remembered = await app.inject({ url: '/metodo', headers: { 'accept-language': 'en', cookie: 'mp_lang=it' } });
+    assert.equal(remembered.statusCode, 200);
 
     // An Italian who picks English from the menu is not sent back.
     const via = await app.inject({ url: '/', headers: { 'accept-language': 'it', cookie: 'mp_lang=en' } });
     assert.equal(via.statusCode, 302);
 
-    const inglese = await app.inject({ url: '/en/method', headers: { 'accept-language': 'it' } });
-    assert.equal(inglese.statusCode, 200);
+    const english = await app.inject({ url: '/en/method', headers: { 'accept-language': 'it' } });
+    assert.equal(english.statusCode, 200);
   } finally {
     await app.close();
   }
@@ -62,8 +62,8 @@ test('bots get the page in the language of the address; robots and sitemap exist
     assert.equal(whatsapp.statusCode, 200);
 
     // A person with an English browser is still sent to English.
-    const persona = await app.inject({ url: '/', headers: { 'user-agent': 'Mozilla/5.0 (Macintosh) Safari/605', 'accept-language': 'en-GB' } });
-    assert.equal(persona.statusCode, 302);
+    const person = await app.inject({ url: '/', headers: { 'user-agent': 'Mozilla/5.0 (Macintosh) Safari/605', 'accept-language': 'en-GB' } });
+    assert.equal(person.statusCode, 302);
 
     const robots = await app.inject({ url: '/robots.txt' });
     assert.equal(robots.statusCode, 200);

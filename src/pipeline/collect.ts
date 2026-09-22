@@ -274,19 +274,19 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     const st = baseStatus('infrabase');
     try {
       // Look up by name only the providers that actually appear in the offers.
-      const nomi = [...new Set(offers.map((o) => o.providerName))];
-      const res = await fetchInfrabase(nomi);
+      const names = [...new Set(offers.map((o) => o.providerName))];
+      const res = await fetchInfrabase(names);
       for (const p of res.providers) providers.set(p.key, p);
       // Every offer carries who the provider is, so the card can say it
       // without going back to the directory.
       for (const offer of offers) {
-        const profilo = findProfile(providers.values(), offer.providerName);
-        offer.profile = profilo
+        const profile = findProfile(providers.values(), offer.providerName);
+        offer.profile = profile
           ? {
-              siteUrl: profilo.siteUrl,
-              hqCountry: profilo.hqCountry,
-              gdpr: profilo.gdpr,
-              directoryUrl: profilo.directoryUrl,
+              siteUrl: profile.siteUrl,
+              hqCountry: profile.hqCountry,
+              gdpr: profile.gdpr,
+              directoryUrl: profile.directoryUrl,
             }
           : null;
       }
@@ -304,27 +304,27 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     const file = JSON.parse(await readFile(join(PATHS.curated, 'providers-sospesi.json'), 'utf8')) as {
       sospesi?: Record<string, string>;
     };
-    const sospesi = file.sospesi ?? {};
-    let contati = 0;
+    const suspended = file.sospesi ?? {};
+    let excluded = 0;
     for (const offer of offers) {
-      const motivo = sospesi[offer.providerId];
-      if (motivo) {
-        offer.blockedReason = motivo;
-        contati++;
+      const reason = suspended[offer.providerId];
+      if (reason) {
+        offer.blockedReason = reason;
+        excluded++;
       }
     }
-    if (contati) warnings.push(`${contati} offers excluded: provider suspended by hand.`);
+    if (excluded) warnings.push(`${excluded} offers excluded: provider suspended by hand.`);
   } catch {
     // The list is optional.
   }
 
   // Last step: which commands OpenCode actually accepts.
   const registry = await loadRegistry();
-  const esito = applyRegistry(offers, registry);
+  const result = applyRegistry(offers, registry);
   if (!registry) {
     warnings.push('OpenCode model list not available: no offer can be verified.');
-  } else if (esito.rejected) {
-    warnings.push(`${esito.rejected} offers excluded: OpenCode does not recognise that model-provider pair.`);
+  } else if (result.rejected) {
+    warnings.push(`${result.rejected} offers excluded: OpenCode does not recognise that model-provider pair.`);
   }
 
   return { opencodeVersion: registry?.version ?? null, models, providers, offers, evidence, statuses, warnings };

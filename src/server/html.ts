@@ -132,23 +132,23 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
 <link rel="icon" href="/static/favicon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 </head>
-<body data-copiato="${esc(c.home.copied)}" data-copia-bloccata="${esc(c.home.copyBlocked)}">
-<header class="intestazione">
-  <div class="intestazione__barra">
-    <div class="marchio">
-      <a class="marchio__nome" href="${esc(pagePath(opts.lang, 'home'))}">MODELPICK</a>
-      <a class="marchio__di" href="${esc(CLOUDSALUS_URL)}" rel="noopener">by CloudSalus</a>
+<body data-copied="${esc(c.home.copied)}" data-copy-blocked="${esc(c.home.copyBlocked)}">
+<header class="header">
+  <div class="header__bar">
+    <div class="brand">
+      <a class="brand__name" href="${esc(pagePath(opts.lang, 'home'))}">MODELPICK</a>
+      <a class="brand__by" href="${esc(CLOUDSALUS_URL)}" rel="noopener">by CloudSalus</a>
     </div>
     <nav class="menu">
       ${nav.map(([id, label]) => `<a href="${esc(pagePath(opts.lang, id))}"${opts.active === id ? ' aria-current="page"' : ''}>${esc(label)}</a>`).join('')}
       <a href="${esc(SITE.repo)}" rel="noopener">${esc(c.nav.code)}</a>
-      <a class="lingua" href="${esc(pagePath(other, opts.active))}?lang=${esc(other)}" hreflang="${esc(other)}">${esc(c.nav.otherLang)}</a>
+      <a class="lang-switch" href="${esc(pagePath(other, opts.active))}?lang=${esc(other)}" hreflang="${esc(other)}">${esc(c.nav.otherLang)}</a>
     </nav>
   </div>
 </header>
 <main>${opts.body}</main>
-<footer class="pie">
-  <div class="contenitore pie__righe">
+<footer class="footer">
+  <div class="container footer__rows">
     <p class="meta">${esc(c.home.aaDisclaimer)} <a href="https://artificialanalysis.ai/" rel="noopener">artificialanalysis.ai</a></p>
     <p class="meta"><strong>${esc(SITE.name)}</strong> by <a href="${esc(CLOUDSALUS_URL)}" rel="noopener">CloudSalus</a> · <a href="${esc(pagePath(opts.lang, 'method'))}">${esc(c.nav.method)}</a> · <a href="${esc(pagePath(opts.lang, 'sources'))}">${esc(c.nav.sources)}</a> · <a href="${esc(pagePath(opts.lang, 'status'))}">${esc(c.nav.status)}</a> · MIT</p>
   </div>
@@ -162,187 +162,187 @@ const option = (value: string, label: string, selected: string): string =>
   `<option value="${esc(value)}"${value === selected ? ' selected' : ''}>${esc(label)}</option>`;
 
 /** The provider comparison: the answer to "where do I buy this". */
-function renderConfronto(pick: Pick, role: string, lang: Lang): string {
+function renderComparison(pick: Pick, role: string, lang: Lang): string {
   const c = t(lang);
-  const riga = (o: OfferView, i: number, scelto: boolean) => {
+  const row = (o: OfferView, i: number, chosen: boolean) => {
     const id = `cmd-${role}-${i}`;
     const conf = configFor(o.offer, lang);
     // Rows routed through OpenRouter share the same command: what changes is
     // the pinned provider, so the configuration is what gets copied.
     const payload = conf.config ?? conf.command;
-    const etichetta = conf.config ? c.home.copyConfig : c.home.copy;
+    const label = conf.config ? c.home.copyConfig : c.home.copy;
     const link = signupUrl(o.offer);
-    return `<tr${scelto ? ' class="scelto"' : ''}>
+    return `<tr${chosen ? ' class="chosen"' : ''}>
       <td>
         <strong>${esc(o.offer.providerName)}</strong>
         <span class="meta">${esc(usabilityLabel(o.usability, o.offer, lang))}</span>
       </td>
       <td class="num nowrap"><strong>${esc(usd(o.cost.totalUsd, lang))}</strong></td>
-      <td class="azione">
-        ${link ? `<a class="riga-link" href="${esc(link)}" target="_blank" rel="noopener">${esc(c.home.key)}</a>` : ''}
-        <button class="bottone bottone--contorno bottone--piccolo" type="button" data-copia="#${esc(id)}">${esc(etichetta)}</button>
-        <details class="anteprima">
+      <td class="action">
+        ${link ? `<a class="row-link" href="${esc(link)}" target="_blank" rel="noopener">${esc(c.home.key)}</a>` : ''}
+        <button class="button button--outline button--small" type="button" data-copy="#${esc(id)}">${esc(label)}</button>
+        <details class="preview">
           <summary>${esc(c.home.showPreview)}</summary>
-          <pre class="codice"><code id="${esc(id)}">${esc(payload)}</code></pre>
+          <pre class="code"><code id="${esc(id)}">${esc(payload)}</code></pre>
         </details>
       </td>
     </tr>`;
   };
 
-  const primi = pick.alternatives.slice(0, 3);
-  const restanti = pick.alternatives.slice(3);
+  const shown = pick.alternatives.slice(0, 3);
+  const rest = pick.alternatives.slice(3);
 
-  return `<div class="acquisto">
-    <h4 class="acquisto__titolo">${esc(c.home.whereToBuy)}</h4>
-    <table class="tabella confronto">
+  return `<div class="purchase">
+    <h4 class="purchase__title">${esc(c.home.whereToBuy)}</h4>
+    <table class="table comparison">
       <tbody>
-        ${riga(pick.chosen, 0, true)}
-        ${primi.map((o, i) => riga(o, i + 1, false)).join('')}
+        ${row(pick.chosen, 0, true)}
+        ${shown.map((o, i) => row(o, i + 1, false)).join('')}
       </tbody>
     </table>
-    ${restanti.length ? `<details class="dettagli">
-      <summary>${esc(c.home.otherProviders(restanti.length))}</summary>
-      <div class="dettagli__corpo">
-        <table class="tabella confronto"><tbody>${restanti.slice(0, 16).map((o, i) => riga(o, i + 100, false)).join('')}</tbody></table>
+    ${rest.length ? `<details class="details">
+      <summary>${esc(c.home.otherProviders(rest.length))}</summary>
+      <div class="details__body">
+        <table class="table comparison"><tbody>${rest.slice(0, 16).map((o, i) => row(o, i + 100, false)).join('')}</tbody></table>
       </div>
     </details>` : ''}
   </div>`;
 }
 
-function renderDettagli(pick: Pick, lang: Lang, opencodeVersion: string | null): string {
+function renderDetails(pick: Pick, lang: Lang, opencodeVersion: string | null): string {
   const c = t(lang);
   const q = pick.quality;
   const f = fmt(lang);
-  const righe = pick.cost.lines
+  const costRows = pick.cost.lines
     .filter((l) => l.tokens > 0)
-    .map((l) => `<div class="prezzi__riga">
-        <span class="prezzi__etichetta">${esc(l.label)} · ${esc(tokens(l.tokens, lang))} token</span>
+    .map((l) => `<div class="prices__row">
+        <span class="prices__label">${esc(l.label)} · ${esc(tokens(l.tokens, lang))} token</span>
         <span>${esc(usd(l.usd, lang))}</span>
       </div>`)
     .join('');
-  const commissioni = [
-    ...pick.cost.feeNotes.map((n) => `<div class="prezzi__riga"><span class="prezzi__etichetta">${esc(n)}</span><span>${esc(usd(pick.cost.feesUsd, lang))}</span></div>`),
-    ...pick.cost.unquantifiedFees.map((n) => `<div class="prezzi__riga"><span class="prezzi__etichetta">${esc(n)}</span><span class="etichetta etichetta--commissione">—</span></div>`),
+  const feeRows = [
+    ...pick.cost.feeNotes.map((n) => `<div class="prices__row"><span class="prices__label">${esc(n)}</span><span>${esc(usd(pick.cost.feesUsd, lang))}</span></div>`),
+    ...pick.cost.unquantifiedFees.map((n) => `<div class="prices__row"><span class="prices__label">${esc(n)}</span><span class="label label--fee">—</span></div>`),
   ].join('');
 
-  const profilo = pick.offer.profile;
-  const gdpr = profilo?.gdpr === true ? c.home.gdprYes : profilo?.gdpr === false ? c.home.gdprNo : c.home.gdprUnknown;
+  const profile = pick.offer.profile;
+  const gdpr = profile?.gdpr === true ? c.home.gdprYes : profile?.gdpr === false ? c.home.gdprNo : c.home.gdprUnknown;
 
-  return `<details class="dettagli">
+  return `<details class="details">
     <summary>${esc(c.home.whyThis)}</summary>
-    <div class="dettagli__corpo">
+    <div class="details__body">
       <p>${esc(pick.reason)}</p>
       <p>${c.home.theEvidence(esc(formatScore(q.value, q.metric)), esc(evidenceLabel(q)), esc(q.harness), esc(dateDay(q.measuredAt, lang)))} ${q.metric === 'aa_coding_index'
         ? `<a href="${esc(q.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>.`
         : `<a href="${esc(q.sourceUrl)}" rel="noopener">${esc(c.home.priceSource)}</a>.`}</p>
       ${q.metric === 'aa_coding_index' ? `<p class="meta">${esc(c.home.evidenceNoDate)}</p>` : ''}
-      <div class="prezzi">${righe}${commissioni}
-        <div class="prezzi__riga prezzi__riga--totale"><span>${esc(c.home.monthlyTotal)}</span><span>${esc(usd(pick.cost.totalUsd, lang))}</span></div>
+      <div class="prices">${costRows}${feeRows}
+        <div class="prices__row prices__row--total"><span>${esc(c.home.monthlyTotal)}</span><span>${esc(usd(pick.cost.totalUsd, lang))}</span></div>
       </div>
       ${pick.cost.assumptions.length ? `<p class="meta">${pick.cost.assumptions.map(esc).join(' ')}</p>` : ''}
       ${pick.provisional ? `<p class="meta">${esc(pick.provisionalReasons.join('; '))}.</p>` : ''}
-      <p><strong>${esc(c.home.whoIs(pick.offer.providerName))}</strong> ${profilo
-        ? `${esc(c.home.profileKnown(profilo.hqCountry ?? c.home.countryUnknown, gdpr))}${profilo.directoryUrl ? `. <a href="${esc(profilo.directoryUrl)}" rel="noopener">${esc(c.home.directoryLink)}</a>` : ''}.`
+      <p><strong>${esc(c.home.whoIs(pick.offer.providerName))}</strong> ${profile
+        ? `${esc(c.home.profileKnown(profile.hqCountry ?? c.home.countryUnknown, gdpr))}${profile.directoryUrl ? `. <a href="${esc(profile.directoryUrl)}" rel="noopener">${esc(c.home.directoryLink)}</a>` : ''}.`
         : esc(c.home.profileUnknown)} ${esc(c.home.geoNote)}</p>
       <p class="meta">${esc(c.home.priceChecked(dateLong(pick.offer.observedAt, lang)))} ${opencodeVersion ? esc(c.home.verifiedWith(opencodeVersion)) : ''} <a href="${esc(pick.offer.sourceUrl)}" rel="noopener">${esc(c.home.priceSource)}</a>${pick.model.officialUrl ? ` · <a href="${esc(pick.model.officialUrl)}" rel="noopener">${esc(c.home.modelPage)}</a>` : ''}. ${esc(f.n.format(pick.offersCompared))} provider.</p>
     </div>
   </details>`;
 }
 
-function renderPick(pick: Pick | null, role: 'quotidiano' | 'difficile', change: Change | null, lang: Lang, empty: string, opencodeVersion: string | null): string {
+function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change | null, lang: Lang, empty: string, opencodeVersion: string | null): string {
   const c = t(lang);
-  const titolo = role === 'quotidiano' ? c.home.everyday : c.home.hard;
+  const title = role === 'everyday' ? c.home.everyday : c.home.hard;
   if (!pick) {
-    return `<article class="scheda pick pick--${role}">
-      <p class="pick__ruolo">${esc(titolo)}</p>
-      <div class="avviso avviso--neutro">${esc(empty)}</div>
+    return `<article class="card pick pick--${role}">
+      <p class="pick__role">${esc(title)}</p>
+      <div class="notice notice--neutral">${esc(empty)}</div>
     </article>`;
   }
   const conf = configFor(pick.offer, lang);
   const link = signupUrl(pick.offer);
-  return `<article class="scheda pick pick--${role}" id="${esc(role === 'quotidiano' ? 'quotidiano' : 'difficile')}">
-    <p class="pick__ruolo">${esc(titolo)}</p>
-    <h3 class="pick__modello">${esc(modelName(pick.model.displayName))}</h3>
-    <p class="pick__sintesi">${esc(c.home.perMonth('\u0000')).replace('\u0000', `<strong class="pick__prezzo">${esc(usd(pick.cost.totalUsd, lang))}</strong>`)}</p>
-    <p class="pick__prova">${esc(c.home.benchmark(formatScore(pick.quality.value, pick.quality.metric), pick.quality.metric === 'aa_coding_index' ? 'Coding Index' : metricLabel(pick.quality.metric), dateShort(pick.quality.measuredAt, lang)))}${pick.quality.metric === 'aa_coding_index' ? ` · <a href="${esc(pick.quality.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>` : ''}</p>
-    ${pick.cost.unquantifiedFees.length ? `<p class="allerta">${esc(c.home.incompleteEstimate)}</p>` : ''}
-    ${change?.moved ? `<p class="pick__cambio pick__cambio--mosso">${esc(change.text)}</p>` : ''}
-    <p class="pick__perche">${esc(pick.reason)}</p>
-    <details class="dettagli dettagli--azioni">
+  return `<article class="card pick pick--${role}" id="${esc(role)}">
+    <p class="pick__role">${esc(title)}</p>
+    <h3 class="pick__model">${esc(modelName(pick.model.displayName))}</h3>
+    <p class="pick__summary">${esc(c.home.perMonth('\u0000')).replace('\u0000', `<strong class="pick__price">${esc(usd(pick.cost.totalUsd, lang))}</strong>`)}</p>
+    <p class="pick__evidence">${esc(c.home.benchmark(formatScore(pick.quality.value, pick.quality.metric), pick.quality.metric === 'aa_coding_index' ? 'Coding Index' : metricLabel(pick.quality.metric), dateShort(pick.quality.measuredAt, lang)))}${pick.quality.metric === 'aa_coding_index' ? ` · <a href="${esc(pick.quality.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>` : ''}</p>
+    ${pick.cost.unquantifiedFees.length ? `<p class="alert">${esc(c.home.incompleteEstimate)}</p>` : ''}
+    ${change?.moved ? `<p class="pick__change pick__change--moved">${esc(change.text)}</p>` : ''}
+    <p class="pick__why">${esc(pick.reason)}</p>
+    <details class="details details--actions">
       <summary>${esc(c.home.detailsFor(modelName(pick.model.displayName)))}</summary>
-      <div class="dettagli__corpo">
-    <ol class="passi">
-      <li class="passo">
-        <span class="passo__testo">${esc(c.home.getKey(accountName(pick.offer)))}</span>
-        ${link ? `<a class="bottone bottone--contorno bottone--piccolo" href="${esc(link)}" target="_blank" rel="noopener">${esc(c.home.open)}</a>` : ''}
+      <div class="details__body">
+    <ol class="steps">
+      <li class="step">
+        <span class="step__text">${esc(c.home.getKey(accountName(pick.offer)))}</span>
+        ${link ? `<a class="button button--outline button--small" href="${esc(link)}" target="_blank" rel="noopener">${esc(c.home.open)}</a>` : ''}
       </li>
-      ${pick.offer.apiKeyEnv ? `<li class="passo">
-        <code class="passo__codice" id="key-${esc(role)}">export ${esc(pick.offer.apiKeyEnv)}="..."</code>
-        <button class="bottone bottone--contorno bottone--piccolo" type="button" data-copia="#key-${esc(role)}">${esc(c.home.copy)}</button>
+      ${pick.offer.apiKeyEnv ? `<li class="step">
+        <code class="step__code" id="key-${esc(role)}">export ${esc(pick.offer.apiKeyEnv)}="..."</code>
+        <button class="button button--outline button--small" type="button" data-copy="#key-${esc(role)}">${esc(c.home.copy)}</button>
       </li>` : ''}
-      ${conf.config ? `<li class="passo">
-        <span class="passo__testo">${esc(c.home.saveConfig(pick.offer.providerName))}</span>
-        <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">${esc(c.home.copyConfig)}</button>
+      ${conf.config ? `<li class="step">
+        <span class="step__text">${esc(c.home.saveConfig(pick.offer.providerName))}</span>
+        <button class="button button--small" type="button" data-copy="#config-${esc(role)}">${esc(c.home.copyConfig)}</button>
       </li>
-      <li class="passo passo--config">
-        <details class="dettagli dettagli--copia">
+      <li class="step step--config">
+        <details class="details details--copy">
           <summary>${esc(c.home.showConfig)}</summary>
-          <pre class="codice"><code id="config-${esc(role)}">${esc(conf.config)}</code></pre>
+          <pre class="code"><code id="config-${esc(role)}">${esc(conf.config)}</code></pre>
         </details>
-      </li>` : `<li class="passo">
-        <code class="passo__codice" id="config-${esc(role)}">${esc(conf.command)}</code>
-        <button class="bottone bottone--piccolo" type="button" data-copia="#config-${esc(role)}">${esc(c.home.copyCommand)}</button>
+      </li>` : `<li class="step">
+        <code class="step__code" id="config-${esc(role)}">${esc(conf.command)}</code>
+        <button class="button button--small" type="button" data-copy="#config-${esc(role)}">${esc(c.home.copyCommand)}</button>
       </li>`}
     </ol>
-    ${conf.pinNote ? `<p class="passi__nota">${esc(conf.pinNote)}</p>` : ''}
-    ${renderConfronto(pick, role, lang)}
-    ${renderDettagli(pick, lang, opencodeVersion)}
+    ${conf.pinNote ? `<p class="steps__note">${esc(conf.pinNote)}</p>` : ''}
+    ${renderComparison(pick, role, lang)}
+    ${renderDetails(pick, lang, opencodeVersion)}
       </div>
     </details>
   </article>`;
 }
 
 /** What the buttons at the top cannot say: your own usage and the model you use today. */
-function renderIpotesi(req: RecommendationRequest, rec: Recommendation | null, models: ModelRecord[], lang: Lang): string {
+function renderYourUsage(req: RecommendationRequest, rec: Recommendation | null, models: ModelRecord[], lang: Lang): string {
   const c = t(lang);
   const modelOptions = models
     .slice()
     .sort((a, b) => modelName(a.displayName).localeCompare(modelName(b.displayName)))
     .map((m) => option(m.key, modelName(m.displayName), req.currentModelKey ?? ''))
     .join('');
-  return `<details class="dettagli dettagli--ipotesi">
+  return `<details class="details details--usage">
     <summary>${esc(c.home.customise)}</summary>
-    <div class="dettagli__corpo">
+    <div class="details__body">
       ${rec ? `<p class="meta">${esc(c.home.scenarioNote(tokens(rec.mix.input, lang), tokens(rec.mix.output, lang), tokens(rec.mix.cacheRead, lang)))}</p>` : ''}
-      <form class="modulo" method="get" action="${esc(pagePath(lang, 'home'))}">
+      <form class="form" method="get" action="${esc(pagePath(lang, 'home'))}">
         <input type="hidden" name="task" value="${esc(req.task)}">
         <input type="hidden" name="priority" value="${esc(req.priority)}">
-        <div class="modulo__righe">
-          <div class="campo">
+        <div class="form__rows">
+          <div class="field">
             <label for="input">${esc(c.home.tokensIn)}</label>
             <input id="input" name="input" type="number" min="0" step="1" value="${req.usage?.input ?? ''}" placeholder="${esc(c.home.defaultValue)}">
           </div>
-          <div class="campo">
+          <div class="field">
             <label for="output">${esc(c.home.tokensOut)}</label>
             <input id="output" name="output" type="number" min="0" step="1" value="${req.usage?.output ?? ''}" placeholder="${esc(c.home.defaultValue)}">
           </div>
-          <div class="campo">
+          <div class="field">
             <label for="cacheRead">${esc(c.home.cacheRead)}</label>
             <input id="cacheRead" name="cacheRead" type="number" min="0" step="1" value="${req.usage?.cacheRead ?? ''}" placeholder="${esc(c.home.defaultValue)}">
           </div>
-          <div class="campo">
+          <div class="field">
             <label for="cacheWrite">${esc(c.home.cacheWrite)}</label>
             <input id="cacheWrite" name="cacheWrite" type="number" min="0" step="1" value="${req.usage?.cacheWrite ?? ''}" placeholder="${esc(c.home.defaultValue)}">
           </div>
-          <div class="campo">
+          <div class="field">
             <label for="currentModel">${esc(c.home.currentModel)}</label>
             <select id="currentModel" name="currentModel">
               <option value="">${esc(c.home.notSet)}</option>${modelOptions}
             </select>
           </div>
         </div>
-        <div class="modulo__azioni">
-          <button class="bottone bottone--piccolo" type="submit">${esc(c.home.recompute)}</button>
+        <div class="form__actions">
+          <button class="button button--small" type="submit">${esc(c.home.recompute)}</button>
         </div>
       </form>
     </div>
@@ -350,7 +350,7 @@ function renderIpotesi(req: RecommendationRequest, rec: Recommendation | null, m
 }
 
 /** One file that sets up both picks: no more copying one over the other. */
-function renderEntrambi(rec: Recommendation | null, lang: Lang): string {
+function renderBoth(rec: Recommendation | null, lang: Lang): string {
   const c = t(lang);
   if (!rec?.everyday || !rec.hard) return '';
   const config = buildOpenCodeConfig(
@@ -359,56 +359,56 @@ function renderEntrambi(rec: Recommendation | null, lang: Lang): string {
   );
   if (!config) return '';
   const query = new URLSearchParams({ task: rec.request.task, priority: rec.request.priority, lang }).toString();
-  return `<div class="scheda entrambi">
+  return `<div class="card both">
     <h3>${esc(c.home.bothTitle)}</h3>
     <p>${esc(c.home.bothIntro(config.everydayId, config.backupId ?? ''))}</p>
     ${(() => {
-      const senzaPin = [
+      const unpinned = [
         config.pinned.everyday ? null : config.everydayId,
         config.pinned.hard ? null : config.backupId,
       ].filter(Boolean) as string[];
-      return senzaPin.length
-        ? `<p class="allerta">${esc(c.home.bothNotPinned(senzaPin.join(', ')))}</p>`
+      return unpinned.length
+        ? `<p class="alert">${esc(c.home.bothNotPinned(unpinned.join(', ')))}</p>`
         : `<p class="meta">${esc(c.home.bothPinned)}</p>`;
     })()}
-    <details class="anteprima anteprima--grande">
+    <details class="preview preview--large">
       <summary>${esc(c.home.showPreview)}</summary>
-      <pre class="codice"><code id="config-entrambi">${esc(config.json)}</code></pre>
+      <pre class="code"><code id="config-both">${esc(config.json)}</code></pre>
     </details>
-    <p class="modulo__azioni">
-      <button class="bottone" type="button" data-copia="#config-entrambi">${esc(c.home.copyConfig)}</button>
-      <a class="bottone bottone--contorno" href="/opencode.json?${esc(query)}">${esc(c.home.download)}</a>
+    <p class="form__actions">
+      <button class="button" type="button" data-copy="#config-both">${esc(c.home.copyConfig)}</button>
+      <a class="button button--outline" href="/opencode.json?${esc(query)}">${esc(c.home.download)}</a>
     </p>
     <p class="meta">${esc(c.home.bothSwitch(config.backupId ?? ''))}</p>
   </div>`;
 }
 
 /** Whatever model the user declared, they get an answer about it. */
-function renderAttuale(rec: Recommendation | null, lang: Lang): string {
+function renderCurrentModel(rec: Recommendation | null, lang: Lang): string {
   const c = t(lang);
   const s = rec?.savings;
   if (!s) return '';
-  const nome = s.currentModelName ? modelName(s.currentModelName) : '';
-  const corpo =
+  const name = s.currentModelName ? modelName(s.currentModelName) : '';
+  const body =
     s.outcome === 'compared' && s.deltaUsd !== null
       ? c.home.comparison(s.currentProviderName ? esc(s.currentProviderName) : null, esc(usd(Math.abs(s.deltaUsd), lang)), s.deltaUsd > 0)
       : s.outcome === 'already-recommended'
-        ? `${esc(c.home.currentSame(nome))}${s.currentTotalUsd !== null ? ` ${esc(c.home.currentSamePrice(usd(s.currentTotalUsd, lang)))}` : ''}`
+        ? `${esc(c.home.currentSame(name))}${s.currentTotalUsd !== null ? ` ${esc(c.home.currentSamePrice(usd(s.currentTotalUsd, lang)))}` : ''}`
         : s.outcome === 'no-seller'
-          ? esc(c.home.currentNoSeller(nome))
+          ? esc(c.home.currentNoSeller(name))
           : s.outcome === 'no-evidence'
-            ? esc(c.home.currentNoEvidence(nome))
+            ? esc(c.home.currentNoEvidence(name))
             : s.outcome === 'no-price'
-              ? esc(c.home.currentNoPrice(nome))
+              ? esc(c.home.currentNoPrice(name))
               : esc(c.home.currentUnknown);
-  return `<div class="risparmio risparmio--${s.outcome}">
-    <p class="risparmio__titolo">${esc(c.home.currentTitle)}</p>
-    <p>${corpo}</p>
+  return `<div class="savings savings--${s.outcome}">
+    <p class="savings__title">${esc(c.home.currentTitle)}</p>
+    <p>${body}</p>
   </div>`;
 }
 
 /** Same page, one parameter changed: the controls are links, so they work without JavaScript. */
-const conParametri = (req: RecommendationRequest, lang: Lang, cambio: Record<string, string>): string => {
+const withParams = (req: RecommendationRequest, lang: Lang, overrides: Record<string, string>): string => {
   const q = new URLSearchParams();
   if (req.task) q.set('task', req.task);
   if (req.priority) q.set('priority', req.priority);
@@ -416,39 +416,39 @@ const conParametri = (req: RecommendationRequest, lang: Lang, cambio: Record<str
     input: req.usage?.input, output: req.usage?.output, cacheRead: req.usage?.cacheRead, cacheWrite: req.usage?.cacheWrite,
   })) if (v !== undefined && v !== null) q.set(k, String(v));
   if (req.currentModelKey) q.set('currentModel', req.currentModelKey);
-  for (const [k, v] of Object.entries(cambio)) q.set(k, v);
+  for (const [k, v] of Object.entries(overrides)) q.set(k, v);
   return `${pagePath(lang, 'home')}?${q.toString()}`;
 };
 
 /** The answer first: what to use today, what it costs, and how the two compare. */
-function renderRisposta(rec: Recommendation | null, snapshot: Snapshot | null, req: RecommendationRequest, lang: Lang): string {
+function renderAnswer(rec: Recommendation | null, snapshot: Snapshot | null, req: RecommendationRequest, lang: Lang): string {
   const c = t(lang);
-  const barra = (p: Pick | null) =>
+  const bar = (p: Pick | null) =>
     p
-      ? `<div class="barra-gruppo">
-          <div class="barra" role="img" aria-label="${esc(c.home.qualityBar(formatScore(p.quality.value, p.quality.metric, 0)))}">
-            <span class="barra__riempimento" style="width:${Math.max(2, Math.min(100, p.quality.value))}%"></span>
+      ? `<div class="bar-group">
+          <div class="bar" role="img" aria-label="${esc(c.home.qualityBar(formatScore(p.quality.value, p.quality.metric, 0)))}">
+            <span class="bar__fill" style="width:${Math.max(2, Math.min(100, p.quality.value))}%"></span>
           </div>
-          <p class="barra__etichetta">${esc(modelName(p.model.displayName))} · ${esc(formatScore(p.quality.value, p.quality.metric, 0))}</p>
+          <p class="bar__label">${esc(modelName(p.model.displayName))} · ${esc(formatScore(p.quality.value, p.quality.metric, 0))}</p>
         </div>`
       : '';
-  const ora = snapshot ? new Date(snapshot.generatedAt).toLocaleTimeString(lang === 'en' ? 'en-GB' : 'it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' }) : '';
-  return `<section class="risposta">
-  <div class="contenitore">
-    <h1 class="risposta__titolo">${esc(c.home.title)}</h1>
+  const time = snapshot ? new Date(snapshot.generatedAt).toLocaleTimeString(lang === 'en' ? 'en-GB' : 'it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' }) : '';
+  return `<section class="answer">
+  <div class="container">
+    <h1 class="answer__title">${esc(c.home.title)}</h1>
     ${rec?.everyday
-      ? `<p class="risposta__riga">${esc(c.home.answer(modelName(rec.everyday.model.displayName), usd(rec.everyday.cost.totalUsd, lang)))}
-         ${rec.hard ? `<span class="risposta__riga--due">${esc(c.home.answerHard(modelName(rec.hard.model.displayName), usd(rec.hard.cost.totalUsd, lang)))} <a href="#difficile">${esc(c.home.jumpHard)}</a></span>` : ''}</p>
-         <div class="barre">${barra(rec.everyday)}${barra(rec.hard)}</div>`
-      : `<p class="risposta__riga">${esc(c.home.answerNone)}</p>`}
-    <p class="risposta__data">${snapshot ? esc(c.home.updatedAt(ora)) : esc(c.home.noData)}</p>
-    <div class="scelte">
-      <span class="scelte__etichetta">${esc(c.home.priority)}</span>
-      ${PRIORITIES.map((p) => `<a class="scelta${p === req.priority ? ' scelta--attiva' : ''}" href="${esc(conParametri(req, lang, { priority: p }))}"${p === req.priority ? ' aria-current="true"' : ''}>${esc(c.priorities[p] ?? p)}</a>`).join('')}
+      ? `<p class="answer__line">${esc(c.home.answer(modelName(rec.everyday.model.displayName), usd(rec.everyday.cost.totalUsd, lang)))}
+         ${rec.hard ? `<span class="answer__line--second">${esc(c.home.answerHard(modelName(rec.hard.model.displayName), usd(rec.hard.cost.totalUsd, lang)))} <a href="#hard">${esc(c.home.jumpHard)}</a></span>` : ''}</p>
+         <div class="bars">${bar(rec.everyday)}${bar(rec.hard)}</div>`
+      : `<p class="answer__line">${esc(c.home.answerNone)}</p>`}
+    <p class="answer__date">${snapshot ? esc(c.home.updatedAt(time)) : esc(c.home.noData)}</p>
+    <div class="choices">
+      <span class="choices__label">${esc(c.home.priority)}</span>
+      ${PRIORITIES.map((p) => `<a class="choice${p === req.priority ? ' choice--active' : ''}" href="${esc(withParams(req, lang, { priority: p }))}"${p === req.priority ? ' aria-current="true"' : ''}>${esc(c.priorities[p] ?? p)}</a>`).join('')}
     </div>
-    <div class="scelte">
-      <span class="scelte__etichetta">${esc(c.home.workType)}</span>
-      ${TASK_IDS.map((t2) => `<a class="scelta${t2 === req.task ? ' scelta--attiva' : ''}" href="${esc(conParametri(req, lang, { task: t2 }))}"${t2 === req.task ? ' aria-current="true"' : ''}>${esc(c.tasks[t2] ?? SCENARIOS[t2].label)}</a>`).join('')}
+    <div class="choices">
+      <span class="choices__label">${esc(c.home.workType)}</span>
+      ${TASK_IDS.map((t2) => `<a class="choice${t2 === req.task ? ' choice--active' : ''}" href="${esc(withParams(req, lang, { task: t2 }))}"${t2 === req.task ? ' aria-current="true"' : ''}>${esc(c.tasks[t2] ?? SCENARIOS[t2].label)}</a>`).join('')}
     </div>
   </div>
 </section>`;
@@ -467,21 +467,21 @@ export function homePage(opts: {
   const stale = rec?.method.snapshotStale ?? false;
 
   const body = `
-${renderRisposta(rec, snapshot, request, lang)}
+${renderAnswer(rec, snapshot, request, lang)}
 
-<section class="sezione">
-  <div class="contenitore">
-    ${!snapshot ? `<div class="avviso avviso--errore">${esc(c.home.noData)}</div>` : ''}
-    ${stale ? `<div class="avviso">${esc(c.home.stale)}</div>` : ''}
-    ${rec?.notes.map((n) => `<div class="avviso">${esc(n)}</div>`).join('') ?? ''}
-    ${renderAttuale(rec, lang)}
-    <div class="risultati">
-      ${renderPick(rec?.everyday ?? null, 'quotidiano', changes.everyday, lang, c.home.noEveryday, snapshot?.opencodeVersion ?? null)}
-      ${renderPick(rec?.hard ?? null, 'difficile', changes.hard, lang, c.home.noHard, snapshot?.opencodeVersion ?? null)}
+<section class="section">
+  <div class="container">
+    ${!snapshot ? `<div class="notice notice--error">${esc(c.home.noData)}</div>` : ''}
+    ${stale ? `<div class="notice">${esc(c.home.stale)}</div>` : ''}
+    ${rec?.notes.map((n) => `<div class="notice">${esc(n)}</div>`).join('') ?? ''}
+    ${renderCurrentModel(rec, lang)}
+    <div class="results">
+      ${renderPick(rec?.everyday ?? null, 'everyday', changes.everyday, lang, c.home.noEveryday, snapshot?.opencodeVersion ?? null)}
+      ${renderPick(rec?.hard ?? null, 'hard', changes.hard, lang, c.home.noHard, snapshot?.opencodeVersion ?? null)}
     </div>
-    ${renderEntrambi(rec, lang)}
-    <div class="coda">
-      ${renderIpotesi(request, rec, models, lang)}
+    ${renderBoth(rec, lang)}
+    <div class="tail">
+      ${renderYourUsage(request, rec, models, lang)}
     </div>
   </div>
 </section>
@@ -498,12 +498,12 @@ ${renderRisposta(rec, snapshot, request, lang)}
 /** A wrong address still gets the site: header, menu and a way back. */
 export function notFoundPage(lang: Lang): string {
   const c = t(lang);
-  const body = `<section class="sezione">
-  <div class="contenitore">
+  const body = `<section class="section">
+  <div class="container">
     <h1>${esc(c.notFound.title)}</h1>
-    <div class="scheda">
+    <div class="card">
       <p>${esc(c.notFound.message)}</p>
-      <p><a class="bottone" href="${esc(pagePath(lang, 'home'))}">${esc(c.notFound.back)}</a></p>
+      <p><a class="button" href="${esc(pagePath(lang, 'home'))}">${esc(c.notFound.back)}</a></p>
     </div>
   </div>
 </section>`;
@@ -513,7 +513,7 @@ export function notFoundPage(lang: Lang): string {
 export function methodPage(lang: Lang): string {
   const c = t(lang);
   const m = c.method;
-  const soglie: [string, string][] = [
+  const thresholds: [string, string][] = [
     [String(THRESHOLDS.offerStaleHours), lang === 'en' ? 'hours: a price older than this cannot win' : 'ore: un prezzo più vecchio non può vincere'],
     [String(THRESHOLDS.snapshotStaleHours), lang === 'en' ? 'hours: the data is flagged as out of date' : 'ore: i dati vengono segnalati come obsoleti'],
     [String(THRESHOLDS.evidenceMaxAgeDays), lang === 'en' ? 'days: an older quality measurement is not used' : 'giorni: una misura di qualità più vecchia non viene usata'],
@@ -523,17 +523,17 @@ export function methodPage(lang: Lang): string {
     [`${THRESHOLDS.minUptime30m}%`, lang === 'en' ? 'minimum recent availability' : 'disponibilità recente minima'],
     [String(THRESHOLDS.backupQualityGapPoints), lang === 'en' ? 'points the backup must add' : 'punti che il modello di riserva deve aggiungere'],
   ];
-  const body = `<section class="sezione">
-  <div class="contenitore">
+  const body = `<section class="section">
+  <div class="container">
     <h1>${esc(m.title)}</h1>
     <p>${esc(m.intro)}</p>
-    <div class="scheda" style="margin-bottom:20px"><h2>${esc(m.orderTitle)}</h2><ol class="elenco">${m.order.map((x) => `<li>${x}</li>`).join('')}</ol></div>
-    <div class="scheda" style="margin-bottom:20px"><h2>${esc(m.notTitle)}</h2><ul class="elenco">${m.not.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
-    <div class="scheda" style="margin-bottom:20px"><h2>${esc(m.thresholdsTitle)}</h2>
-      <table class="tabella"><tbody>${soglie.map(([v, d]) => `<tr><td class="num"><strong>${esc(v)}</strong></td><td>${esc(d)}</td></tr>`).join('')}</tbody></table>
+    <div class="card" style="margin-bottom:20px"><h2>${esc(m.orderTitle)}</h2><ol class="list">${m.order.map((x) => `<li>${x}</li>`).join('')}</ol></div>
+    <div class="card" style="margin-bottom:20px"><h2>${esc(m.notTitle)}</h2><ul class="list">${m.not.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+    <div class="card" style="margin-bottom:20px"><h2>${esc(m.thresholdsTitle)}</h2>
+      <table class="table"><tbody>${thresholds.map(([v, d]) => `<tr><td class="num"><strong>${esc(v)}</strong></td><td>${esc(d)}</td></tr>`).join('')}</tbody></table>
     </div>
-    <div class="scheda" style="margin-bottom:20px"><h2>${esc(m.missingTitle)}</h2><p>${esc(m.missing)}</p></div>
-    <div class="scheda"><h2>${esc(m.limitsTitle)}</h2><ul class="elenco">${m.limits.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+    <div class="card" style="margin-bottom:20px"><h2>${esc(m.missingTitle)}</h2><p>${esc(m.missing)}</p></div>
+    <div class="card"><h2>${esc(m.limitsTitle)}</h2><ul class="list">${m.limits.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
   </div>
 </section>`;
   return layout({ lang, title: `${m.title} — ${SITE.name}`, description: m.intro, body, active: 'method' });
@@ -548,28 +548,28 @@ export function sourcesPage(snapshot: Snapshot | null, lang: Lang): string {
   const rows = SOURCES.map((cfg) => {
     const st = statuses.get(cfg.id);
     const state = !cfg.enabled
-      ? `<span class="etichetta etichetta--attenzione">${esc(c.sources.off)}</span>`
+      ? `<span class="label label--warning">${esc(c.sources.off)}</span>`
       : st?.outcome === 'ok'
-        ? `<span class="etichetta etichetta--ok">${esc(c.sources.active)}</span>`
+        ? `<span class="label label--ok">${esc(c.sources.active)}</span>`
         : st
-          ? `<span class="etichetta etichetta--attenzione">${esc(c.sources.failed)}</span>`
-          : `<span class="etichetta etichetta--info">${esc(c.sources.never)}</span>`;
+          ? `<span class="label label--warning">${esc(c.sources.failed)}</span>`
+          : `<span class="label label--info">${esc(c.sources.never)}</span>`;
     const [, colState, colLicence, colNote, colCount] = c.sources.cols;
-    const testi = lang === 'en' ? cfg.en : cfg;
+    const texts = lang === 'en' ? cfg.en : cfg;
     return `<tr>
-      <td class="pila__titolo"><a href="${esc(cfg.url)}" rel="noopener">${esc(cfg.name)}</a></td>
-      <td data-etichetta="${esc(colState)}">${state}</td>
-      <td data-etichetta="${esc(colLicence)}">${esc(testi.licence)}</td>
-      <td data-etichetta="${esc(colNote)}">${esc(testi.note ?? testi.attribution)}</td>
-      <td class="num" data-etichetta="${esc(colCount)}">${esc(st ? f.n.format(st.itemCount) : '—')}</td>
+      <td class="stack__title"><a href="${esc(cfg.url)}" rel="noopener">${esc(cfg.name)}</a></td>
+      <td data-label="${esc(colState)}">${state}</td>
+      <td data-label="${esc(colLicence)}">${esc(texts.licence)}</td>
+      <td data-label="${esc(colNote)}">${esc(texts.note ?? texts.attribution)}</td>
+      <td class="num" data-label="${esc(colCount)}">${esc(st ? f.n.format(st.itemCount) : '—')}</td>
     </tr>`;
   }).join('');
 
-  const body = `<section class="sezione">
-  <div class="contenitore">
+  const body = `<section class="section">
+  <div class="container">
     <h1>${esc(c.sources.title)}</h1>
-    <div class="scheda">
-      <table class="tabella tabella--pila">
+    <div class="card">
+      <table class="table table--stack">
         <thead><tr>${c.sources.cols.map((h, i) => `<th${i === 4 ? ' class="num"' : ''}>${esc(h)}</th>`).join('')}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -584,27 +584,27 @@ export function statusPage(snapshot: Snapshot | null, status: RunStatus | null, 
   const f = fmt(lang);
   const sources = (snapshot?.sources ?? [])
     .map((s) => `<tr>
-        <td class="pila__titolo">${esc(s.name)}</td>
-        <td data-etichetta="${esc(c.status.cols[1])}">${esc(s.outcome)}</td>
-        <td class="num" data-etichetta="${esc(c.status.cols[2])}">${esc(f.n.format(s.itemCount))}</td>
-        <td data-etichetta="${esc(c.status.cols[3])}">${s.error ? esc(s.error) : s.servedFromCache ? esc(c.status.reused(s.dataAgeHours !== null ? f.n2.format(s.dataAgeHours) + ' h' : '—')) : '—'}</td>
-        <td class="num" data-etichetta="${esc(c.status.cols[4])}">${s.durationMs !== null ? esc(c.status.duration(f.n.format(s.durationMs))) : '—'}</td>
+        <td class="stack__title">${esc(s.name)}</td>
+        <td data-label="${esc(c.status.cols[1])}">${esc(s.outcome)}</td>
+        <td class="num" data-label="${esc(c.status.cols[2])}">${esc(f.n.format(s.itemCount))}</td>
+        <td data-label="${esc(c.status.cols[3])}">${s.error ? esc(s.error) : s.servedFromCache ? esc(c.status.reused(s.dataAgeHours !== null ? f.n2.format(s.dataAgeHours) + ' h' : '—')) : '—'}</td>
+        <td class="num" data-label="${esc(c.status.cols[4])}">${s.durationMs !== null ? esc(c.status.duration(f.n.format(s.durationMs))) : '—'}</td>
       </tr>`)
     .join('');
 
-  const body = `<section class="sezione">
-  <div class="contenitore">
+  const body = `<section class="section">
+  <div class="container">
     <h1>${esc(c.status.title)}</h1>
     <p>${esc(c.status.intro)}</p>
-    ${status ? `<div class="scheda" style="margin-bottom:20px">
-      <p><strong>${esc(c.status.lastRun(dateLong(status.finishedAt, lang)))}</strong> — ${status.ok ? `<span class="etichetta etichetta--ok">${esc(c.status.ok)}</span>` : `<span class="etichetta etichetta--attenzione">${esc(c.status.problems)}</span>`} ${status.published ? `<span class="etichetta etichetta--ok">${esc(c.status.published)}</span>` : `<span class="etichetta etichetta--attenzione">${esc(c.status.notPublished)}</span>`}</p>
+    ${status ? `<div class="card" style="margin-bottom:20px">
+      <p><strong>${esc(c.status.lastRun(dateLong(status.finishedAt, lang)))}</strong> — ${status.ok ? `<span class="label label--ok">${esc(c.status.ok)}</span>` : `<span class="label label--warning">${esc(c.status.problems)}</span>`} ${status.published ? `<span class="label label--ok">${esc(c.status.published)}</span>` : `<span class="label label--warning">${esc(c.status.notPublished)}</span>`}</p>
       <p>${esc(status.message)}</p>
-      ${status.warnings.length ? `<details class="dettagli"><summary>${esc(c.status.warnings(status.warnings.length))}</summary><div class="dettagli__corpo"><ul class="elenco">${status.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div></details>` : ''}
-    </div>` : `<div class="avviso">${esc(c.status.never)}</div>`}
-    ${snapshot ? `<div class="scheda">
+      ${status.warnings.length ? `<details class="details"><summary>${esc(c.status.warnings(status.warnings.length))}</summary><div class="details__body"><ul class="list">${status.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div></details>` : ''}
+    </div>` : `<div class="notice">${esc(c.status.never)}</div>`}
+    ${snapshot ? `<div class="card">
       <h2>${esc(c.status.dataTitle)}</h2>
       <p class="meta">${esc(dateLong(snapshot.generatedAt, lang))}</p>
-      <table class="tabella tabella--pila">
+      <table class="table table--stack">
         <thead><tr>${c.status.cols.map((h, i) => `<th${i === 2 || i === 4 ? ' class="num"' : ''}>${esc(h)}</th>`).join('')}</tr></thead>
         <tbody>${sources}</tbody>
       </table>

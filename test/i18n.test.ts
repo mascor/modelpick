@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { LANGS, t, pagePath, otherLang, isLang } from '../src/i18n.js';
 
 test('every language has the same set of keys', () => {
-  const chiavi = (o: unknown, prefisso = ''): string[] => {
-    if (o === null || typeof o !== 'object') return [prefisso];
+  const keys = (o: unknown, prefix = ''): string[] => {
+    if (o === null || typeof o !== 'object') return [prefix];
     return Object.entries(o as Record<string, unknown>).flatMap(([k, v]) =>
-      typeof v === 'function' || Array.isArray(v) ? [`${prefisso}.${k}`] : chiavi(v, `${prefisso}.${k}`),
+      typeof v === 'function' || Array.isArray(v) ? [`${prefix}.${k}`] : keys(v, `${prefix}.${k}`),
     );
   };
-  const it = chiavi(t('it')).sort();
-  const en = chiavi(t('en')).sort();
+  const it = keys(t('it')).sort();
+  const en = keys(t('en')).sort();
   assert.deepEqual(en, it, 'the English catalogue must have the same keys as the Italian one');
 });
 
