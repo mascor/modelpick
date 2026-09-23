@@ -98,8 +98,8 @@ export function breakEven(
  */
 export type PlanVerdict = 'plan' | 'direct' | 'not-enough' | 'even';
 
-/** Differences below this are noise next to the estimates they come from. */
-export const EVEN_USD = 0.5;
+/** Differences up to this are a tie: noise next to the estimates they come from. */
+export const EVEN_USD = 0.1;
 
 export interface PlanRow {
   planModelId: string;
@@ -152,9 +152,17 @@ export interface ChoiceOption {
 export interface PlanChoice {
   budgetUsd: number;
   recommended: ChoiceOption | null;
+  /** The highest score within budget, the reference the CLOSE_POINTS rule counts from. */
+  top: ChoiceOption | null;
   alternative: ChoiceOption | null;
   /** Options compared, both kinds. */
   compared: number;
+}
+
+/** The highest-scoring option within budget (the cheaper one on equal scores). */
+export function topWithin(options: ChoiceOption[], budgetUsd: number): ChoiceOption | null {
+  const within = options.filter((o) => o.costUsd <= budgetUsd + 1e-9);
+  return within.sort((a, b) => b.quality.value - a.quality.value || a.costUsd - b.costUsd)[0] ?? null;
 }
 
 export function chooseWithin(options: ChoiceOption[], budgetUsd: number): ChoiceOption | null {
@@ -320,7 +328,7 @@ export function comparePlan(snapshot: Snapshot, planId: string, req: Recommendat
     plan,
     mix,
     rows,
-    choice: { budgetUsd: plan.monthlyFeeUsd, recommended, alternative, compared: perToken.length + onPlan.length },
+    choice: { budgetUsd: plan.monthlyFeeUsd, recommended, top: topWithin([...perToken, ...onPlan], plan.monthlyFeeUsd), alternative, compared: perToken.length + onPlan.length },
     stale: checkedAgeDays === null || checkedAgeDays > THRESHOLDS.planMaxAgeDays,
     checkedAgeDays,
     summary: {

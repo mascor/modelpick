@@ -185,3 +185,30 @@ test('an expired promotion is never shown or applied', async () => {
   s.plans![0]!.models.m!.capUsd = 3;
   assert.equal(comparePlan(s, 'go', req)!.rows.find((r) => r.planModelId === 'm')!.verdict, 'not-enough');
 });
+
+test('a difference of up to 10 cents is a tie, a larger one is not', async () => {
+  const { EVEN_USD } = await import('../src/engine/plans.js');
+  assert.equal(EVEN_USD, 0.1);
+  const s = fixture();
+  // The provider month: 1M in + 1M out at the same price p costs 2p.
+  const at = (usdMonth: number) => {
+    for (const id of ['cheap', 'dear']) s.offers.find((o) => o.id === id)!.prices = { inputPerMTok: usdMonth / 2, outputPerMTok: usdMonth / 2, cacheReadPerMTok: null, cacheWritePerMTok: null };
+    return comparePlan(s, 'go', req)!.rows.find((r) => r.planModelId === 'm')!.verdict;
+  };
+  assert.equal(at(10.05), 'even');
+  assert.equal(at(9.85), 'direct');
+  assert.equal(at(10.2), 'plan');
+});
+
+test('the choice names the top option the 3-point rule counts from', () => {
+  const s = fixture();
+  // Top: 74 at 9 USD. Close and cheaper: 72 at 1 USD, which wins.
+  for (const [key, score, price] of [['a/top', 74, 4.5], ['b/close', 72, 0.5]] as const) {
+    s.models[key] = model(key);
+    s.offers.push(offer({ id: key, modelKey: key, providerId: `p-${key}`, opencodeVerified: true, prices: { inputPerMTok: price, outputPerMTok: price, cacheReadPerMTok: null, cacheWritePerMTok: null } }));
+    s.evidence.push(evidence(key, score));
+  }
+  const { recommended, top } = comparePlan(s, 'go', req)!.choice;
+  assert.equal(top?.modelKey, 'a/top');
+  assert.equal(recommended?.modelKey, 'b/close');
+});

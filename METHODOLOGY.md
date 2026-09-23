@@ -121,7 +121,7 @@ Beyond the allowance the plan stops unless "Use balance" is enabled; with it, Op
 
 **Intensity.** `?intensity=light|standard|heavy` multiplies the scenario's tokens by 0.5, 1 or 2 (stated assumptions, not measurements) for every option alike, Go's allowance included. Usage the user supplies is never scaled.
 
-**Limits and promotions.** Where the allowance lasts the month, the page says "estimated monthly coverage; short-term limits may interrupt you": the 5-hour and weekly windows are shown, not modelled. Promotions from the documentation are stored with their last day (`promotions` in `plans.json`), shown next to the model with that date, hidden once expired, and never used in the monthly figures.
+**Limits and promotions.** Where the estimated monthly usage fits the allowance, the page says so and adds that the 5-hour and weekly limits still apply: the 5-hour and weekly windows are shown, not modelled. Promotions from the documentation are stored with their last day (`promotions` in `plans.json`), shown next to the model with that date, hidden once expired, and never used in the monthly figures.
 
 **When the plan pays off.** Both bills grow with the amount of work: the provider's in a straight line, the plan's flat up to the allowance and then at `O`. The page gives the range of monthly spend at the provider in which the plan costs less:
 
