@@ -201,14 +201,15 @@ export interface Catalog {
     perMonth: (amount: string) => string;
     onPlan: string;
     perToken: (provider: string) => string;
-    whyRecommended: (budget: string, points: string) => string;
+    whyRecommended: (budget: string) => string;
+    whyClose: (budget: string, top: string, score: string, cost: string, model: string, points: string) => string;
     whyAltPlan: string;
     whyAltToken: (budget: string) => string;
     versus: (points: string, more: boolean, amount: string) => string;
     noAltPlan: string;
     noAltToken: (budget: string) => string;
-    limits: (cap: string, five: string, week: string) => string;
-    shortWindows: string;
+    fits: (cap: string, five: string, week: string) => string;
+    fitsCap: string;
     promo: (mult: string, until: string) => string;
     checked: (date: string) => string;
     winnersTitle: string;
@@ -230,7 +231,7 @@ export interface Catalog {
     moreTitle: (n: number) => string;
     unmeasured: string;
     howTitle: string;
-    how: (task: string, fee: string, five: string, week: string) => string[];
+    how: (task: string, intensity: string, fee: string, five: string, week: string) => string[];
     setup: string;
     source: (date: string) => string;
     stale: (days: string) => string;
@@ -487,14 +488,15 @@ const it: Catalog = {
     perMonth: (a) => `${a} al mese stimati`,
     onPlan: 'su OpenCode Go',
     perToken: (p) => `a consumo, da ${p}`,
-    whyRecommended: (b, pts) => `Il Coding Index più alto fra tutte le opzioni che costano al massimo ${b} al mese, il prezzo di Go; a parità (entro ${pts} punti) vince la più economica.`,
-    whyAltPlan: 'Se vuoi Go: il modello migliore per cui l\'abbonamento costa meno che pagarlo a consumo, e il tetto basta per tutto il mese.',
+    whyRecommended: (b) => `Il Coding Index più alto fra tutte le opzioni che costano al massimo ${b} al mese, il prezzo di Go.`,
+    whyClose: (b, top, sc, cost, m, pts) => `Il punteggio più alto entro ${b} è ${top} (${sc}, ${cost}); ${m} è entro ${pts} punti e costa meno.`,
+    whyAltPlan: 'Se vuoi Go: il modello migliore per cui l\'abbonamento costa meno che pagarlo a consumo.',
     whyAltToken: (b) => `La migliore opzione a consumo entro ${b} al mese.`,
     versus: (pts, more, a) => `Rispetto alla scelta consigliata: ${pts} punti in meno e ${a} ${more ? 'in più' : 'in meno'} al mese.`,
     noAltPlan: 'Con Go nessun modello costa meno che pagarlo a consumo per un mese di questo lavoro, a questa intensità.',
     noAltToken: (b) => `Nessuna opzione a consumo entro ${b} al mese.`,
-    limits: (cap, five, week) => `Tetto del modello: ${cap} al mese ai prezzi di Go; al massimo il ${five}% in 5 ore e il ${week}% in una settimana.`,
-    shortWindows: 'Copertura mensile stimata; possibili interruzioni per i limiti di breve periodo.',
+    fits: (cap, five, week) => `Il consumo mensile stimato rientra nel tetto del modello (${cap} ai prezzi di Go); restano i limiti delle 5 ore (${five}%) e settimanali (${week}%).`,
+    fitsCap: 'il consumo stimato rientra nel tetto',
     promo: (m, u) => `Promozione temporanea: tetto ×${m} fino al ${u}, non inclusa nella stima del mese.`,
     checked: (d) => `Condizioni verificate il ${d}.`,
     winnersTitle: 'Go conviene rispetto a pagare a consumo gli stessi modelli',
@@ -505,7 +507,7 @@ const it: Catalog = {
     cols: ['Modello', 'Qualità', 'Con Go', 'A consumo', 'Conviene'],
     goWins: (a) => `Go, risparmi ${a}`,
     payWins: (a) => `A consumo, risparmi ${a}`,
-    even: 'Costano uguale',
+    even: 'Costo equivalente',
     lasts: (p) => `basta per il ${p} del mese`,
     notEnough: (p) => `Go non basta: copre il ${p} del mese`,
     noDirect: 'nessun provider',
@@ -516,9 +518,9 @@ const it: Catalog = {
     moreTitle: (n) => `Altri ${n} modelli di Go, non ancora misurati o non utilizzabili oggi`,
     unmeasured: 'non misurato',
     howTitle: 'Come facciamo il conto',
-    how: (task, fee, five, week) => [
-      `Un mese di ${task} di una persona che usa un agente di codice ogni giorno: lo stesso scenario della pagina principale.`,
-      `Con Go paghi ${fee} al mese e ogni modello ha un tetto mensile (15, 30 o 60 USD ai prezzi di listino di Go). Diciamo che Go conviene solo se il tetto basta per tutto il mese: se finisce prima, Go si ferma, e il resto andrebbe pagato a consumo su OpenCode Zen («Use balance»), che non è l'abbonamento.`,
+    how: (task, i, fee, five, week) => [
+      `Un mese di ${task}, ${i}: le stesse ipotesi della pagina principale.`,
+      `Con Go paghi ${fee} al mese e ogni modello ha un tetto mensile (15, 30 o 60 USD ai prezzi di listino di Go). Diciamo che Go conviene solo se il consumo mensile stimato rientra nel tetto: se lo supera, Go si ferma, e il resto andrebbe pagato a consumo su OpenCode Zen («Use balance»), che non è l'abbonamento.`,
       'A consumo: il provider più economico che consigliamo per lo stesso modello, commissioni incluse.',
       `Ogni riga considera un solo modello alla volta. In 5 ore puoi usare al massimo il ${five}% del tetto, in una settimana il ${week}%. Per DeepSeek usiamo i prezzi delle ore di punta.`,
       'Un solo abbonato per workspace, e Go è pensato per un agente di codice, non per le chiamate API di una tua applicazione.',
@@ -784,14 +786,15 @@ const en: Catalog = {
     perMonth: (a) => `${a} estimated per month`,
     onPlan: 'on OpenCode Go',
     perToken: (p) => `pay per token, at ${p}`,
-    whyRecommended: (b, pts) => `The highest Coding Index among all the options costing at most ${b} a month, Go's price; within ${pts} points they count as equal and the cheapest wins.`,
-    whyAltPlan: 'If you want Go: the best model for which the subscription costs less than paying for it per token, and the allowance lasts the whole month.',
+    whyRecommended: (b) => `The highest Coding Index among all the options costing at most ${b} a month, Go's price.`,
+    whyClose: (b, top, sc, cost, m, pts) => `The highest score within ${b} is ${top} (${sc}, ${cost}); ${m} is within ${pts} points and costs less.`,
+    whyAltPlan: 'If you want Go: the best model for which the subscription costs less than paying for it per token.',
     whyAltToken: (b) => `The best pay-per-token option within ${b} a month.`,
     versus: (pts, more, a) => `Against the recommended choice: ${pts} points lower and ${a} ${more ? 'more' : 'less'} a month.`,
     noAltPlan: 'On Go no model costs less than paying for it per token for a month of this work at this intensity.',
     noAltToken: (b) => `No pay-per-token option within ${b} a month.`,
-    limits: (cap, five, week) => `Model allowance: ${cap} a month at Go's prices; at most ${five}% in 5 hours and ${week}% in a week.`,
-    shortWindows: 'Estimated monthly coverage; short-term limits may interrupt you.',
+    fits: (cap, five, week) => `The estimated monthly usage fits the model's allowance (${cap} at Go's prices); the 5-hour (${five}%) and weekly (${week}%) limits still apply.`,
+    fitsCap: 'estimated usage fits the allowance',
     promo: (m, u) => `Temporary promotion: allowance ×${m} until ${u}, not included in the monthly estimate.`,
     checked: (d) => `Terms checked on ${d}.`,
     winnersTitle: 'Go beats paying per token for these same models',
@@ -802,7 +805,7 @@ const en: Catalog = {
     cols: ['Model', 'Quality', 'On Go', 'Pay per token', 'Better deal'],
     goWins: (a) => `Go, you save ${a}`,
     payWins: (a) => `Per token, you save ${a}`,
-    even: 'Same cost',
+    even: 'Equivalent cost',
     lasts: (p) => `lasts ${p} of the month`,
     notEnough: (p) => `Go is not enough: it covers ${p} of the month`,
     noDirect: 'no provider',
@@ -813,9 +816,9 @@ const en: Catalog = {
     moreTitle: (n) => `${n} more Go models, not measured yet or not usable today`,
     unmeasured: 'not measured',
     howTitle: 'How we work it out',
-    how: (task, fee, five, week) => [
-      `A month of ${task} for one person using a coding agent every day: the same scenario as the main page.`,
-      `On Go you pay ${fee} a month and each model has a monthly allowance (15, 30 or 60 USD at Go's list prices). We only say Go pays off when the allowance lasts the whole month: if it runs out, Go stops, and the rest would be paid per token on OpenCode Zen ("Use balance"), which is not the subscription.`,
+    how: (task, i, fee, five, week) => [
+      `A month of ${task}, ${i}: the same assumptions as the main page.`,
+      `On Go you pay ${fee} a month and each model has a monthly allowance (15, 30 or 60 USD at Go's list prices). We only say Go pays off when the estimated monthly usage fits the allowance: past it, Go stops, and the rest would be paid per token on OpenCode Zen ("Use balance"), which is not the subscription.`,
       'Per token: the cheapest provider we recommend for the same model, fees included.',
       `Each row assumes one model at a time. At most ${five}% of the allowance in 5 hours and ${week}% in a week. DeepSeek is priced at busy-hour rates.`,
       'One subscriber per workspace, and Go is meant for a coding agent, not for your own application\'s API calls.',

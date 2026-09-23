@@ -481,8 +481,9 @@ export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: R
   const priced = go.rows.filter((r) => !r.blocker && r.month);
   const shown = priced.filter((r) => r.quality && r.direct);
   const more = go.rows.filter((r) => !shown.includes(r));
-  const winners = shown.filter((r) => r.verdict === 'plan');
-  const losers = shown.filter((r) => r.verdict === 'direct' || r.verdict === 'even');
+  // A tie sits with Go ("same cost"), never under a title saying per token costs less.
+  const winners = shown.filter((r) => r.verdict === 'plan' || r.verdict === 'even');
+  const losers = shown.filter((r) => r.verdict === 'direct');
   const notEnough = shown.filter((r) => r.verdict === 'not-enough');
 
   const f = fmt(lang);
@@ -501,7 +502,7 @@ export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: R
     if (!row) return '';
     const promo = activePromotions(go.plan).find((p) => p.planModelId === row.planModelId);
     return `<div class="plan__terms">
-      <p>${esc(g.limits(usd(row.terms.capUsd, lang), f.n.format(go.plan.fiveHourPercent), f.n.format(go.plan.weeklyPercent)))} ${esc(g.shortWindows)}</p>
+      <p>${esc(g.fits(usd(row.terms.capUsd, lang), f.n.format(go.plan.fiveHourPercent), f.n.format(go.plan.weeklyPercent)))}</p>
       ${promo ? `<p>${esc(g.promo(f.n.format(promo.capMultiplier), dateDay(promo.until, lang)))}</p>` : ''}
       <p class="meta">${esc(g.checked(dateDay(go.plan.checkedAt, lang)))} <a href="${esc(go.plan.sourceUrl)}" rel="noopener">opencode.ai/docs/go</a></p>
     </div>`;
@@ -514,9 +515,13 @@ export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: R
       const empty = !recommended ? g.noData : recommended.kind === 'plan' ? g.noAltToken(fee) : g.noAltPlan;
       return `<article class="card pick ${cls}"><p class="pick__role">${esc(title)}</p><div class="notice notice--neutral">${esc(empty)}</div></article>`;
     }
-    const why = role === 'recommended'
-      ? g.whyRecommended(fee, String(CLOSE_POINTS))
-      : o.kind === 'plan' ? g.whyAltPlan : g.whyAltToken(fee);
+    const top = go.choice.top;
+    // Name the reference the 3-point rule counts from, or the choice looks arbitrary.
+    const why = role !== 'recommended'
+      ? (o.kind === 'plan' ? g.whyAltPlan : g.whyAltToken(fee))
+      : top && top !== o
+        ? g.whyClose(fee, optName(top), formatScore(top.quality.value, top.quality.metric), usd(top.costUsd, lang), optName(o), String(CLOSE_POINTS))
+        : g.whyRecommended(fee);
     const versus = role === 'alternative' && recommended
       ? g.versus(f.n.format(Math.max(0, recommended.quality.value - o.quality.value)), o.costUsd > recommended.costUsd, usd(Math.abs(o.costUsd - recommended.costUsd), lang))
       : null;
@@ -589,12 +594,12 @@ export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: R
     </details>` : ''}
     ${more.length ? `<details class="details">
       <summary>${esc(g.moreTitle(more.length))}</summary>
-      <div class="details__body"><ul class="list">${more.map((r) => `<li><strong>${esc(name(r))}</strong>: ${esc(r.blocker ? c.reasons[r.blocker] : !r.quality ? g.unmeasured : !r.direct ? g.noDirect : c.reasons['incomplete-prices'])}${r.month && !r.blocker && r.month.coveredShare < 1 ? ` · ${esc(g.lasts(percent(r.month.coveredShare, lang)))}` : ''}</li>`).join('')}</ul></div>
+      <div class="details__body"><ul class="list">${more.map((r) => `<li><strong>${esc(name(r))}</strong>: ${esc(r.blocker ? c.reasons[r.blocker] : !r.quality ? g.unmeasured : !r.direct ? g.noDirect : c.reasons['incomplete-prices'])}${r.month && !r.blocker ? ` · ${esc(r.month.coveredShare < 1 ? g.lasts(percent(r.month.coveredShare, lang)) : g.fitsCap)}` : ''}</li>`).join('')}</ul></div>
     </details>` : ''}
     <details class="details">
       <summary>${esc(g.howTitle)}</summary>
       <div class="details__body">
-        <ul class="list">${[...g.how(taskName, fee, f.n.format(go.plan.fiveHourPercent), f.n.format(go.plan.weeklyPercent)), g.tokens(tokens(go.mix.input, lang), tokens(go.mix.output, lang), tokens(go.mix.cacheRead, lang))].map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
+        <ul class="list">${[...g.how(taskName, `${(g.intensities[intensity] ?? intensity).toLowerCase()} (${g.intensityNotes[intensity] ?? ''})`, fee, f.n.format(go.plan.fiveHourPercent), f.n.format(go.plan.weeklyPercent)), g.tokens(tokens(go.mix.input, lang), tokens(go.mix.output, lang), tokens(go.mix.cacheRead, lang))].map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
         <p class="meta">${esc(g.source(dateDay(go.plan.checkedAt, lang)))} <a href="${esc(go.plan.sourceUrl)}" rel="noopener">opencode.ai/docs/go</a> · ${esc(c.home.aaDisclaimer)}</p>
       </div>
     </details>
