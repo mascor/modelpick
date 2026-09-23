@@ -12,6 +12,7 @@ import type { ModelRecord, Offer, QualityEvidence, Replacement, Snapshot } from 
 import { costOf, type CostBreakdown } from './cost.js';
 import { isIdentified, providerKey, usabilityOf, type Usability } from './usability.js';
 import { successorOf } from './lineage.js';
+import { OPENAI_EFFORTS } from './opencode.js';
 import { gateFor, SCENARIOS, type Priority, type TaskId, type TokenMix } from './scenarios.js';
 import { t, type Lang, type ReasonCode } from '../i18n.js';
 
@@ -37,6 +38,12 @@ export interface QualityView {
   comparable: boolean;
   stale: boolean;
   instanceCalls: number | null;
+  /** Reasoning effort of the measured variant, normalised: "high", "xhigh", "max"... */
+  effort: string | null;
+  /** Artificial Analysis cost per task of that variant, when published. */
+  costPerTask: number | null;
+  /** A provisional score carried over from the version this model follows. */
+  inheritedFrom: { modelKey: string; harness: string } | null;
 }
 
 export interface OfferView {
@@ -165,26 +172,67 @@ function bestQuality(
 ): QualityView | null {
   const mine = evidence.filter((e) => e.modelKey === modelKey);
   if (!mine.length) return null;
-  const staleMs = THRESHOLDS.evidenceFreshDays * 86_400_000;
   const pickFrom = (rows: QualityEvidence[]) =>
     rows.reduce((a, b) => (b.value > a.value ? b : a));
 
   const inRef = refKey ? mine.filter((e) => e.harnessKey === refKey) : [];
   if (!inRef.length) return null;
-  const chosen = pickFrom(inRef);
-  const measured = chosen.measuredAt ? Date.parse(chosen.measuredAt) : NaN;
+  return viewOf(pickFrom(inRef), now);
+}
+
+/** "Adaptive Reasoning, Xhigh Effort" -> "xhigh"; null when the variant names no effort. */
+export function effortOf(variant: string | null): string | null {
+  if (!variant) return null;
+  const v = variant.toLowerCase();
+  if (/non-reasoning/.test(v)) return 'none';
+  for (const e of ['xhigh', 'max', 'high', 'medium', 'minimal', 'low']) if (new RegExp(`\\b${e}\\b`).test(v)) return e;
+  return null;
+}
+
+/** One measured variant as the engine shows it. */
+function viewOf(e: QualityEvidence, now: number): QualityView {
+  const measured = e.measuredAt ? Date.parse(e.measuredAt) : NaN;
   return {
-    value: chosen.value,
-    metric: chosen.metric,
-    harness: chosen.harness,
-    harnessKey: chosen.harnessKey,
-    measuredAt: chosen.measuredAt,
-    sourceUrl: chosen.sourceUrl,
+    value: e.value,
+    metric: e.metric,
+    harness: e.harness,
+    harnessKey: e.harnessKey,
+    measuredAt: e.measuredAt,
+    sourceUrl: e.sourceUrl,
     comparable: true,
-    stale: Number.isNaN(measured) ? true : now - measured > staleMs,
-    instanceCalls: chosen.instanceCalls,
+    stale: Number.isNaN(measured) ? true : now - measured > THRESHOLDS.evidenceFreshDays * 86_400_000,
+    instanceCalls: e.instanceCalls,
+    effort: effortOf(e.reasoningEffort),
+    costPerTask: e.costPerTask ?? null,
+    inheritedFrom: e.inheritedFrom ?? null,
   };
 }
+
+/**
+ * The variants a buyer of this offer actually gets. A score measured at a
+ * reasoning effort the buyer cannot select would promise more than they get:
+ * - OpenAI's own API: OpenCode sets the effort, so every settable variant counts;
+ * - Anthropic's own API: OpenCode uses "high" unless changed by hand;
+ * - anywhere else we cannot tell, so only the lowest measured variant counts.
+ */
+function deliverable(variants: QualityEvidence[], offer: Offer): QualityEvidence[] {
+  if (variants.length <= 1) return variants;
+  if (offer.providerId === 'openai' && offer.sourceId !== 'openrouter') {
+    const settable = variants.filter((v) => OPENAI_EFFORTS.has(effortOf(v.reasoningEffort) ?? ''));
+    if (settable.length) return settable;
+  }
+  if (offer.providerId === 'anthropic' && offer.sourceId !== 'openrouter') {
+    const high = variants.filter((v) => effortOf(v.reasoningEffort) === 'high');
+    if (high.length) return high;
+  }
+  return [variants.reduce((a, b) => (b.value < a.value ? b : a))];
+}
+
+/** How far above the market's mean cost per task a pick may go, by priority. */
+export const PRICE_CAP: Record<Priority, number> = { cheap: 1.25, balanced: 1.25, quality: 5 };
+
+/** With "balanced", the everyday pick may cost up to this many times the cheapest one above the bar. */
+export const BALANCED_PRICE_FACTOR = 2;
 
 /** Offer-level eligibility. Returns null when usable, otherwise the reason it is not. */
 function offerBlocker(offer: Offer, req: RecommendationRequest, minContext: number, now: number): ReasonCode | null {
@@ -307,6 +355,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   }
   const candidates: Candidate[] = [];
 
+  const pending: { model: ModelRecord; variants: QualityEvidence[]; usable: OfferView[]; ready: OfferView[] }[] = [];
   for (const model of Object.values(snapshot.models)) {
     const quality = bestQuality(model.key, evidence, ref.key, now);
     if (!quality) {
@@ -335,7 +384,36 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
       bump(blocked[0] ?? 'no-usable-offer');
       continue;
     }
-    candidates.push({ model, quality, offers: usable, ready });
+    const variants = evidence.filter((e) => e.modelKey === model.key && e.harnessKey === ref.key);
+    pending.push({ model, variants, usable, ready });
+  }
+
+  // Price caps, as a multiple of the market's mean cost per task (Artificial
+  // Analysis, recent models). A variant with no published cost per task is
+  // held to the same multiple of the mean monthly cost of the candidates.
+  const taskCap = snapshot.costReference ? snapshot.costReference.meanPerTask * PRICE_CAP[req.priority] : null;
+  const monthly = pending.map((p) => p.usable[0]!.cost.totalUsd).filter((v): v is number => v !== null);
+  const monthlyCap = monthly.length ? (monthly.reduce((a, b) => a + b, 0) / monthly.length) * PRICE_CAP[req.priority] : null;
+  const affordable = (v: QualityEvidence, o: OfferView) =>
+    v.costPerTask != null ? taskCap === null || v.costPerTask <= taskCap : monthlyCap === null || (o.cost.totalUsd ?? Infinity) <= monthlyCap;
+
+  // Each offer gets the best variant its buyer can actually have, within the cap;
+  // offers that deliver the same variant form one candidate.
+  for (const p of pending) {
+    const groups = new Map<QualityEvidence, OfferView[]>();
+    for (const o of p.usable) {
+      const within = deliverable(p.variants, o.offer).filter((v) => affordable(v, o));
+      if (!within.length) continue;
+      const best = within.reduce((a, b) => (b.value > a.value ? b : a));
+      groups.set(best, [...(groups.get(best) ?? []), o]);
+    }
+    if (!groups.size) {
+      bump('over-price-cap');
+      continue;
+    }
+    for (const [variant, offers] of groups) {
+      candidates.push({ model: p.model, quality: viewOf(variant, now), offers, ready: offers.filter((o) => p.ready.includes(o)) });
+    }
   }
 
   /**
@@ -363,7 +441,9 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
       role === 'everyday'
         ? req.priority === 'quality'
           ? c.engine.everydayBest(score, label, price)
-          : c.engine.everydayCheapest(score, label, unit(gate.everyday), price)
+          : req.priority === 'balanced'
+            ? c.engine.everydayBalanced(score, label, unit(gate.everyday), price)
+            : c.engine.everydayCheapest(score, label, unit(gate.everyday), price)
         : c.engine.hardReason(score, label, gap);
 
     const whenToUse = role === 'hard' ? c.engine.hardWhen : null;
@@ -391,9 +471,11 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   /**
    * The user's single choice changes what "best" means, which is the whole point
    * of asking it:
-   * - spend less / balanced: the cheapest model that clears the quality gate;
-   * - work well: the highest measured score, with price only breaking ties
+   * - spend less: the cheapest model that clears the quality gate;
+   * - balanced: the best score among those costing at most twice the cheapest;
+   * - best results: the highest measured score, with price only breaking ties
    *   inside a band where the score difference is not meaningful.
+   * Every pick also stays under the price cap of its priority (PRICE_CAP).
    */
   const everydayPool = candidates.filter((c) => c.quality.value >= gate.everyday);
   const byPrice = (a: Candidate, b: Candidate) => choiceOf(a).cost.totalUsd! - choiceOf(b).cost.totalUsd!;
@@ -402,6 +484,13 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     const top = everydayPool.reduce((max, c) => Math.max(max, c.quality.value), 0);
     const band = everydayPool.filter((c) => c.quality.value >= top - 2).sort(byPrice);
     everydayCandidate = band[0] ?? null;
+  } else if (req.priority === 'balanced') {
+    // Balanced: a little more money for clearly more quality. Among the models
+    // costing at most BALANCED_PRICE_FACTOR times the cheapest one, the best score wins.
+    const cheapest = [...everydayPool].sort(byPrice)[0];
+    const limit = cheapest ? choiceOf(cheapest).cost.totalUsd! * BALANCED_PRICE_FACTOR : 0;
+    const affordable = everydayPool.filter((c) => choiceOf(c).cost.totalUsd! <= limit);
+    everydayCandidate = affordable.sort((a, b) => b.quality.value - a.quality.value || byPrice(a, b))[0] ?? null;
   } else {
     everydayCandidate = [...everydayPool].sort(byPrice)[0] ?? null;
   }

@@ -45,7 +45,7 @@ test('Artificial Analysis takes precedence over SWE-bench as the reference', () 
   assert.doesNotMatch(r.everyday!.reason, /%/); // the index is not a percentage
 });
 
-test('AA effort variants map to the model and the best one is kept', () => {
+test('AA effort variants map to the model and every variant is kept', () => {
   const known = new Map([[matchForm('claude-opus-5'), 'anthropic/claude-opus-5']]);
   const m = (slug: string, name: string, v: number): AaModel => ({
     id: slug, name, slug, release_date: null, model_creator: null,
@@ -61,9 +61,9 @@ test('AA effort variants map to the model and the best one is kept', () => {
     known,
     new Date().toISOString(),
   );
-  assert.equal(ev.length, 1);
-  assert.equal(ev[0]!.value, 78);
-  assert.equal(ev[0]!.reasoningEffort, 'Max Effort');
+  // Every variant is kept, with its effort: the engine decides which one a buyer gets.
+  assert.equal(ev.length, 2);
+  assert.deepEqual(ev.map((e) => [e.value, e.reasoningEffort]).sort(), [[74.3, 'Medium Effort'], [78, 'Max Effort']]);
   assert.deepEqual(unmatched, ['unknown-1']);
 });
 

@@ -15,6 +15,7 @@ import { dirname, join } from 'node:path';
 import { AA, HTTP, PATHS } from '../config.js';
 import { hoursSince, matchForm } from '../lib/normalize.js';
 import type { QualityEvidence } from '../types.js';
+import { lineOf } from '../engine/lineage.js';
 
 export interface AaModel {
   id: string;
@@ -22,6 +23,7 @@ export interface AaModel {
   slug: string;
   release_date: string | null;
   model_creator: { id: string; name: string } | null;
+  artificial_analysis_intelligence_index_cost?: { total_cost?: number | null; cost_per_task?: { total_cost?: number | null } | null } | null;
   evaluations: {
     artificial_analysis_intelligence_index: number | null;
     artificial_analysis_coding_index: number | null;
@@ -152,29 +154,41 @@ export function aaModelKey(m: AaModel, knownKeys: Map<string, string>): string |
 /** "Claude Opus 5 (Adaptive Reasoning, Max Effort)" -> "Adaptive Reasoning, Max Effort". */
 const variantOf = (name: string): string | null => /\(([^)]*)\)\s*$/.exec(name)?.[1] ?? null;
 
+/** Mean cost per task over recent models: the reference for the price caps. */
+export interface CostReference {
+  meanPerTask: number;
+  models: number;
+  sinceDays: number;
+}
+
+const RECENT_DAYS = 183;
+
 /**
- * Coding Index evidence, one row per model of ours: when several effort
- * variants map to the same model, the best published one is kept and named.
+ * Coding Index evidence, one row per effort variant of each model of ours
+ * (the engine chooses which variant a buyer actually gets), with the cost per
+ * task Artificial Analysis measured for that variant.
+ *
+ * A model that has no Coding Index yet, but whose Intelligence Index is at
+ * least that of the version it follows in the same line, carries that
+ * version's Coding Index as a provisional score (see METHODOLOGY.md).
  */
 export function aaEvidence(
   download: AaDownload,
   knownKeys: Map<string, string>,
   observedAt: string,
   displayNameOf: (modelKey: string) => string = () => '',
-): { evidence: QualityEvidence[]; unmatched: string[]; wrongSnapshot: string[] } {
+): { evidence: QualityEvidence[]; unmatched: string[]; wrongSnapshot: string[]; inherited: string[]; costReference: CostReference | null } {
   const version = download.indexVersion !== null ? `v${download.indexVersion}` : 'undeclared version';
-  const best = new Map<string, { m: AaModel; value: number }>();
+  const rows = new Map<string, { key: string; m: AaModel; value: number }>();
+  const unscored: { key: string; m: AaModel }[] = [];
   const unmatched: string[] = [];
   const wrongSnapshot: string[] = [];
   const ourKeys = new Set(knownKeys.values());
-  for (const m of download.models) {
-    const value = m.evaluations?.artificial_analysis_coding_index;
-    if (typeof value !== 'number') continue;
+  const costOf = (m: AaModel): number | null => m.artificial_analysis_intelligence_index_cost?.cost_per_task?.total_cost ?? null;
+
+  const keyFor = (m: AaModel): string | null => {
     let key = aaModelKey(m, knownKeys);
-    if (!key) {
-      unmatched.push(m.slug);
-      continue;
-    }
+    if (!key) return null;
     // "claude-sonnet-4:thinking" is a mode of claude-sonnet-4: the score goes to the model.
     const base = key.split(':')[0]!;
     if (base !== key && ourKeys.has(base)) key = base;
@@ -183,14 +197,33 @@ export function aaEvidence(
       const sibling = datedSibling(m, key, knownKeys, displayNameOf);
       if (!sibling) {
         wrongSnapshot.push(`${m.slug} \u2260 ${displayNameOf(key)}`);
-        continue;
+        return null;
       }
       key = sibling;
     }
-    const prev = best.get(key);
-    if (!prev || value > prev.value) best.set(key, { m, value });
+    return key;
+  };
+
+  for (const m of download.models) {
+    const value = m.evaluations?.artificial_analysis_coding_index;
+    const intelligence = m.evaluations?.artificial_analysis_intelligence_index;
+    if (typeof value !== 'number') {
+      if (typeof intelligence === 'number') {
+        const key = aaModelKey(m, knownKeys);
+        if (key) unscored.push({ key: key.split(':')[0]!, m });
+      }
+      continue;
+    }
+    const key = keyFor(m);
+    if (!key) {
+      if (!aaModelKey(m, knownKeys)) unmatched.push(m.slug);
+      continue;
+    }
+    const id = `${key}|${m.name}`;
+    if (!rows.has(id)) rows.set(id, { key, m, value });
   }
-  const evidence: QualityEvidence[] = [...best.entries()].map(([modelKey, { m, value }]) => ({
+
+  const row = (modelKey: string, m: AaModel, value: number, inheritedFrom: QualityEvidence['inheritedFrom']): QualityEvidence => ({
     modelKey,
     metric: 'aa_coding_index',
     value,
@@ -205,6 +238,60 @@ export function aaEvidence(
     sourceId: 'artificialanalysis',
     sourceUrl: `https://artificialanalysis.ai/models/${encodeURIComponent(m.slug)}`,
     observedAt,
-  }));
-  return { evidence, unmatched, wrongSnapshot };
+    costPerTask: costOf(m),
+    intelligenceIndex: m.evaluations?.artificial_analysis_intelligence_index ?? null,
+    inheritedFrom,
+  });
+  const evidence: QualityEvidence[] = [...rows.values()].map(({ key, m, value }) => row(key, m, value, null));
+
+  // Provisional scores for new versions, from the version they follow.
+  const scored = new Set(evidence.map((e) => e.modelKey));
+  const bestOf = new Map<string, QualityEvidence>();
+  for (const e of evidence) {
+    const prev = bestOf.get(e.modelKey);
+    if (!prev || e.value > prev.value) bestOf.set(e.modelKey, e);
+  }
+  const inherited: string[] = [];
+  const done = new Set<string>();
+  for (const { key, m } of unscored) {
+    if (scored.has(key) || done.has(key)) continue;
+    const own = lineOf(key);
+    if (!own) continue;
+    let parent: { key: string; version: number[] } | null = null;
+    for (const k of scored) {
+      const l = lineOf(k);
+      if (!l || l.line !== own.line || !olderVersion(l.version, own.version)) continue;
+      if (!parent || olderVersion(parent.version, l.version)) parent = { key: k, version: l.version };
+    }
+    const from = parent ? bestOf.get(parent.key) : undefined;
+    const mine = unscored.filter((u) => u.key === key);
+    const myIntelligence = Math.max(...mine.map((u) => u.m.evaluations?.artificial_analysis_intelligence_index ?? -Infinity));
+    if (!from || from.intelligenceIndex == null || myIntelligence < from.intelligenceIndex) continue;
+    const variant = mine.find((u) => u.m.evaluations?.artificial_analysis_intelligence_index === myIntelligence)!.m;
+    evidence.push(row(key, variant, from.value, { modelKey: from.modelKey, harness: from.harness }));
+    inherited.push(`${key} \u2190 ${from.modelKey}`);
+    done.add(key);
+  }
+
+  // The price caps follow the market: mean cost per task of recent measured variants.
+  const cutoff = Date.parse(download.fetchedAt) - RECENT_DAYS * 86_400_000;
+  const costs = download.models
+    .filter((m) => typeof m.evaluations?.artificial_analysis_coding_index === 'number' && costOf(m) !== null)
+    .filter((m) => m.release_date && Date.parse(m.release_date) >= cutoff)
+    .map((m) => costOf(m)!);
+  const costReference = costs.length
+    ? { meanPerTask: costs.reduce((a, b) => a + b, 0) / costs.length, models: costs.length, sinceDays: RECENT_DAYS }
+    : null;
+
+  return { evidence, unmatched, wrongSnapshot, inherited, costReference };
 }
+
+/** True when version a comes before version b ([4] before [4, 1]). */
+const olderVersion = (a: number[], b: number[]): boolean => {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] ?? 0;
+    const y = b[i] ?? 0;
+    if (x !== y) return x < y;
+  }
+  return false;
+};

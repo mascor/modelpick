@@ -124,6 +124,15 @@ export interface QualityEvidence {
   sourceId: string;
   sourceUrl: string;
   observedAt: Iso;
+  /** USD per task on Artificial Analysis' own runs of this variant, when published. */
+  costPerTask?: number | null;
+  /** Artificial Analysis Intelligence Index of this variant, when published. */
+  intelligenceIndex?: number | null;
+  /**
+   * Set when the model has no Coding Index yet and carries the one measured on
+   * the version it follows: a provisional score, shown as such.
+   */
+  inheritedFrom?: { modelKey: string; harness: string } | null;
 }
 
 export type SourceOutcome = 'ok' | 'failed' | 'disabled' | 'skipped';
@@ -183,6 +192,8 @@ export interface Snapshot {
   /** Which OpenCode version the commands were verified against. */
   opencodeVersion?: string | null;
   replacements?: Replacement[];
+  /** Mean cost per task of recent measured variants (Artificial Analysis): the price caps build on it. */
+  costReference?: { meanPerTask: number; models: number; sinceDays: number } | null;
   stats: {
     modelCount: number;
     offerCount: number;

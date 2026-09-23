@@ -65,7 +65,7 @@ export const evidence = (modelKey: string, value: number, over: Partial<QualityE
   ...over,
 });
 
-export const snapshot = (models: ModelRecord[], offers: Offer[], ev: QualityEvidence[]): Snapshot => ({
+export const snapshot = (models: ModelRecord[], offers: Offer[], ev: QualityEvidence[], extra: Partial<Snapshot> = {}): Snapshot => ({
   version: 1,
   runId: 'test-run',
   generatedAt: now.toISOString(),
@@ -75,4 +75,5 @@ export const snapshot = (models: ModelRecord[], offers: Offer[], ev: QualityEvid
   sources: [],
   warnings: [],
   stats: { modelCount: models.length, offerCount: offers.length, evidenceCount: ev.length, sourcesOk: 1, sourcesFailed: 0 },
+  ...extra,
 });

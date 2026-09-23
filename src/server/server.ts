@@ -70,8 +70,8 @@ export async function buildServer() {
     if (!snapshot) return { snapshot: null, request, rec: null, config: null, changes: noChanges };
     const rec = recommend(snapshot, request);
     const config = buildOpenCodeConfig(
-      rec.everyday ? { model: rec.everyday.model, offer: rec.everyday.offer } : null,
-      rec.hard ? { model: rec.hard.model, offer: rec.hard.offer } : null,
+      rec.everyday ? { model: rec.everyday.model, offer: rec.everyday.offer, effort: rec.everyday.quality.effort } : null,
+      rec.hard ? { model: rec.hard.model, offer: rec.hard.offer, effort: rec.hard.quality.effort } : null,
     );
     // What moved since the previous published update: the reason to open the
     // page in the morning at all.
@@ -131,7 +131,7 @@ export async function buildServer() {
     });
     app.get(paths.method, { onRequest: negotiate(lang, 'method') }, async (_req, reply) => {
       reply.type('text/html; charset=utf-8');
-      return methodPage(lang);
+      return methodPage(lang, await currentSnapshot());
     });
     app.get(paths.sources, { onRequest: negotiate(lang, 'sources') }, async (_req, reply) => {
       reply.type('text/html; charset=utf-8');

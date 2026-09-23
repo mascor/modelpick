@@ -35,6 +35,7 @@ export type ReasonCode =
   | 'not-comparable'
   | 'stale-evidence'
   | 'no-usable-offer'
+  | 'over-price-cap'
   | 'demo'
   | 'quarantine'
   | 'suspended'
@@ -64,6 +65,9 @@ export interface Catalog {
     evidenceNoDate: string;
     incompleteEstimate: string;
     successor: (name: string) => string;
+    inherited: (from: string) => string;
+    effort: (level: string) => string;
+    perTask: (usd: string) => string;
     replaced: (retired: string, successor: string) => string;
     getKey: (account: string) => string;
     open: string;
@@ -120,6 +124,7 @@ export interface Catalog {
   reasons: Record<ReasonCode, string>;
   engine: {
     everydayCheapest: (value: string, metric: string, gate: string, price: string) => string;
+    everydayBalanced: (value: string, metric: string, gate: string, price: string) => string;
     everydayBest: (value: string, metric: string, price: string) => string;
     hardReason: (value: string, metric: string, gap: string | null) => string;
     hardWhen: string;
@@ -154,11 +159,15 @@ export interface Catalog {
     stepsTitle: string;
     steps: string[];
     gatesTitle: string;
-    gatesCols: [string, string, string];
+    gatesCols: [string, string, string, string];
     gatesNote: (gap: string) => string;
+    capNote: (mean: string, models: string, months: string) => string;
+    capMissing: string;
     costTitle: string;
     costCols: [string, string, string, string];
     costNote: string;
+    rulesTitle: string;
+    rules: string[];
     excludedTitle: string;
     excluded: (t: { offerHours: string; uptime: string; jump: string }) => string[];
     limitsTitle: string;
@@ -206,6 +215,9 @@ const it: Catalog = {
     perMonth: (a) => `${a} stimati al mese a consumo`,
     benchmark: (v, m, w) => `${m} ${v} · letto il ${w}`,
     replaced: (o, n) => `${o} è stato ritirato dal produttore. La versione nuova, ${n}, non è ancora misurata sul codice da Artificial Analysis: per questo non possiamo ancora confrontarla.`,
+    inherited: (f) => `Punteggio provvisorio: Artificial Analysis non ha ancora misurato questa versione sul codice, quindi usiamo quello di ${f}, la versione precedente. Nel 95% dei casi misurati la versione nuova è stata almeno altrettanto buona.`,
+    effort: (l) => `sforzo ${l}`,
+    perTask: (u) => `${u} USD per task`,
     successor: (n) => `È uscito ${n}: Artificial Analysis non l'ha ancora misurato sul codice, per questo non possiamo confrontarlo.`,
     incompleteEstimate:
       'Stima incompleta: una commissione applicabile non è quantificabile, il confronto fra provider vicini può ribaltarsi.',
@@ -287,6 +299,7 @@ const it: Catalog = {
     'not-comparable': 'misurato solo con banchi di prova non confrontabili con quello di riferimento',
     'stale-evidence': 'nessuna misura di qualità degli ultimi 7 giorni',
     'no-usable-offer': 'nessuna offerta utilizzabile',
+    'over-price-cap': 'costa troppo rispetto alla media',
     demo: 'dato dimostrativo',
     quarantine: 'prezzo in quarantena per variazione anomala',
     suspended: 'provider sospeso: non risulta possibile aprire un account',
@@ -299,6 +312,8 @@ const it: Catalog = {
     'opencode-unknown': 'OpenCode non riconosce questo modello presso questo provider',
   },
   engine: {
+    everydayBalanced: (v, m, g, p) =>
+      `Ottiene ${v} su ${m}, il punteggio più alto fra i modelli sopra la soglia di ${g} che costano al massimo il doppio del più economico (${p} al mese sullo scenario scelto).`,
     everydayCheapest: (v, m, g, p) =>
       `Ottiene ${v} su ${m}, sopra la soglia di ${g} richiesta per questa priorità, ed è la combinazione modello-provider meno costosa fra quelle che ci riescono (${p} al mese sullo scenario scelto).`,
     everydayBest: (v, m, p) =>
@@ -344,21 +359,31 @@ const it: Catalog = {
   method: {
     title: 'Come scegliamo',
     intro: 'Ogni mattina alle 6:30 ripetiamo questi passi con prezzi e punteggi appena scaricati.',
-    stepsTitle: 'In tre passi',
+    stepsTitle: 'In quattro passi',
     steps: [
-      '<strong>Qualità.</strong> Contano solo i modelli con un Coding Index di Artificial Analysis misurato negli ultimi 7 giorni. Senza una misura recente un modello non può vincere.',
-      '<strong>Soglia.</strong> Il modello deve superare la soglia della priorità che hai scelto (tabella qui sotto).',
-      '<strong>Prezzo.</strong> Fra quelli che la superano vince la coppia modello-provider che costa meno al mese, commissioni incluse. Con "Risultati migliori" vince il punteggio più alto, e il prezzo decide solo fra modelli entro 2 punti.',
+      '<strong>Qualità.</strong> Contano solo i modelli con un Coding Index di Artificial Analysis misurato negli ultimi 7 giorni.',
+      '<strong>Soglia.</strong> Il modello deve superare la soglia di qualità della priorità che hai scelto.',
+      '<strong>Tetto di prezzo.</strong> Non deve costare per task più di un multiplo della media del mercato: 1,25 volte con "Spendere poco" ed "Equilibrio", 5 volte con "Risultati migliori".',
+      '<strong>Scelta.</strong> Con "Spendere poco" vince il più economico al mese. Con "Equilibrio" vince il punteggio più alto fra i modelli che costano al massimo il doppio del più economico. Con "Risultati migliori" vince il punteggio più alto, e il prezzo decide solo fra modelli entro 2 punti.',
     ],
-    gatesTitle: 'Le soglie',
-    gatesCols: ['Priorità', 'Ogni giorno', 'Problemi difficili'],
+    gatesTitle: 'Soglie e tetti',
+    gatesCols: ['Priorità', 'Ogni giorno', 'Problemi difficili', 'Tetto per task'],
     gatesNote: (g) => `Punteggio minimo sul Coding Index. Il modello per i problemi difficili deve anche fare almeno ${g} punti più di quello di ogni giorno: se nessuno ci riesce, non lo indichiamo.`,
+    capNote: (m, n, mo) => `Tetto per task: multiplo della media di ${m} USD per task, calcolata ogni giorno su ${n} varianti di modelli usciti negli ultimi ${mo} mesi (costo misurato da Artificial Analysis). Un modello di cui AA non pubblica il costo per task non può superare lo stesso multiplo della spesa mensile media dei candidati.`,
+    capMissing: 'Oggi il costo medio per task non è disponibile: il tetto non viene applicato.',
     costTitle: 'Il costo al mese',
     costCols: ['Tipo di lavoro', 'Input', 'Output', 'Dalla cache'],
     costNote: "Token al mese per una persona che usa un agente di codice ogni giorno. Sono ipotesi dichiarate, non misure dei tuoi consumi. Un prezzo mancante non diventa mai zero: se manca il prezzo della cache, quei token costano come l'input.",
+    rulesTitle: 'Tre regole per non promettere troppo',
+    rules: [
+      '<strong>Lo sforzo di ragionamento che puoi davvero usare.</strong> Lo stesso modello fa punteggi e costi diversi a seconda dello sforzo (per esempio high o xhigh). Contiamo solo quello che la configurazione può impostare: con l\'API diretta di OpenAI lo scriviamo nella configurazione; con quella di Anthropic vale "high", il predefinito di OpenCode; altrove non si può scegliere, quindi contiamo il punteggio più basso misurato.',
+      '<strong>Modelli ritirati mai.</strong> Se il produttore ritira un modello non lo mostriamo più, neanche nelle versioni datate o nelle varianti dei rivenditori.',
+      '<strong>Versioni nuove non ancora misurate.</strong> Se Artificial Analysis non ha ancora misurato sul codice una versione nuova, ma il suo Intelligence Index è almeno pari a quello della versione precedente, usiamo il Coding Index della versione precedente e lo segnaliamo come provvisorio. Sui casi misurati, la versione nuova è stata almeno altrettanto buona 95 volte su 100.',
+    ],
     excludedTitle: "Quando un'offerta è esclusa",
     excluded: (t) => [
-      'Il produttore ha ritirato il modello: non lo mostriamo più, neanche nelle sue versioni datate o nelle varianti dei rivenditori. Se ne esiste una versione nuova non ancora misurata, la pagina lo dice.',
+      'Il produttore ha ritirato il modello.',
+      'Costa più del tetto per task della priorità scelta.',
       `Il prezzo ha più di ${t.offerHours} ore.`,
       `Il provider è stato disponibile meno del ${t.uptime} delle volte nell'ultima mezz'ora.`,
       'Il contesto è troppo piccolo per il tipo di lavoro scelto.',
@@ -369,7 +394,7 @@ const it: Catalog = {
     limits: [
       'Copriamo i provider raggiunti dalle nostre fonti, non tutto il mercato.',
       'Un benchmark misura compiti standard: è un indizio serio, non una garanzia sul tuo codice.',
-      'Usiamo la variante con il punteggio più alto, spesso quella con il ragionamento al massimo: con impostazioni più leggere il modello può rendere meno.',
+      'Il costo per task di Artificial Analysis viene dai loro test, ai prezzi del produttore: serve a confrontare i modelli fra loro, non a prevedere la tua bolletta.',
       'OpenCode non passa da solo al modello per i problemi difficili: va scelto a mano con /models.',
     ],
     fullDetails: 'Tutti i dettagli, comprese le regole per associare i modelli, in METHODOLOGY.md',
@@ -421,6 +446,9 @@ const en: Catalog = {
     perMonth: (a) => `${a} estimated per month, pay as you go`,
     benchmark: (v, m, w) => `${m} ${v} · read on ${w}`,
     replaced: (o, n) => `${o} has been retired by its maker. Its newer version, ${n}, is not yet measured on code by Artificial Analysis, so we cannot compare it yet.`,
+    inherited: (f) => `Provisional score: Artificial Analysis has not measured this version on code yet, so we use the one of ${f}, the previous version. In 95% of measured cases the newer version was at least as good.`,
+    effort: (l) => `${l} effort`,
+    perTask: (u) => `${u} USD per task`,
     successor: (n) => `${n} is out: Artificial Analysis has not measured it on code yet, so we cannot compare it.`,
     incompleteEstimate:
       'Incomplete estimate: one applicable fee cannot be quantified, so a close call between providers could flip.',
@@ -501,6 +529,7 @@ const en: Catalog = {
     'not-comparable': 'only measured on benchmarks not comparable with the reference one',
     'stale-evidence': 'no quality measurement from the last 7 days',
     'no-usable-offer': 'no usable offer',
+    'over-price-cap': 'too expensive compared with the average',
     demo: 'demo data',
     quarantine: 'price quarantined after an implausible change',
     suspended: 'provider suspended: an account could not be opened',
@@ -513,6 +542,8 @@ const en: Catalog = {
     'opencode-unknown': 'OpenCode does not recognise this model at this provider',
   },
   engine: {
+    everydayBalanced: (v, m, g, p) =>
+      `Scores ${v} on ${m}, the highest among the models above the ${g} bar that cost at most twice the cheapest one (${p} per month on the chosen scenario).`,
     everydayCheapest: (v, m, g, p) =>
       `Scores ${v} on ${m}, above the ${g} bar set by this priority, and it is the cheapest model-provider pair that clears it (${p} per month on the chosen scenario).`,
     everydayBest: (v, m, p) =>
@@ -557,21 +588,31 @@ const en: Catalog = {
   method: {
     title: 'How we choose',
     intro: 'Every morning at 6:30 (Rome time) we repeat these steps on freshly downloaded prices and scores.',
-    stepsTitle: 'In three steps',
+    stepsTitle: 'In four steps',
     steps: [
-      '<strong>Quality.</strong> Only models with an Artificial Analysis Coding Index measured in the last 7 days count. Without a recent measurement a model cannot win.',
-      '<strong>Bar.</strong> The model must clear the bar of the priority you chose (table below).',
-      '<strong>Price.</strong> Among those that clear it, the model-provider pair that costs least per month wins, fees included. With "Best results" the highest score wins, and price only decides between models within 2 points.',
+      '<strong>Quality.</strong> Only models with an Artificial Analysis Coding Index measured in the last 7 days count.',
+      '<strong>Bar.</strong> The model must clear the quality bar of the priority you chose.',
+      '<strong>Price cap.</strong> It must not cost more per task than a multiple of the market average: 1.25 times with "Spend less" and "Balanced", 5 times with "Best results".',
+      '<strong>Choice.</strong> With "Spend less" the cheapest per month wins. With "Balanced" the highest score wins among the models costing at most twice the cheapest. With "Best results" the highest score wins, and price only decides between models within 2 points.',
     ],
-    gatesTitle: 'The bars',
-    gatesCols: ['Priority', 'Every day', 'Hard problems'],
+    gatesTitle: 'Bars and caps',
+    gatesCols: ['Priority', 'Every day', 'Hard problems', 'Cap per task'],
     gatesNote: (g) => `Minimum Coding Index score. The model for hard problems must also score at least ${g} points above the everyday one: if none does, we name none.`,
+    capNote: (m, n, mo) => `Cap per task: a multiple of the mean of ${m} USD per task, recomputed every day over ${n} variants of models released in the last ${mo} months (cost measured by Artificial Analysis). A model whose cost per task AA does not publish cannot exceed the same multiple of the candidates' mean monthly spend.`,
+    capMissing: 'The mean cost per task is not available today: no cap is applied.',
     costTitle: 'The monthly cost',
     costCols: ['Kind of work', 'Input', 'Output', 'From cache'],
     costNote: 'Tokens per month for one person using a coding agent every day. They are stated assumptions, not measurements of your usage. A missing price never becomes zero: if the cache price is missing, those tokens cost as much as input.',
+    rulesTitle: 'Three rules so we do not overpromise',
+    rules: [
+      '<strong>The reasoning effort you can actually use.</strong> The same model scores and costs differently depending on its effort (for example high or xhigh). We only count what the configuration can set: with OpenAI\'s own API we write it into the configuration; with Anthropic\'s it is "high", OpenCode\'s default; elsewhere it cannot be chosen, so we count the lowest measured score.',
+      '<strong>Never retired models.</strong> When the maker retires a model we no longer show it, nor its dated builds or resellers\' variants.',
+      '<strong>New versions not measured yet.</strong> If Artificial Analysis has not measured a new version on code yet, but its Intelligence Index is at least that of the previous version, we use the previous version\'s Coding Index and flag it as provisional. Across measured cases, the new version was at least as good 95 times out of 100.',
+    ],
     excludedTitle: 'When an offer is excluded',
     excluded: (t) => [
-      'The maker has retired the model: we no longer show it, nor its dated builds or resellers\' variants. If a newer version exists but is not measured yet, the page says so.',
+      'The maker has retired the model.',
+      'It costs more than the cap per task of the chosen priority.',
       `The price is more than ${t.offerHours} hours old.`,
       `The provider was available less than ${t.uptime} of the time in the last half hour.`,
       'The context is too small for the chosen kind of work.',
@@ -582,7 +623,7 @@ const en: Catalog = {
     limits: [
       'We cover the providers our sources reach, not the whole market.',
       'A benchmark measures standard tasks: a serious signal, not a guarantee about your code.',
-      'We use the variant with the highest score, often the one with maximum reasoning: with lighter settings the model may perform worse.',
+      "Artificial Analysis' cost per task comes from their own runs at the maker's prices: it compares models with each other, it does not predict your bill.",
       'OpenCode does not switch to the model for hard problems on its own: pick it by hand with /models.',
     ],
     fullDetails: 'All the details, including how models are matched, in METHODOLOGY.md',

@@ -6,7 +6,7 @@
 import { SITE, THRESHOLDS, SOURCES } from '../config.js';
 import type { Snapshot, SourceStatus } from '../types.js';
 import type { OfferView, Pick, Recommendation, RecommendationRequest } from '../engine/recommend.js';
-import { formatScore, metricLabel } from '../engine/recommend.js';
+import { formatScore, metricLabel, PRICE_CAP } from '../engine/recommend.js';
 import type { Change } from '../engine/changes.js';
 import { SCENARIOS, TASK_IDS, PRIORITIES, gateFor } from '../engine/scenarios.js';
 import { accountName, usabilityLabel } from '../engine/usability.js';
@@ -160,12 +160,15 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
 }
 
 
+/** The name of the version a provisional score comes from, as Artificial Analysis publishes it. */
+const snapshotName = (_key: string, harness: string): string => harness.replace(/\s*\([^)]*\)\s*$/, '');
+
 /** The provider comparison: the answer to "where do I buy this". */
 function renderComparison(pick: Pick, role: string, lang: Lang): string {
   const c = t(lang);
   const row = (o: OfferView, i: number, chosen: boolean) => {
     const id = `cmd-${role}-${i}`;
-    const conf = configFor(o.offer, lang);
+    const conf = configFor(o.offer, lang, pick.quality.effort);
     // Rows routed through OpenRouter share the same command: what changes is
     // the pinned provider, so the configuration is what gets copied.
     const payload = conf.config ?? conf.command;
@@ -257,13 +260,14 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
       <div class="notice notice--neutral">${esc(empty)}</div>
     </article>`;
   }
-  const conf = configFor(pick.offer, lang);
+  const conf = configFor(pick.offer, lang, pick.quality.effort);
   const link = signupUrl(pick.offer);
   return `<article class="card pick pick--${role}" id="${esc(role)}">
     <p class="pick__role">${esc(title)}</p>
     <h3 class="pick__model">${esc(modelName(pick.model.displayName))}</h3>
     <p class="pick__summary">${esc(c.home.perMonth('\u0000')).replace('\u0000', `<strong class="pick__price">${esc(usd(pick.cost.totalUsd, lang))}</strong>`)}</p>
-    <p class="pick__evidence">${esc(c.home.benchmark(formatScore(pick.quality.value, pick.quality.metric), pick.quality.metric === 'aa_coding_index' ? 'Coding Index' : metricLabel(pick.quality.metric), dateShort(pick.quality.measuredAt, lang)))}${pick.quality.metric === 'aa_coding_index' ? ` · <a href="${esc(pick.quality.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>` : ''}</p>
+    <p class="pick__evidence">${esc(c.home.benchmark(formatScore(pick.quality.value, pick.quality.metric), pick.quality.metric === 'aa_coding_index' ? 'Coding Index' : metricLabel(pick.quality.metric), dateShort(pick.quality.measuredAt, lang)))}${pick.quality.effort ? ` · ${esc(c.home.effort(pick.quality.effort))}` : ''}${pick.quality.costPerTask !== null ? ` · ${esc(c.home.perTask(fmt(lang).n2.format(pick.quality.costPerTask)))}` : ''}${pick.quality.metric === 'aa_coding_index' ? ` · <a href="${esc(pick.quality.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>` : ''}</p>
+    ${pick.quality.inheritedFrom ? `<p class="alert">${esc(c.home.inherited(modelName(snapshotName(pick.quality.inheritedFrom.modelKey, pick.quality.inheritedFrom.harness))))}</p>` : ''}
     ${pick.successor ? `<p class="alert">${esc(c.home.successor(modelName(pick.successor.name)))}</p>` : ''}
     ${pick.cost.unquantifiedFees.length ? `<p class="alert">${esc(c.home.incompleteEstimate)}</p>` : ''}
     ${change?.moved ? `<p class="pick__change pick__change--moved">${esc(change.text)}</p>` : ''}
@@ -416,13 +420,15 @@ export function notFoundPage(lang: Lang): string {
   return layout({ lang, title: `${c.notFound.title} — ${SITE.name}`, description: c.siteDescription, body, active: 'home' });
 }
 
-export function methodPage(lang: Lang): string {
+export function methodPage(lang: Lang, snapshot: Snapshot | null = null): string {
   const c = t(lang);
   const m = c.method;
   const f = fmt(lang);
+  const ref = snapshot?.costReference ?? null;
   const gates = PRIORITIES.map((p) => {
     const g = gateFor('aa_coding_index', p);
-    return `<tr><td>${esc(c.priorities[p] ?? p)}</td><td class="num">${g.everyday}</td><td class="num">${g.hard}</td></tr>`;
+    const cap = ref ? `${f.n2.format(ref.meanPerTask * PRICE_CAP[p])} USD` : '—';
+    return `<tr><td>${esc(c.priorities[p] ?? p)}</td><td class="num">${g.everyday}</td><td class="num">${g.hard}</td><td class="num">${esc(cap)} <span class="meta">(${esc(f.n.format(PRICE_CAP[p]))}×)</span></td></tr>`;
   }).join('');
   // Millions throughout, so the columns read at a glance.
   const millions = (v: number) => `${f.n.format(Math.round(v / 100_000) / 10)} M`;
@@ -445,12 +451,14 @@ export function methodPage(lang: Lang): string {
       <div class="card"><h2>${esc(m.gatesTitle)}</h2>
         <table class="table">${th(m.gatesCols)}<tbody>${gates}</tbody></table>
         <p class="meta">${esc(m.gatesNote(String(THRESHOLDS.backupQualityGapPoints)))}</p>
+        <p class="meta">${esc(ref ? m.capNote(f.n2.format(ref.meanPerTask), f.n.format(ref.models), f.n.format(Math.round(ref.sinceDays / 30.5))) : m.capMissing)}</p>
       </div>
       <div class="card"><h2>${esc(m.costTitle)}</h2>
         <table class="table">${th(m.costCols)}<tbody>${costs}</tbody></table>
         <p class="meta">${esc(m.costNote)}</p>
       </div>
     </div>
+    <div class="card"><h2>${esc(m.rulesTitle)}</h2><ul class="list">${m.rules.map((x) => `<li>${x}</li>`).join('')}</ul></div>
     <div class="method__grid">
       <div class="card"><h2>${esc(m.excludedTitle)}</h2><ul class="list">${excluded.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
       <div class="card"><h2>${esc(m.limitsTitle)}</h2><ul class="list">${m.limits.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>

@@ -23,7 +23,8 @@ const base = () =>
       offer({ id: 'strong-a', modelKey: 'v/strong', providerId: 'gamma', prices: { inputPerMTok: 8, outputPerMTok: 30, cacheReadPerMTok: 0.8, cacheWritePerMTok: 10 } }),
       offer({ id: 'weak-a', modelKey: 'v/weak', providerId: 'delta', prices: { inputPerMTok: 0.1, outputPerMTok: 0.3, cacheReadPerMTok: 0.01, cacheWritePerMTok: 0.1 } }),
     ],
-    [evidence('v/cheap', 60), evidence('v/strong', 78), evidence('v/weak', 30)],
+    [evidence('v/cheap', 60, { costPerTask: 0.3 }), evidence('v/strong', 78, { costPerTask: 1.1 }), evidence('v/weak', 30, { costPerTask: 0.1 })],
+    { costReference: { meanPerTask: 1, models: 3, sinceDays: 183 } },
   );
 
 test('the everyday pick is the cheapest that clears the gate, not the best', () => {
@@ -115,8 +116,8 @@ test('a model measured with another benchmark does not enter the comparison', ()
   // "ref" measures two models, "other-bench" only one: the reference group is "ref".
   s.evidence = [
     evidence('v/cheap', 60, { harnessKey: 'other-bench', harness: 'another agent' }),
-    evidence('v/strong', 78),
-    evidence('v/weak', 30),
+    evidence('v/strong', 78, { costPerTask: 1.1 }),
+    evidence('v/weak', 30, { costPerTask: 0.1 }),
   ];
   const r = recommend(s, req());
   // v/cheap would cost less but its score is not comparable: v/strong wins.
@@ -240,4 +241,55 @@ test('on equal price the offer with a pinnable provider wins', () => {
   );
   const r = recommend(s, req({ priority: 'balanced' }));
   assert.equal(r.everyday?.offer.id, 'pinned');
+});
+
+test('a pick never costs more per task than 1.25 times the mean, or 5 times with "best results"', () => {
+  const s = snapshot(
+    [model('v/cheap'), model('v/luxury')],
+    [
+      offer({ id: 'cheap-a', modelKey: 'v/cheap', providerId: 'alfa', prices: { inputPerMTok: 1, outputPerMTok: 3, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1 } }),
+      offer({ id: 'lux-a', modelKey: 'v/luxury', providerId: 'beta', prices: { inputPerMTok: 5, outputPerMTok: 20, cacheReadPerMTok: 0.5, cacheWritePerMTok: 5 } }),
+    ],
+    [evidence('v/cheap', 60, { costPerTask: 0.5 }), evidence('v/luxury', 82, { costPerTask: 3 })],
+    { costReference: { meanPerTask: 1, models: 2, sinceDays: 183 } },
+  );
+  const balanced = recommend(s, req());
+  assert.equal(balanced.hard, null); // 3 USD per task is above 1.25 x 1
+  assert.ok(balanced.method.excluded.some((e) => e.reason === 'over-price-cap'));
+  const best = recommend(s, req({ priority: 'quality' }));
+  assert.equal(best.everyday?.model.key, 'v/luxury'); // within 5 x 1
+});
+
+test('a score counts only at an effort the buyer can actually select', () => {
+  const s = snapshot(
+    [model('openai/sol')],
+    [
+      offer({ id: 'direct', modelKey: 'openai/sol', providerId: 'openai', prices: { inputPerMTok: 1, outputPerMTok: 3, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1 } }),
+      offer({ id: 'reseller', modelKey: 'openai/sol', providerId: 'other', prices: { inputPerMTok: 0.5, outputPerMTok: 1.5, cacheReadPerMTok: 0.05, cacheWritePerMTok: 0.5 } }),
+    ],
+    [
+      evidence('openai/sol', 78, { reasoningEffort: 'xhigh', costPerTask: 1 }),
+      evidence('openai/sol', 70, { reasoningEffort: 'low', costPerTask: 0.3 }),
+    ],
+    { costReference: { meanPerTask: 1, models: 2, sinceDays: 183 } },
+  );
+  const r = recommend(s, req({ priority: 'quality' }));
+  // OpenAI's own API can be told "xhigh"; a reseller gives no such control, so only "low" counts there.
+  assert.equal(r.everyday?.offer.providerId, 'openai');
+  assert.equal(r.everyday?.quality.value, 78);
+  assert.equal(r.everyday?.quality.effort, 'xhigh');
+});
+
+test('"balanced" takes clearly more quality for a little more money, "spend less" does not', () => {
+  const s = snapshot(
+    [model('v/cheapest'), model('v/better')],
+    [
+      offer({ id: 'a', modelKey: 'v/cheapest', providerId: 'alfa', prices: { inputPerMTok: 0.06, outputPerMTok: 0.18, cacheReadPerMTok: 0.012, cacheWritePerMTok: 0.06 } }),
+      offer({ id: 'b', modelKey: 'v/better', providerId: 'beta', prices: { inputPerMTok: 0.1, outputPerMTok: 0.5, cacheReadPerMTok: 0.01, cacheWritePerMTok: 0.1 } }),
+    ],
+    [evidence('v/cheapest', 57, { costPerTask: 0.2 }), evidence('v/better', 69, { costPerTask: 0.26 })],
+    { costReference: { meanPerTask: 1, models: 2, sinceDays: 183 } },
+  );
+  assert.equal(recommend(s, req({ priority: 'cheap' })).everyday?.model.key, 'v/cheapest');
+  assert.equal(recommend(s, req({ priority: 'balanced' })).everyday?.model.key, 'v/better');
 });

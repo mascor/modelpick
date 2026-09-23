@@ -47,11 +47,28 @@ export function modelIdFor(offer: Offer): string {
 }
 
 /** Everything needed to actually use one offer. */
-export function configFor(offer: Offer, lang: Lang = 'it'): PickConfig {
+/** Reasoning efforts OpenCode can set on OpenAI's own API (docs: opencode.ai/docs/models). */
+export const OPENAI_EFFORTS = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+
+/**
+ * @param effort the reasoning effort the score was measured with. When set,
+ *        the configuration asks for it: without it the buyer would get another
+ *        variant than the one we quoted.
+ */
+export function configFor(offer: Offer, lang: Lang = 'it', effort: string | null = null): PickConfig {
   const c = t(lang).engine;
   const modelId = modelIdFor(offer);
   const command = `opencode -m ${modelId}`;
   const routed = offer.sourceId === 'openrouter';
+
+  if (!routed && effort && offer.providerId === 'openai' && OPENAI_EFFORTS.has(effort)) {
+    const config = {
+      $schema: 'https://opencode.ai/config.json',
+      provider: { openai: { models: { [offer.remoteModelId ?? '']: { options: { reasoningEffort: effort } } } } },
+      model: modelId,
+    };
+    return { modelId, command, commandIsExact: false, config: JSON.stringify(config, null, 2), pinNote: null };
+  }
 
   if (!routed) {
     // Buying straight from the provider: the model id already determines who bills you.
@@ -92,13 +109,13 @@ export function configFor(offer: Offer, lang: Lang = 'it'): PickConfig {
 }
 
 export function buildOpenCodeConfig(
-  everyday: { model: ModelRecord; offer: Offer } | null,
-  hard: { model: ModelRecord; offer: Offer } | null,
+  everyday: { model: ModelRecord; offer: Offer; effort?: string | null } | null,
+  hard: { model: ModelRecord; offer: Offer; effort?: string | null } | null,
 ): OpenCodeConfigResult | null {
   if (!everyday) return null;
 
-  const eConf = configFor(everyday.offer);
-  const hConf = hard ? configFor(hard.offer) : null;
+  const eConf = configFor(everyday.offer, 'it', everyday.effort ?? null);
+  const hConf = hard ? configFor(hard.offer, 'it', hard.effort ?? null) : null;
 
   // One file for both picks: each provider is pinned under its own model id,
   // so choosing the backup with /models keeps the provider we quoted a price for.
