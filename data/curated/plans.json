@@ -1,0 +1,197 @@
+{
+  "_comment": "Capped subscription plans, read by hand from each plan's documentation. capUsd is the monthly allowance at the plan's own list prices; the documentation states the limits per model. retentionDays null = not zero retention, length not stated. peakPrices: prices at busy hours (DeepSeek: 01-04 and 06-10 UTC, Mon-Fri), used as an upper bound. Update checkedAt whenever the page is read again: past 30 days the Go page says the figures may be out of date.",
+  "plans": [
+    {
+      "id": "opencode-go",
+      "name": "OpenCode Go",
+      "providerId": "opencode-go",
+      "monthlyFeeUsd": 10,
+      "fiveHourPercent": 20,
+      "weeklyPercent": 50,
+      "overageProviderId": "opencode",
+      "sourceUrl": "https://opencode.ai/docs/go",
+      "checkedAt": "2026-09-23",
+      "models": {
+        "deepseek-v4-flash": {
+          "capUsd": 30,
+          "retentionDays": 0,
+          "trainsOnData": false,
+          "note": "ZDR_UNTIL:2026-09-30",
+          "peakPrices": {
+            "inputPerMTok": 0.3,
+            "outputPerMTok": 1.2,
+            "cacheReadPerMTok": 0.006
+          }
+        },
+        "deepseek-v4-flash-vision-exp": {
+          "capUsd": 15,
+          "retentionDays": 0,
+          "trainsOnData": false,
+          "note": "ZDR_UNTIL:2026-09-30",
+          "peakPrices": {
+            "inputPerMTok": 0.3,
+            "outputPerMTok": 1.2,
+            "cacheReadPerMTok": 0.006
+          }
+        },
+        "deepseek-v4-pro": {
+          "capUsd": 15,
+          "retentionDays": 0,
+          "trainsOnData": false,
+          "note": "ZDR_UNTIL:2026-09-30",
+          "peakPrices": {
+            "inputPerMTok": 1.32,
+            "outputPerMTok": 3.96,
+            "cacheReadPerMTok": 0.044
+          }
+        },
+        "deepseek-v4.1-flash": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false,
+          "note": "ZDR_UNTIL:2026-09-30",
+          "peakPrices": {
+            "inputPerMTok": 0.3,
+            "outputPerMTok": 1.2,
+            "cacheReadPerMTok": 0.006
+          }
+        },
+        "glm-5.1": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "glm-5.2": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "glm-5.3": {
+          "capUsd": 15,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "glm-5.3-flash": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "gpt-5.6-luna": {
+          "capUsd": 15,
+          "retentionDays": 30,
+          "trainsOnData": false
+        },
+        "grok-4.6": {
+          "capUsd": 15,
+          "retentionDays": 30,
+          "trainsOnData": false
+        },
+        "grok-4.7": {
+          "capUsd": 15,
+          "retentionDays": 30,
+          "trainsOnData": false
+        },
+        "hy3": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "hy4-preview": {
+          "capUsd": 30,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "kimi-k2.6": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "kimi-k2.7-code": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "kimi-k3": {
+          "capUsd": 15,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "longcat-2.0": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "mimo-v2.5": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "mimo-v2.5-pro": {
+          "capUsd": 15,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "mimo-v2.6-flash": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "mimo-v2.6-pro": {
+          "capUsd": 15,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "minimax-m2.5": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "minimax-m2.7": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "minimax-m3": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "muse-spark-1.2-contributor": {
+          "capUsd": 60,
+          "retentionDays": null,
+          "trainsOnData": true
+        },
+        "muse-spark-1.3-contributor": {
+          "capUsd": 60,
+          "retentionDays": null,
+          "trainsOnData": true
+        },
+        "qwen3.6-plus": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "qwen3.7-max": {
+          "capUsd": 30,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "qwen3.7-plus": {
+          "capUsd": 60,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "qwen3.8-flash": {
+          "capUsd": 30,
+          "retentionDays": 0,
+          "trainsOnData": false
+        },
+        "qwen3.8-max": {
+          "capUsd": 15,
+          "retentionDays": 0,
+          "trainsOnData": false
+        }
+      }
+    }
+  ]
+}

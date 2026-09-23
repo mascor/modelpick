@@ -47,6 +47,7 @@ export async function runUpdate(): Promise<RunStatus> {
       opencodeVersion: collected.opencodeVersion,
       replacements: collected.replacements,
       usage: collected.usage,
+      plans: collected.plans,
       stats: {
         modelCount: collected.models.size,
         offerCount: validation.kept.length,

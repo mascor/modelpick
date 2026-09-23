@@ -12,6 +12,7 @@ import { SCENARIOS, TASK_IDS, PRIORITIES, BUDGETS } from '../engine/scenarios.js
 import { accountName, usabilityLabel } from '../engine/usability.js';
 import { signupUrl } from '../engine/signup.js';
 import { configFor } from '../engine/opencode.js';
+import { retentionUntil, type PlanComparison, type PlanRow } from '../engine/plans.js';
 import { t, pagePath, otherLang, type Lang } from '../i18n.js';
 import type { RunStatus } from '../pipeline/store.js';
 import { msUntilNextRun } from '../scheduler.js';
@@ -47,6 +48,9 @@ const fmt = (lang: Lang) => ({
 
 const usd = (v: number | null, lang: Lang): string =>
   v === null ? t(lang).home.notAvailable : `${fmt(lang).n2.format(v)} USD`;
+
+const percent = (share: number, lang: Lang): string =>
+  new Intl.NumberFormat(locale(lang), { style: 'percent', maximumFractionDigits: 0 }).format(share);
 
 const tokens = (v: number, lang: Lang): string => {
   const f = fmt(lang);
@@ -87,7 +91,7 @@ const modelName = (raw: string): string => {
   return i > 0 ? raw.slice(i + 2) : raw;
 };
 
-type PageId = 'home' | 'method' | 'sources' | 'status';
+type PageId = 'home' | 'method' | 'go' | 'sources' | 'status';
 
 export function layout(opts: { lang: Lang; title: string; description: string; body: string; active: PageId }): string {
   const c = t(opts.lang);
@@ -96,6 +100,7 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
   const nav: [PageId, string][] = [
     ['home', c.nav.choice],
     ['method', c.nav.method],
+    ['go', c.nav.go],
     ['sources', c.nav.sources],
     ['status', c.nav.status],
   ];
@@ -141,7 +146,7 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
       <a class="brand__by" href="${esc(CLOUDSALUS_URL)}" rel="noopener">by CloudSalus</a>
     </div>
     <nav class="menu">
-      ${nav.map(([id, label]) => `<a href="${esc(pagePath(opts.lang, id))}"${opts.active === id ? ' aria-current="page"' : ''}>${esc(label)}</a>`).join('')}
+      ${nav.map(([id, label]) => `<a href="${esc(pagePath(opts.lang, id))}"${opts.active === id ? ' aria-current="page"' : ''}>${id === 'go' ? `<span class="menu__long">${esc(label)}</span><span class="menu__short">${esc(c.nav.goShort)}</span>` : esc(label)}</a>`).join('')}
       <a href="${esc(SITE.repo)}" rel="noopener">${esc(c.nav.code)}</a>
       <a class="lang-switch" href="${esc(pagePath(other, opts.active))}?lang=${esc(other)}" hreflang="${esc(other)}">${esc(c.nav.otherLang)}</a>
     </nav>
@@ -248,8 +253,13 @@ function renderDetails(pick: Pick, lang: Lang, opencodeVersion: string | null): 
   </details>`;
 }
 
-function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change | null, lang: Lang, empty: string, opencodeVersion: string | null, request: RecommendationRequest): string {
+function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change | null, lang: Lang, empty: string, opencodeVersion: string | null, request: RecommendationRequest, go: PlanComparison | null = null): string {
   const c = t(lang);
+  // Only when the plan would actually cost less for this same month of work.
+  const planRow = pick ? go?.rows.find((r) => r.modelKey === pick.model.key && !r.blocker && r.month) : undefined;
+  const goHint = pick && planRow?.month && planRow.month.totalUsd < pick.cost.totalUsd!
+    ? c.go.homeHint(modelName(pick.model.displayName), usd(planRow.month.totalUsd, lang), percent(planRow.month.coveredShare, lang))
+    : null;
   const title = role === 'everyday' ? c.home.everyday : c.home.hard;
   if (!pick) {
     return `<article class="card pick pick--${role}">
@@ -269,6 +279,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
     ${pick.cost.unquantifiedFees.length ? `<p class="alert">${esc(c.home.incompleteEstimate)}</p>` : ''}
     ${change?.moved ? `<p class="pick__change pick__change--moved">${esc(change.text)}</p>` : ''}
     <p class="pick__why">${esc(pick.reason)}</p>
+    ${goHint ? `<p class="pick__plan"><a href="${esc(pagePath(lang, 'go'))}?task=${esc(request.task)}">${esc(goHint)}</a></p>` : ''}
     ${pick.alternative ? `<p class="pick__alternative">${esc(c.home.alternative(modelName(pick.alternative.name), `${formatScore(pick.alternative.score, pick.quality.metric)}${pick.alternative.provisional ? ` (${c.home.provisionalShort})` : ''}`, usd(pick.alternative.totalUsd, lang)))}</p>` : ''}
     <details class="details details--actions">
       <summary>${esc(c.home.detailsFor(modelName(pick.model.displayName)))}</summary>
@@ -391,8 +402,10 @@ export function homePage(opts: {
   snapshot: Snapshot | null;
   request: RecommendationRequest;
   changes: { everyday: Change | null; hard: Change | null };
+  go?: PlanComparison | null;
 }): string {
   const { lang, rec, snapshot, request, changes } = opts;
+  const go = opts.go ?? null;
   const c = t(lang);
   const stale = rec?.method.snapshotStale ?? false;
 
@@ -407,9 +420,10 @@ ${renderAnswer(rec, snapshot, request, lang)}
     ${rec?.replacements.map((r) => `<p class="alert">${esc(c.home.replaced(modelName(r.retiredName), modelName(r.successorName)))}</p>`).join('') ?? ''}
     ${renderCurrentModel(rec, lang)}
     <div class="results">
-      ${renderPick(rec?.everyday ?? null, 'everyday', changes.everyday, lang, c.home.noEveryday, snapshot?.opencodeVersion ?? null, request)}
-      ${renderPick(rec?.hard ?? null, 'hard', changes.hard, lang, c.home.noHard, snapshot?.opencodeVersion ?? null, request)}
+      ${renderPick(rec?.everyday ?? null, 'everyday', changes.everyday, lang, c.home.noEveryday, snapshot?.opencodeVersion ?? null, request, go)}
+      ${renderPick(rec?.hard ?? null, 'hard', changes.hard, lang, c.home.noHard, snapshot?.opencodeVersion ?? null, request, go)}
     </div>
+    ${go ? `<p class="plan-link"><a href="${esc(pagePath(lang, 'go'))}?task=${esc(request.task)}">${esc(c.go.homeLink)} →</a></p>` : ''}
   </div>
 </section>
 `;
@@ -420,6 +434,118 @@ ${renderAnswer(rec, snapshot, request, lang)}
     body,
     active: 'home',
   });
+}
+
+/** Privacy terms of one plan model, in plain words. */
+function planPrivacy(row: PlanRow, lang: Lang, now = Date.now()): string {
+  const c = t(lang).go;
+  const parts: string[] = [];
+  const r = row.terms.retentionDays;
+  parts.push(r === 0 ? c.retentionZero : r === null ? c.retentionUnknown : c.retentionDays(String(r)));
+  if (row.terms.trainsOnData) parts.push(c.training);
+  const until = retentionUntil(row.terms.note);
+  if (until) {
+    // The agreement covers the whole last day, in any time zone.
+    const ended = now > Date.parse(`${until}T23:59:59-12:00`);
+    parts.push(ended ? c.zdrEnded(dateDay(until, lang)) : c.zdrUntil(dateDay(until, lang)));
+  }
+  const risky = r !== 0 || row.terms.trainsOnData || (until !== null && now > Date.parse(`${until}T23:59:59-12:00`));
+  return `<span class="${risky ? 'label label--warning' : 'meta'}">${esc(parts.join(' · '))}</span>`;
+}
+
+/** The plan against the cheapest provider, one model per row. */
+export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: RecommendationRequest; go: PlanComparison | null }): string {
+  const { lang, request, go } = opts;
+  const c = t(lang);
+  const g = c.go;
+  const cols = g.cols;
+  const taskName = (c.tasks[request.task] ?? SCENARIOS[request.task].label).toLowerCase();
+  const choices = `<div class="choices">
+      <span class="choices__label">${esc(c.home.workType)}</span>
+      ${TASK_IDS.map((id) => `<a class="choice${id === request.task ? ' choice--active' : ''}" href="${esc(pagePath(lang, 'go'))}?task=${esc(id)}"${id === request.task ? ' aria-current="true"' : ''}>${esc(c.tasks[id] ?? SCENARIOS[id].label)}</a>`).join('')}
+    </div>`;
+
+  if (!go) {
+    const body = `<section class="answer"><div class="container"><h1 class="answer__title">${esc(g.title)}</h1></div></section>
+<section class="section"><div class="container"><div class="notice">${esc(g.noPlan)}</div></div></section>`;
+    return layout({ lang, title: `${g.title} — ${SITE.name}`, description: g.description, body, active: 'go' });
+  }
+
+  const fee = usd(go.plan.monthlyFeeUsd, lang);
+  const best = go.summary.best;
+  const answer = go.summary.usable
+    ? `${g.answer(taskName, String(go.summary.planCheaper), String(go.summary.usable))}${best?.month && best.direct && best.quality
+        ? ` ${g.answerBest(modelName(best.model?.displayName ?? best.planModelId), formatScore(best.quality.value, best.quality.metric), usd(best.month.totalUsd, lang), usd(best.direct.cost.totalUsd, lang), best.direct.offer.providerName)}`
+        : ''}`
+    : g.answerNone;
+
+  const row = (r: PlanRow) => {
+    const m = r.month!;
+    const name = modelName(r.model?.displayName ?? r.planModelId);
+    const used = m.capUsd > 0 ? m.drawUsd / m.capUsd : 0;
+    const diff = r.savingUsd === null
+      ? '—'
+      : Math.abs(r.savingUsd) < 0.005
+        ? esc(g.even)
+        : r.savingUsd > 0
+          ? `<span class="label label--ok">${esc(g.goCheaper(usd(r.savingUsd, lang)))}</span>`
+          : `<span class="label label--info">${esc(g.directCheaper(usd(-r.savingUsd, lang)))}</span>`;
+    const range = !r.direct
+      ? '—'
+      : !r.breakEven
+        ? esc(g.never)
+        : r.breakEven.toUsd === null
+          ? esc(g.rangeOpen(usd(r.breakEven.fromUsd, lang)))
+          : esc(g.range(usd(r.breakEven.fromUsd, lang), usd(r.breakEven.toUsd, lang)));
+    const notes = [
+      r.peakApplied ? g.peak : null,
+      r.overageFrom === 'plan-list' && m.coveredShare < 1 ? g.overageList : null,
+    ].filter(Boolean) as string[];
+    return `<tr${r.savingUsd !== null && r.savingUsd > 0 ? ' class="chosen"' : ''}>
+      <td class="stack__title">${esc(name)}<span class="meta"><code>${esc(r.offer.opencodeId ?? `opencode-go/${r.planModelId}`)}</code></span></td>
+      <td class="num" data-label="${esc(cols[1])}">${r.quality ? esc(formatScore(r.quality.value, r.quality.metric)) : `<span class="meta">${esc(g.unmeasured)}</span>`}</td>
+      <td class="num" data-label="${esc(cols[2])}">${esc(g.allowanceUsed(percent(used, lang), usd(m.capUsd, lang)))}${m.coveredShare < 1 ? `<span class="meta">${esc(g.covers(percent(m.coveredShare, lang)))}</span>` : ''}</td>
+      <td class="num nowrap" data-label="${esc(cols[3])}"><strong>${esc(usd(m.totalUsd, lang))}</strong></td>
+      <td data-label="${esc(cols[4])}">${r.direct ? `${esc(r.direct.offer.providerName)} <span class="nowrap">${esc(usd(r.direct.cost.totalUsd, lang))}</span>` : `<span class="meta">${esc(g.noDirect)}</span>`}</td>
+      <td data-label="${esc(cols[5])}">${diff}</td>
+      <td data-label="${esc(cols[6])}">${range}</td>
+      <td data-label="${esc(cols[7])}">${planPrivacy(r, lang)}${notes.length ? `<span class="meta">${esc(notes.join(' · '))}</span>` : ''}</td>
+    </tr>`;
+  };
+
+  const usable = go.rows.filter((r) => !r.blocker && r.month);
+  const left = go.rows.filter((r) => r.blocker || !r.month);
+  const f = fmt(lang);
+  const body = `<section class="answer">
+  <div class="container">
+    <h1 class="answer__title">${esc(g.title)}</h1>
+    <p class="answer__line">${esc(answer)}</p>
+    <p class="answer__date">${esc(g.intro(fee))}</p>
+    ${choices}
+  </div>
+</section>
+<section class="section">
+  <div class="container plan">
+    ${go.stale ? `<div class="notice">${esc(g.stale(f.n.format(go.checkedAgeDays ?? 0)))}</div>` : ''}
+    <div class="card">
+      <table class="table table--stack plan__table">
+        <thead><tr>${cols.map((h, i) => `<th${i >= 1 && i <= 3 ? ' class="num"' : ''}>${esc(h)}</th>`).join('')}</tr></thead>
+        <tbody>${usable.map(row).join('')}</tbody>
+      </table>
+      <p class="meta">${esc(g.source(dateDay(go.plan.checkedAt, lang)))} <a href="${esc(go.plan.sourceUrl)}" rel="noopener">opencode.ai/docs/go</a> · ${esc(c.home.aaDisclaimer)}</p>
+    </div>
+    ${left.length ? `<details class="details">
+      <summary>${esc(g.unusableTitle(left.length))}</summary>
+      <div class="details__body"><ul class="list">${left.map((r) => `<li><strong>${esc(modelName(r.model?.displayName ?? r.planModelId))}</strong>: ${esc(r.blocker ? c.reasons[r.blocker] : c.reasons['incomplete-prices'])}</li>`).join('')}</ul></div>
+    </details>` : ''}
+    <div class="card">
+      <h2>${esc(g.howTitle)}</h2>
+      <ul class="list">${g.how(f.n.format(go.plan.fiveHourPercent), f.n.format(go.plan.weeklyPercent)).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
+      <p>${esc(g.setup)}</p>
+    </div>
+  </div>
+</section>`;
+  return layout({ lang, title: `${g.title} — ${SITE.name}`, description: g.description, body, active: 'go' });
 }
 
 /** A wrong address still gets the site: header, menu and a way back. */
