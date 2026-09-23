@@ -138,3 +138,50 @@ test('the plan wins only when the fee covers the month and the provider costs mo
   close(row.savingUsd, 2); // 12 at the provider against the 10 fee
   assert.equal(cmp.summary.best?.planModelId, 'm');
 });
+
+test('usage intensity scales the scenario, never usage the user supplied', async () => {
+  const { mixFor } = await import('../src/engine/recommend.js');
+  const std = mixFor({ task: 'bug' });
+  const light = mixFor({ task: 'bug', intensity: 'light' });
+  const heavy = mixFor({ task: 'bug', intensity: 'heavy' });
+  close(light.input, std.input / 2);
+  close(heavy.output, std.output * 2);
+  close(mixFor({ task: 'bug', intensity: 'heavy', usage }).input, usage.input);
+});
+
+test('a better and cheaper pay-per-token option is recommended over the plan', () => {
+  // A second model, not in the plan, scoring higher and costing less per token.
+  const s = fixture();
+  s.models['w/better'] = model('w/better');
+  s.offers.push(offer({ id: 'better', modelKey: 'w/better', providerId: 'p2', opencodeVerified: true, prices: { inputPerMTok: 0.2, outputPerMTok: 0.2, cacheReadPerMTok: null, cacheWritePerMTok: null } }));
+  s.evidence.push(evidence('w/better', 70));
+  const { recommended } = comparePlan(s, 'go', req)!.choice;
+  assert.equal(recommended?.kind, 'per-token');
+  assert.equal(recommended?.modelKey, 'w/better');
+});
+
+test('the plan alternative is a model the plan serves better, never the same model dearer', () => {
+  const s = fixture();
+  // v/m costs 1.5 per token: Go at 10 is no deal for it, so there is no plan alternative.
+  assert.equal(comparePlan(s, 'go', req)!.choice.alternative, null);
+  // Make v/m dear per token: now Go beats paying for it, and it becomes the plan alternative.
+  for (const id of ['cheap', 'dear']) s.offers.find((o) => o.id === id)!.prices = { inputPerMTok: 6, outputPerMTok: 6, cacheReadPerMTok: null, cacheWritePerMTok: null };
+  s.models['w/better'] = model('w/better');
+  s.offers.push(offer({ id: 'better', modelKey: 'w/better', providerId: 'p2', opencodeVerified: true, prices: { inputPerMTok: 0.2, outputPerMTok: 0.2, cacheReadPerMTok: null, cacheWritePerMTok: null } }));
+  s.evidence.push(evidence('w/better', 70));
+  const { recommended, alternative } = comparePlan(s, 'go', req)!.choice;
+  assert.equal(recommended?.modelKey, 'w/better');
+  assert.equal(alternative?.kind, 'plan');
+  assert.equal(alternative?.modelKey, 'v/m');
+});
+
+test('an expired promotion is never shown or applied', async () => {
+  const { activePromotions } = await import('../src/engine/plans.js');
+  const plan = { ...PLAN, promotions: [{ planModelId: 'm', capMultiplier: 4, until: '2020-01-01' }, { planModelId: 'm', capMultiplier: 2, until: '2999-01-01' }] };
+  assert.deepEqual(activePromotions(plan).map((p) => p.capMultiplier), [2]);
+  // The monthly figures never use a promotion: the allowance stays the documented one.
+  const s = fixture();
+  s.plans![0]!.promotions = [{ planModelId: 'm', capMultiplier: 100, until: '2999-01-01' }];
+  s.plans![0]!.models.m!.capUsd = 3;
+  assert.equal(comparePlan(s, 'go', req)!.rows.find((r) => r.planModelId === 'm')!.verdict, 'not-enough');
+});

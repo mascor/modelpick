@@ -13,7 +13,7 @@ import { costOf, type CostBreakdown } from './cost.js';
 import { isIdentified, providerKey, usabilityOf, type Usability } from './usability.js';
 import { successorOf } from './lineage.js';
 import { OPENAI_EFFORTS } from './opencode.js';
-import { BUDGETS, CLOSE_POINTS, SCENARIOS, type Budget, type Priority, type TaskId, type TokenMix } from './scenarios.js';
+import { BUDGETS, CLOSE_POINTS, INTENSITIES, SCENARIOS, type Budget, type Intensity, type Priority, type TaskId, type TokenMix } from './scenarios.js';
 import { t, type Lang, type ReasonCode } from '../i18n.js';
 
 
@@ -27,6 +27,8 @@ export interface RecommendationRequest {
   currentOfferId?: string | null;
   /** Ask OpenRouter to use only providers that do not retain prompts. Off by default. */
   privacy?: boolean;
+  /** How much of the work a month holds; scales the scenario, not usage the user supplied. */
+  intensity?: Intensity;
 }
 
 export interface QualityView {
@@ -365,13 +367,14 @@ export function knownProviders(snapshot: Snapshot): Set<string> {
 }
 
 /** The month of work being priced: the scenario, or the usage the user supplied. */
-export function mixFor(req: { task: TaskId; usage?: RecommendationRequest['usage'] }): TokenMix {
+export function mixFor(req: { task: TaskId; usage?: RecommendationRequest['usage']; intensity?: Intensity }): TokenMix {
   const scenario = SCENARIOS[req.task];
+  const k = INTENSITIES[req.intensity ?? 'standard'];
   return {
-    input: req.usage?.input ?? scenario.monthly.input,
-    output: req.usage?.output ?? scenario.monthly.output,
-    cacheRead: req.usage?.cacheRead ?? scenario.monthly.cacheRead,
-    cacheWrite: req.usage?.cacheWrite ?? scenario.monthly.cacheWrite,
+    input: req.usage?.input ?? scenario.monthly.input * k,
+    output: req.usage?.output ?? scenario.monthly.output * k,
+    cacheRead: req.usage?.cacheRead ?? scenario.monthly.cacheRead * k,
+    cacheWrite: req.usage?.cacheWrite ?? scenario.monthly.cacheWrite * k,
   };
 }
 

@@ -5,7 +5,7 @@ import fastifyStatic from '@fastify/static';
 import { SERVER, SITE, SOURCES } from '../config.js';
 import { recommend, type RecommendationRequest } from '../engine/recommend.js';
 import { buildOpenCodeConfig } from '../engine/opencode.js';
-import { SCENARIOS, TASK_IDS, PRIORITIES, type Priority, type TaskId } from '../engine/scenarios.js';
+import { INTENSITY_IDS, SCENARIOS, TASK_IDS, PRIORITIES, type Intensity, type Priority, type TaskId } from '../engine/scenarios.js';
 import { browserLang, DEFAULT_LANG, isLang, LANG_COOKIE, LANGS, pagePath, type Lang, type Page } from '../i18n.js';
 import { priceHistory, listRuns, previousRun } from '../pipeline/store.js';
 import { describeChange, type Change } from '../engine/changes.js';
@@ -52,6 +52,7 @@ export function parseRequest(q: Query, lang: Lang = DEFAULT_LANG): Recommendatio
     currentModelKey: q['currentModel'] || null,
     currentOfferId: q['currentOffer'] || null,
     privacy: q['privacy'] === '1',
+    intensity: (INTENSITY_IDS as string[]).includes(q['intensity'] ?? '') ? (q['intensity'] as Intensity) : 'standard',
   };
 }
 
@@ -220,7 +221,13 @@ export async function buildServer() {
       task: request.task,
       mix: go.mix,
       stale: go.stale,
+      intensity: request.intensity ?? 'standard',
       summary: { usable: go.summary.usable, planCheaper: go.summary.planCheaper, best: go.summary.best?.planModelId ?? null },
+      choice: Object.fromEntries((['recommended', 'alternative'] as const).map((k) => {
+        const o = go.choice[k];
+        return [k, o ? { kind: o.kind, modelKey: o.modelKey, provider: o.providerName, monthUsd: o.costUsd, quality: o.quality.value } : null];
+      })),
+      promotions: go.plan.promotions ?? [],
       rows: go.rows.map((r) => ({
         model: r.planModelId,
         modelKey: r.modelKey,

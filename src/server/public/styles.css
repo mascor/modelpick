@@ -489,6 +489,11 @@ pre.code {
 .plan__table .plan__warn { display: table; margin-top: 4px; font-size: 11px; font-weight: 400; }
 .plan .details { margin-bottom: 12px; }
 .plan__title { font-size: 17px; margin: 0 0 8px; }
+.plan__cards { margin-bottom: 24px; }
+.plan__cards .pick__model { font-size: 26px; margin: 4px 0 6px; }
+.plan__terms { font-family: var(--cs-font-ui); font-size: 13px; background: var(--cs-surface-alt); border-radius: var(--cs-radius-sm); padding: 10px 12px; }
+.plan__terms p { margin: 0 0 6px; }
+.plan__terms p:last-child { margin-bottom: 0; }
 .plan__table code { font-size: 11px; }
 .plan__table td.nowrap, .plan__table .nowrap { white-space: nowrap; }
 .plan__table tr.chosen td { background: var(--cs-success-soft); }

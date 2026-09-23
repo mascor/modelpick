@@ -1,5 +1,5 @@
 {
-  "_comment": "Capped subscription plans, read by hand from each plan's documentation. capUsd is the monthly allowance at the plan's own list prices; the documentation states the limits per model. retentionDays null = not zero retention, length not stated. peakPrices: prices at busy hours (DeepSeek: 01-04 and 06-10 UTC, Mon-Fri), used as an upper bound. Update checkedAt whenever the page is read again: past 30 days the Go page says the figures may be out of date.",
+  "_comment": "Capped subscription plans, read by hand from each plan's documentation. capUsd is the monthly allowance at the plan's own list prices; the documentation states the limits per model. retentionDays null = not zero retention, length not stated. peakPrices: prices at busy hours (DeepSeek: 01-04 and 06-10 UTC, Mon-Fri), used as an upper bound. Update checkedAt whenever the page is read again: past 30 days the Go page says the figures may be out of date. promotions: temporary offers as the docs state them (\"DeepSeek V4.1 Flash 4x · Ends Sep 27\", read 2026-09-23); shown with their end date and never used in the monthly figures, which a promotion ending mid-month would overstate.",
   "plans": [
     {
       "id": "opencode-go",
@@ -191,7 +191,14 @@
           "retentionDays": 0,
           "trainsOnData": false
         }
-      }
+      },
+      "promotions": [
+        {
+          "planModelId": "deepseek-v4.1-flash",
+          "capMultiplier": 4,
+          "until": "2026-09-27"
+        }
+      ]
     }
   ]
 }

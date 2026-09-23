@@ -8,11 +8,11 @@ import type { Snapshot, SourceStatus } from '../types.js';
 import type { OfferView, Pick, Recommendation, RecommendationRequest } from '../engine/recommend.js';
 import { formatScore, metricLabel, workFactor } from '../engine/recommend.js';
 import type { Change } from '../engine/changes.js';
-import { SCENARIOS, TASK_IDS, PRIORITIES, BUDGETS } from '../engine/scenarios.js';
+import { SCENARIOS, TASK_IDS, PRIORITIES, BUDGETS, CLOSE_POINTS, INTENSITY_IDS } from '../engine/scenarios.js';
 import { accountName, usabilityLabel } from '../engine/usability.js';
 import { signupUrl } from '../engine/signup.js';
 import { configFor } from '../engine/opencode.js';
-import { EVEN_USD, retentionUntil, type PlanComparison, type PlanRow } from '../engine/plans.js';
+import { activePromotions, EVEN_USD, retentionUntil, type ChoiceOption, type PlanComparison, type PlanRow } from '../engine/plans.js';
 import { t, pagePath, otherLang, type Lang } from '../i18n.js';
 import type { RunStatus } from '../pipeline/store.js';
 import { msUntilNextRun } from '../scheduler.js';
@@ -459,9 +459,16 @@ export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: R
   const c = t(lang);
   const g = c.go;
   const taskName = (c.tasks[request.task] ?? SCENARIOS[request.task].label).toLowerCase();
+  const intensity = request.intensity ?? 'standard';
+  // Plain links carrying both choices, so the page works without JavaScript and links can be shared.
+  const link = (task: string, level: string) => `${pagePath(lang, 'go')}?${new URLSearchParams({ task, ...(level !== 'standard' ? { intensity: level } : {}) }).toString()}`;
   const choices = `<div class="choices">
       <span class="choices__label">${esc(c.home.workType)}</span>
-      ${TASK_IDS.map((id) => `<a class="choice${id === request.task ? ' choice--active' : ''}" href="${esc(pagePath(lang, 'go'))}?task=${esc(id)}"${id === request.task ? ' aria-current="true"' : ''}>${esc(c.tasks[id] ?? SCENARIOS[id].label)}</a>`).join('')}
+      ${TASK_IDS.map((id) => `<a class="choice${id === request.task ? ' choice--active' : ''}" href="${esc(link(id, intensity))}"${id === request.task ? ' aria-current="true"' : ''}>${esc(c.tasks[id] ?? SCENARIOS[id].label)}</a>`).join('')}
+    </div>
+    <div class="choices">
+      <span class="choices__label">${esc(g.intensityLabel)}</span>
+      ${INTENSITY_IDS.map((id) => `<a class="choice${id === intensity ? ' choice--active' : ''}" href="${esc(link(request.task, id))}"${id === intensity ? ' aria-current="true"' : ''}>${esc(g.intensities[id] ?? id)}</a>`).join('')}
     </div>`;
 
   if (!go) {
@@ -478,12 +485,52 @@ export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: R
   const losers = shown.filter((r) => r.verdict === 'direct' || r.verdict === 'even');
   const notEnough = shown.filter((r) => r.verdict === 'not-enough');
 
-  // Rows come best score first, so the first winner is the best model Go pays off with.
-  const answer = !shown.length
+  const f = fmt(lang);
+  const fee = usd(go.plan.monthlyFeeUsd, lang);
+  const { recommended, alternative } = go.choice;
+  const optName = (o: ChoiceOption) => modelName(o.model?.displayName ?? o.modelKey);
+  const answer = !recommended
     ? g.noData
-    : winners.length
-      ? g.yes(taskName, String(winners.length), String(shown.length), name(winners[0]!))
-      : g.no(taskName);
+    : recommended.kind === 'plan'
+      ? g.answerPlan(taskName, optName(recommended), fee)
+      : g.answerToken(taskName, optName(recommended), usd(recommended.costUsd, lang));
+
+  /** The plan's limits, promotion and check date, beside any option on the plan. */
+  const planTerms = (o: ChoiceOption): string => {
+    const row = go.rows.find((r) => r.offer.id === o.offer.id);
+    if (!row) return '';
+    const promo = activePromotions(go.plan).find((p) => p.planModelId === row.planModelId);
+    return `<div class="plan__terms">
+      <p>${esc(g.limits(usd(row.terms.capUsd, lang), f.n.format(go.plan.fiveHourPercent), f.n.format(go.plan.weeklyPercent)))} ${esc(g.shortWindows)}</p>
+      ${promo ? `<p>${esc(g.promo(f.n.format(promo.capMultiplier), dateDay(promo.until, lang)))}</p>` : ''}
+      <p class="meta">${esc(g.checked(dateDay(go.plan.checkedAt, lang)))} <a href="${esc(go.plan.sourceUrl)}" rel="noopener">opencode.ai/docs/go</a></p>
+    </div>`;
+  };
+
+  const card = (o: ChoiceOption | null, role: 'recommended' | 'alternative'): string => {
+    const cls = role === 'recommended' ? 'pick--everyday' : 'pick--hard';
+    const title = role === 'recommended' ? g.recommended : g.alternative;
+    if (!o) {
+      const empty = !recommended ? g.noData : recommended.kind === 'plan' ? g.noAltToken(fee) : g.noAltPlan;
+      return `<article class="card pick ${cls}"><p class="pick__role">${esc(title)}</p><div class="notice notice--neutral">${esc(empty)}</div></article>`;
+    }
+    const why = role === 'recommended'
+      ? g.whyRecommended(fee, String(CLOSE_POINTS))
+      : o.kind === 'plan' ? g.whyAltPlan : g.whyAltToken(fee);
+    const versus = role === 'alternative' && recommended
+      ? g.versus(f.n.format(Math.max(0, recommended.quality.value - o.quality.value)), o.costUsd > recommended.costUsd, usd(Math.abs(o.costUsd - recommended.costUsd), lang))
+      : null;
+    const warning = o.kind === 'plan' ? (() => { const r = go.rows.find((x) => x.offer.id === o.offer.id); return r ? planDataWarning(r, lang) : null; })() : null;
+    return `<article class="card pick ${cls}">
+      <p class="pick__role">${esc(title)}</p>
+      <h2 class="pick__model">${esc(optName(o))}</h2>
+      <p class="pick__summary">${esc(g.perMonth('\u0000')).replace('\u0000', `<strong class="pick__price">${esc(usd(o.costUsd, lang))}</strong>`)}</p>
+      <p class="pick__evidence">${esc(o.kind === 'plan' ? g.onPlan : g.perToken(o.providerName))} · Coding Index ${esc(formatScore(o.quality.value, o.quality.metric))}</p>
+      ${warning ? `<p class="alert">${esc(warning)}</p>` : ''}
+      <p class="pick__why">${esc(why)}${versus ? ` ${esc(versus)}` : ''}</p>
+      ${o.kind === 'plan' ? planTerms(o) : ''}
+    </article>`;
+  };
 
   const row = (r: PlanRow) => {
     const m = r.month!;
@@ -496,8 +543,10 @@ export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: R
           ? `<span class="label label--ok">${esc(g.goWins(usd(r.savingUsd!, lang)))}</span>`
           : `<span class="label label--info">${esc(g.payWins(usd(-r.savingUsd!, lang)))}</span>`;
     const warning = planDataWarning(r, lang);
+    const promo = activePromotions(go.plan).find((p) => p.planModelId === r.planModelId);
+    const notes = [warning, promo ? g.promo(f.n.format(promo.capMultiplier), dateDay(promo.until, lang)) : null].filter(Boolean) as string[];
     return `<tr${r.verdict === 'plan' ? ' class="chosen"' : ''}>
-      <td class="stack__title">${esc(name(r))}${warning ? `<span class="label label--warning plan__warn">${esc(warning)}</span>` : ''}</td>
+      <td class="stack__title">${esc(name(r))}${notes.map((n) => `<span class="visually-hidden">, </span><span class="label label--warning plan__warn">${esc(n)}</span>`).join('')}</td>
       <td class="num" data-label="${esc(g.cols[1])}">${esc(formatScore(r.quality!.value, r.quality!.metric))}</td>
       <td class="num nowrap" data-label="${esc(g.cols[2])}"><strong>${esc(usd(go.plan.monthlyFeeUsd, lang))}</strong>${m.coveredShare < 1 ? `<span class="meta">${esc(g.lasts(covers))}</span>` : ''}</td>
       <td class="num nowrap" data-label="${esc(g.cols[3])}"><strong>${esc(usd(r.direct!.cost.totalUsd, lang))}</strong><span class="meta">${esc(r.direct!.offer.providerName)}</span></td>
@@ -510,19 +559,21 @@ export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: R
         <tbody>${rows.map(row).join('')}</tbody>
       </table>`;
 
-  const f = fmt(lang);
-  const fee = usd(go.plan.monthlyFeeUsd, lang);
   const body = `<section class="answer">
   <div class="container">
     <h1 class="answer__title">${esc(g.title)}</h1>
     <p class="answer__line">${esc(answer)}</p>
-    <p class="answer__date">${esc(g.lead(fee))}</p>
+    <p class="answer__date">${esc(g.scenario(taskName, g.intensities[intensity] ?? intensity, g.intensityNotes[intensity] ?? ''))}</p>
     ${choices}
   </div>
 </section>
 <section class="section">
   <div class="container plan">
     ${go.stale ? `<div class="notice">${esc(g.stale(f.n.format(go.checkedAgeDays ?? 0)))}</div>` : ''}
+    <div class="results plan__cards">
+      ${card(recommended, 'recommended')}
+      ${card(alternative, 'alternative')}
+    </div>
     ${winners.length ? `<div class="card">
       <h2 class="plan__title">${esc(g.winnersTitle)}</h2>
       ${table(winners)}
@@ -543,7 +594,7 @@ export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: R
     <details class="details">
       <summary>${esc(g.howTitle)}</summary>
       <div class="details__body">
-        <ul class="list">${g.how(taskName, fee, f.n.format(go.plan.fiveHourPercent), f.n.format(go.plan.weeklyPercent)).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
+        <ul class="list">${[...g.how(taskName, fee, f.n.format(go.plan.fiveHourPercent), f.n.format(go.plan.weeklyPercent)), g.tokens(tokens(go.mix.input, lang), tokens(go.mix.output, lang), tokens(go.mix.cacheRead, lang))].map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
         <p class="meta">${esc(g.source(dateDay(go.plan.checkedAt, lang)))} <a href="${esc(go.plan.sourceUrl)}" rel="noopener">opencode.ai/docs/go</a> · ${esc(c.home.aaDisclaimer)}</p>
       </div>
     </details>

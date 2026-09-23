@@ -134,6 +134,11 @@ export interface Plan {
   overageProviderId: string | null;
   /** Keyed by the plan's own model id (remoteModelId). */
   models: Record<string, PlanModel>;
+  /**
+   * Temporary offers as the documentation states them, with their last day.
+   * Shown with that date and never folded into the ordinary price.
+   */
+  promotions?: { planModelId: string; capMultiplier: number; until: string }[];
   sourceUrl: string;
   /** Day the documentation was read, YYYY-MM-DD. */
   checkedAt: string;

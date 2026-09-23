@@ -62,6 +62,14 @@ export const SCENARIOS: Record<TaskId, Scenario> = {
 };
 
 export const TASK_IDS = Object.keys(SCENARIOS) as TaskId[];
+
+/**
+ * How much of that work a month holds. A stated multiplier on the scenario's
+ * tokens, never a measurement: "standard" is the scenario as written.
+ */
+export type Intensity = 'light' | 'standard' | 'heavy';
+export const INTENSITIES: Record<Intensity, number> = { light: 0.5, standard: 1, heavy: 2 };
+export const INTENSITY_IDS = Object.keys(INTENSITIES) as Intensity[];
 export const PRIORITIES: Priority[] = ['cheap', 'balanced', 'quality'];
 
 /**

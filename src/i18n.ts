@@ -190,12 +190,31 @@ export interface Catalog {
   go: {
     title: string;
     description: string;
-    yes: (task: string, n: string, total: string, best: string) => string;
+    answerPlan: (task: string, model: string, fee: string) => string;
+    answerToken: (task: string, model: string, cost: string) => string;
+    intensityLabel: string;
+    intensities: Record<string, string>;
+    intensityNotes: Record<string, string>;
+    scenario: (task: string, intensity: string, note: string) => string;
+    recommended: string;
+    alternative: string;
+    perMonth: (amount: string) => string;
+    onPlan: string;
+    perToken: (provider: string) => string;
+    whyRecommended: (budget: string, points: string) => string;
+    whyAltPlan: string;
+    whyAltToken: (budget: string) => string;
+    versus: (points: string, more: boolean, amount: string) => string;
+    noAltPlan: string;
+    noAltToken: (budget: string) => string;
+    limits: (cap: string, five: string, week: string) => string;
+    shortWindows: string;
+    promo: (mult: string, until: string) => string;
+    checked: (date: string) => string;
     winnersTitle: string;
     losersTitle: (n: number) => string;
-    no: (task: string) => string;
     noData: string;
-    lead: (fee: string) => string;
+    tokens: (input: string, output: string, cache: string) => string;
     cols: [string, string, string, string, string];
     goWins: (amount: string) => string;
     payWins: (amount: string) => string;
@@ -453,13 +472,36 @@ const it: Catalog = {
   go: {
     title: 'Ti conviene OpenCode Go?',
     description: "Con quali modelli l'abbonamento OpenCode Go costa meno che pagare a consumo, per il lavoro che fai.",
-    yes: (task, n, total, best) => `Per ${task}, sì con ${n} modelli su ${total}. Il migliore è ${best}.`,
-    winnersTitle: 'Con questi modelli conviene Go',
+    answerPlan: (task, m, fee) => `Per ${task}, sì: la scelta migliore è ${m} su Go, a ${fee} al mese.`,
+    answerToken: (task, m, cost) => `Per ${task}, no: la scelta migliore è ${m} pagato a consumo, circa ${cost} al mese.`,
+    intensityLabel: 'Quanto lo usi',
+    intensities: { light: 'Uso occasionale', standard: 'Uso quotidiano', heavy: 'Uso intenso' },
+    intensityNotes: {
+      light: 'metà del lavoro di un uso quotidiano',
+      standard: 'una persona che usa un agente di codice ogni giorno',
+      heavy: 'il doppio: giornate lunghe o più sessioni in parallelo',
+    },
+    scenario: (task, i, note) => `Costo mensile stimato per ${task}, ${i.toLowerCase()} (${note}). Sono stime, non i tuoi consumi reali.`,
+    recommended: 'Scelta consigliata',
+    alternative: 'Alternativa',
+    perMonth: (a) => `${a} al mese stimati`,
+    onPlan: 'su OpenCode Go',
+    perToken: (p) => `a consumo, da ${p}`,
+    whyRecommended: (b, pts) => `Il Coding Index più alto fra tutte le opzioni che costano al massimo ${b} al mese, il prezzo di Go; a parità (entro ${pts} punti) vince la più economica.`,
+    whyAltPlan: 'Se vuoi Go: il modello migliore per cui l\'abbonamento costa meno che pagarlo a consumo, e il tetto basta per tutto il mese.',
+    whyAltToken: (b) => `La migliore opzione a consumo entro ${b} al mese.`,
+    versus: (pts, more, a) => `Rispetto alla scelta consigliata: ${pts} punti in meno e ${a} ${more ? 'in più' : 'in meno'} al mese.`,
+    noAltPlan: 'Con Go nessun modello costa meno che pagarlo a consumo per un mese di questo lavoro, a questa intensità.',
+    noAltToken: (b) => `Nessuna opzione a consumo entro ${b} al mese.`,
+    limits: (cap, five, week) => `Tetto del modello: ${cap} al mese ai prezzi di Go; al massimo il ${five}% in 5 ore e il ${week}% in una settimana.`,
+    shortWindows: 'Copertura mensile stimata; possibili interruzioni per i limiti di breve periodo.',
+    promo: (m, u) => `Promozione temporanea: tetto ×${m} fino al ${u}, non inclusa nella stima del mese.`,
+    checked: (d) => `Condizioni verificate il ${d}.`,
+    winnersTitle: 'Go conviene rispetto a pagare a consumo gli stessi modelli',
     losersTitle: (n) => `Con altri ${n} modelli spendi meno pagando a consumo`,
     notEnoughTitle: (n) => `Con altri ${n} modelli Go non basta per un mese di questo lavoro`,
-    no: (task) => `Per ${task}, no: con ogni modello di Go spendi meno pagando a consumo.`,
     noData: 'Oggi nessun modello di Go è utilizzabile con i nostri dati.',
-    lead: (fee) => `Go costa ${fee} al mese, ma ogni modello ha un tetto di consumo. Qui trovi i modelli con cui quei ${fee} bastano per tutto il mese e costano meno che pagare a consumo.`,
+    tokens: (i, o, ca) => `Token al mese in questo scenario: ${i} in input, ${o} in output e ${ca} letti dalla cache. Uso occasionale = metà, uso intenso = il doppio dell'uso quotidiano.`,
     cols: ['Modello', 'Qualità', 'Con Go', 'A consumo', 'Conviene'],
     goWins: (a) => `Go, risparmi ${a}`,
     payWins: (a) => `A consumo, risparmi ${a}`,
@@ -727,13 +769,36 @@ const en: Catalog = {
   go: {
     title: 'Is OpenCode Go worth it for you?',
     description: 'Which models cost less on the OpenCode Go subscription than paying per token, for the work you do.',
-    yes: (task, n, total, best) => `For ${task}, yes with ${n} of ${total} models. The best of them is ${best}.`,
-    winnersTitle: 'With these models Go is the better deal',
+    answerPlan: (task, m, fee) => `For ${task}, yes: the best choice is ${m} on Go, at ${fee} a month.`,
+    answerToken: (task, m, cost) => `For ${task}, no: the best choice is ${m} paid per token, about ${cost} a month.`,
+    intensityLabel: 'How much you use it',
+    intensities: { light: 'Occasional use', standard: 'Daily use', heavy: 'Heavy use' },
+    intensityNotes: {
+      light: 'half the work of daily use',
+      standard: 'one person using a coding agent every day',
+      heavy: 'twice that: long days or several sessions in parallel',
+    },
+    scenario: (task, i, note) => `Estimated monthly cost for ${task}, ${i.toLowerCase()} (${note}). These are estimates, not your actual usage.`,
+    recommended: 'Recommended',
+    alternative: 'Alternative',
+    perMonth: (a) => `${a} estimated per month`,
+    onPlan: 'on OpenCode Go',
+    perToken: (p) => `pay per token, at ${p}`,
+    whyRecommended: (b, pts) => `The highest Coding Index among all the options costing at most ${b} a month, Go's price; within ${pts} points they count as equal and the cheapest wins.`,
+    whyAltPlan: 'If you want Go: the best model for which the subscription costs less than paying for it per token, and the allowance lasts the whole month.',
+    whyAltToken: (b) => `The best pay-per-token option within ${b} a month.`,
+    versus: (pts, more, a) => `Against the recommended choice: ${pts} points lower and ${a} ${more ? 'more' : 'less'} a month.`,
+    noAltPlan: 'On Go no model costs less than paying for it per token for a month of this work at this intensity.',
+    noAltToken: (b) => `No pay-per-token option within ${b} a month.`,
+    limits: (cap, five, week) => `Model allowance: ${cap} a month at Go's prices; at most ${five}% in 5 hours and ${week}% in a week.`,
+    shortWindows: 'Estimated monthly coverage; short-term limits may interrupt you.',
+    promo: (m, u) => `Temporary promotion: allowance ×${m} until ${u}, not included in the monthly estimate.`,
+    checked: (d) => `Terms checked on ${d}.`,
+    winnersTitle: 'Go beats paying per token for these same models',
     losersTitle: (n) => `With ${n} other models paying per token costs less`,
     notEnoughTitle: (n) => `With ${n} other models Go is not enough for a month of this work`,
-    no: (task) => `For ${task}, no: every Go model costs less paying per token.`,
     noData: 'No Go model is usable with our data today.',
-    lead: (fee) => `Go costs ${fee} a month, but each model has a usage allowance. These are the models for which that ${fee} lasts the whole month and costs less than paying per token.`,
+    tokens: (i, o, ca) => `Tokens a month in this scenario: ${i} input, ${o} output and ${ca} read from cache. Occasional use = half, heavy use = twice daily use.`,
     cols: ['Model', 'Quality', 'On Go', 'Pay per token', 'Better deal'],
     goWins: (a) => `Go, you save ${a}`,
     payWins: (a) => `Per token, you save ${a}`,
