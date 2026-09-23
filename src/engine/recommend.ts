@@ -144,7 +144,7 @@ const METRIC_PRIORITY: QualityEvidence['metric'][] = ['aa_coding_index', 'sweben
  * method across hundreds of models), otherwise the SWE-bench harness that
  * measured the most models. Comparing inside it is fair; nothing else is used.
  */
-function referenceGroup(evidence: QualityEvidence[]): {
+export function referenceGroup(evidence: QualityEvidence[]): {
   key: string | null;
   label: string | null;
   size: number;
@@ -200,7 +200,7 @@ export function effortOf(variant: string | null): string | null {
 }
 
 /** One measured variant as the engine shows it. */
-function viewOf(e: QualityEvidence, now: number): QualityView {
+export function viewOf(e: QualityEvidence, now: number): QualityView {
   const measured = e.measuredAt ? Date.parse(e.measuredAt) : NaN;
   return {
     value: e.value,
@@ -225,7 +225,7 @@ function viewOf(e: QualityEvidence, now: number): QualityView {
  * - Anthropic's own API: OpenCode uses "high" unless changed by hand;
  * - anywhere else we cannot tell, so only the lowest measured variant counts.
  */
-function deliverable(variants: QualityEvidence[], offer: Offer): QualityEvidence[] {
+export function deliverable(variants: QualityEvidence[], offer: Offer): QualityEvidence[] {
   if (variants.length <= 1) return variants;
   if (offer.providerId === 'openai' && offer.sourceId !== 'openrouter') {
     const settable = variants.filter((v) => OPENAI_EFFORTS.has(effortOf(v.reasoningEffort) ?? ''));
@@ -275,10 +275,15 @@ export function budgetFor(snapshot: Snapshot, priority: Priority, mix: TokenMix)
   return { everyday: round(BUDGETS[priority].everyday), hard: round(BUDGETS[priority].hard) };
 }
 
-/** Offer-level eligibility. Returns null when usable, otherwise the reason it is not. */
-function offerBlocker(offer: Offer, req: RecommendationRequest, minContext: number, now: number): ReasonCode | null {
+/**
+ * Offer-level eligibility. Returns null when usable, otherwise the reason it is not.
+ * Offers inside a capped plan are left out unless `withPlans` is set: their
+ * price draws down an allowance, and the plan page compares them properly.
+ */
+export function offerBlocker(offer: Offer, req: RecommendationRequest, minContext: number, now: number, withPlans = false): ReasonCode | null {
   void req;
   if (offer.demo) return 'demo';
+  if (offer.planId && !withPlans) return 'capped-plan';
   // We publish commands to paste: if OpenCode does not know this model-provider
   // pair, the command does not run and the offer should not even be shown.
   if (offer.opencodeVerified === false) return 'opencode-unknown';
@@ -296,7 +301,7 @@ function offerBlocker(offer: Offer, req: RecommendationRequest, minContext: numb
   return null;
 }
 
-function rankOffers(
+export function rankOffers(
   offers: Offer[],
   mix: TokenMix,
   req: RecommendationRequest,
@@ -343,26 +348,39 @@ function rankOffers(
   return { usable, ready, blocked };
 }
 
-export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recommendation {
-  const now = Date.now();
-  const c = t(req.lang);
-  // Providers a curated directory lists, plus their own first-party sellers.
-  // The directory writes a company with its product ("Anthropic Claude") where
-  // our offers carry the company alone, so the first word counts as a name too,
-  // but only when it belongs to exactly one entry.
+/**
+ * Providers a curated directory lists, plus their own first-party sellers.
+ * The directory writes a company with its product ("Anthropic Claude") where
+ * our offers carry the company alone, so the first word counts as a name too,
+ * but only when it belongs to exactly one entry.
+ */
+export function knownProviders(snapshot: Snapshot): Set<string> {
   const directory = Object.values(snapshot.providers ?? {});
   const known = new Set(directory.map((p) => providerKey(p.name)));
   const firstWords = directory.map((p) => providerKey(p.name.split(/\s+/)[0] ?? ''));
   for (const word of firstWords) {
     if (word && firstWords.filter((w) => w === word).length === 1) known.add(word);
   }
+  return known;
+}
+
+/** The month of work being priced: the scenario, or the usage the user supplied. */
+export function mixFor(req: { task: TaskId; usage?: RecommendationRequest['usage'] }): TokenMix {
   const scenario = SCENARIOS[req.task];
-  const mix: TokenMix = {
+  return {
     input: req.usage?.input ?? scenario.monthly.input,
     output: req.usage?.output ?? scenario.monthly.output,
     cacheRead: req.usage?.cacheRead ?? scenario.monthly.cacheRead,
     cacheWrite: req.usage?.cacheWrite ?? scenario.monthly.cacheWrite,
   };
+}
+
+export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recommendation {
+  const now = Date.now();
+  const c = t(req.lang);
+  const known = knownProviders(snapshot);
+  const scenario = SCENARIOS[req.task];
+  const mix = mixFor(req);
   const usingCustomUsage = Boolean(
     req.usage && (req.usage.input || req.usage.output || req.usage.cacheRead || req.usage.cacheWrite),
   );

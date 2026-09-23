@@ -91,6 +91,52 @@ export interface Offer {
   quarantine?: string | null;
   /** Set when the provider is suspended: the price may be real, the account is not obtainable. */
   blockedReason?: string | null;
+  /**
+   * Set when the offer belongs to a subscription with a usage cap (e.g.
+   * "opencode-go"): its per-token price draws down an allowance instead of
+   * being billed, so it is compared on its own page, never as a plain price.
+   */
+  planId?: string | null;
+}
+
+/** What a capped plan says about one of its models, as its documentation states it. */
+export interface PlanModel {
+  /** Monthly allowance, USD at the plan's own list prices. */
+  capUsd: number;
+  /** Days prompts are kept; null when the documentation does not say. */
+  retentionDays: number | null;
+  /** True when prompts may be used for training. */
+  trainsOnData: boolean;
+  /** Code for a note the page renders in its own language, e.g. a retention agreement end date. */
+  note?: string | null;
+  /**
+   * Higher prices charged at busy hours. The allowance is drawn at these
+   * prices: an upper bound, since nobody chooses when their bugs happen.
+   */
+  peakPrices?: Partial<PriceSet> | null;
+}
+
+/**
+ * A subscription with a monthly fee and a monthly allowance per model, drawn
+ * down at the plan's list prices (OpenCode Go). Curated by hand from the
+ * plan's documentation, with the date it was read.
+ */
+export interface Plan {
+  id: string;
+  name: string;
+  /** Provider id its offers carry in the sources, e.g. "opencode-go". */
+  providerId: string;
+  monthlyFeeUsd: number;
+  /** Share of the monthly allowance usable in 5 hours and in a week. */
+  fiveHourPercent: number;
+  weeklyPercent: number;
+  /** Provider whose pay-as-you-go prices apply beyond the allowance, when enabled. */
+  overageProviderId: string | null;
+  /** Keyed by the plan's own model id (remoteModelId). */
+  models: Record<string, PlanModel>;
+  sourceUrl: string;
+  /** Day the documentation was read, YYYY-MM-DD. */
+  checkedAt: string;
 }
 
 export interface ModelRecord {
@@ -214,6 +260,8 @@ export interface Snapshot {
   opencodeVersion?: string | null;
   replacements?: Replacement[];
   usage?: UsageSignal[];
+  /** Capped subscription plans, from the curated list. */
+  plans?: Plan[];
   stats: {
     modelCount: number;
     offerCount: number;

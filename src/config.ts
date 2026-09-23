@@ -67,6 +67,11 @@ export const THRESHOLDS = {
   minUptime1d: num(env.MODELPICK_MIN_UPTIME_DAY, 98),
   /** Minimum context an offer must serve to be usable with a coding agent. */
   minContextTokens: num(env.MODELPICK_MIN_CONTEXT, 100_000),
+  /**
+   * Plan terms are read by hand from the plan's documentation: past this age
+   * the plan page says they may no longer be current.
+   */
+  planMaxAgeDays: num(env.MODELPICK_PLAN_MAX_DAYS, 30),
 };
 
 /** Artificial Analysis API: private key, and a download at most once per update. */

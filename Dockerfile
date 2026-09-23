@@ -11,6 +11,9 @@ RUN npm run build
 # OpenCode only accepts the identifiers it knows: we extract them from OpenCode
 # itself, so the site cannot publish a command that would not run. The keys are
 # dummies and only make it list the providers: no call is made to any model.
+# OPENCODE_API_KEY is given to one listing only and only its opencode-go/ lines
+# are kept: the same key would also list OpenCode Zen's paid models, and those
+# are a separate decision (see issue #1).
 FROM node:22-alpine AS opencode
 RUN npm install -g opencode-ai@1.18.32
 ENV DEEPINFRA_API_KEY=x OPENROUTER_API_KEY=x ANTHROPIC_API_KEY=x OPENAI_API_KEY=x \
@@ -20,6 +23,7 @@ ENV DEEPINFRA_API_KEY=x OPENROUTER_API_KEY=x ANTHROPIC_API_KEY=x OPENAI_API_KEY=
     BASETEN_API_KEY=x NEBIUS_API_KEY=x HUGGINGFACE_API_KEY=x VENICE_API_KEY=x
 RUN mkdir -p /registry \
  && opencode models > /registry/models.txt \
+ && OPENCODE_API_KEY=x opencode models | grep '^opencode-go/' >> /registry/models.txt \
  && opencode --version > /registry/version.txt \
  && test -s /registry/models.txt
 

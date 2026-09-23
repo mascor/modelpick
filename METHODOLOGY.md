@@ -100,6 +100,33 @@ The default usage scenarios are **stated, editable assumptions**, not measuremen
 
 Savings are only calculated against a configuration the user has declared, and are always labelled as an estimate.
 
+## 5-bis. Capped subscription plans (OpenCode Go)
+
+A capped plan charges a fixed monthly fee and gives each model a monthly allowance, counted in dollars **at the plan's own list prices**. Those per-token prices are therefore not a price anyone pays: they only measure how fast the allowance runs out. So plan offers **never compete on the main page** (reason `capped-plan`); they are compared on their own page, `/go` (`/en/go`), and in the API at `/api/plans/opencode-go?task=…`.
+
+The plan's terms (fee, allowance per model, 5-hour and weekly windows, retention, busy-hour prices) are read by hand from the plan's documentation into `data/curated/plans.json`, with the day they were read. Past `MODELPICK_PLAN_MAX_DAYS` (default 30) the page says they may be out of date. Per-token prices still come from the sources (models.dev), like every other offer, and the plan's offers must pass the same checks (OpenCode accepts the id, recent price, tools, context).
+
+For one month of the chosen work, with `C` the allowance the month uses (plan prices), `T` the model's allowance, `O` the month at the pay-as-you-go prices that apply beyond it and `P` the cheapest provider we would recommend for the same model:
+
+| Situation | Plan month |
+|---|---|
+| `C ≤ T` | the fee |
+| `C > T` | the fee + `(1 − T/C) × O`: only the share of the work the allowance does not cover, at pay-as-you-go prices |
+
+Beyond the allowance the plan stops unless "Use balance" is enabled; with it, OpenCode Go bills the rest from the OpenCode Zen balance, so `O` uses Zen's price for the same model when a source publishes one, otherwise the plan's own list price (stated on the row).
+
+**When the plan pays off.** Both bills grow with the amount of work: the provider's in a straight line, the plan's flat up to the allowance and then at `O`. The page gives the range of monthly spend at the provider in which the plan costs less:
+
+- if the allowance still covers the work when the provider reaches the fee (`fee / P ≤ T / C`): from the fee upwards, up to `P × (T·O/C − fee) / (O − P)` when `O > P`, with no upper end otherwise;
+- otherwise, only when pay-as-you-go is cheaper than the provider (`O < P`): from `P × (fee − T·O/C) / (P − O)` upwards; if not, never.
+
+Stated assumptions, shown on the page:
+
+- the documentation gives the allowance **per model**; whether two models used in the same month each have their own is not stated in so many words, so every row assumes a single model;
+- DeepSeek models cost more at busy hours: the allowance is drawn at those prices, an upper bound;
+- prices that rise beyond a context length are taken at the base price, as everywhere on the site;
+- the 5-hour (20%) and weekly (50%) windows are stated, not modelled: the monthly figures assume work spread over the month.
+
 ## 6. Operating thresholds
 
 | Rule | Value | Effect |

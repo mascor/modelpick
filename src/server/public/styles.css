@@ -122,6 +122,7 @@ a { color: var(--cs-link); }
 .menu { display: flex; gap: 20px; font-size: 15px; }
 .menu a { color: var(--cs-text-muted); text-decoration: none; }
 .menu a:hover { color: var(--cs-link); }
+.menu__short { display: none; }
 @media (max-width: 720px) { .menu { display: none; } }
 
 /* Hero */
@@ -346,6 +347,9 @@ pre.code {
   .menu::-webkit-scrollbar { display: none; }
   .menu a { display: inline-flex; align-items: center; min-height: 32px; white-space: nowrap; }
   .menu .lang-switch { margin-left: auto; font-weight: 600; color: var(--cs-color-primary); }
+  /* Six links and the language must fit a phone without scrolling out of sight. */
+  .menu__long { display: none; }
+  .menu__short { display: inline; }
   @media (max-width: 400px) { .menu { gap: 12px; } }
 
   /* Compact notices: they inform, but must not push the action off screen. */
@@ -477,6 +481,17 @@ pre.code {
 .preview summary::marker { content: ''; }
 .preview summary { display: inline-block; }
 .preview pre.code { margin: 6px 0 0; font-size: 12px; white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow: auto; text-align: left; }
+
+/* OpenCode Go page: one model per row, the plan against the cheapest provider. */
+.plan .card { margin-bottom: 20px; overflow-x: auto; }
+.plan__table td .meta { display: block; font-size: 11px; font-weight: 400; margin-top: 2px; }
+.plan__table td .label { display: inline-block; }
+.plan__table code { font-size: 11px; }
+.plan__table td.nowrap, .plan__table .nowrap { white-space: nowrap; }
+.plan__table tr.chosen td { background: var(--cs-success-soft); }
+.plan__table tr.chosen td:first-child { border-left: 3px solid var(--cs-success); }
+.pick__plan { font-family: var(--cs-font-ui); font-size: 13px; margin: -8px 0 16px; }
+.plan-link { font-family: var(--cs-font-ui); font-size: 14px; margin-top: 20px; text-align: center; }
 
 /* One column below 960px: two cards side by side are cramped here. */
 @media (max-width: 960px) {

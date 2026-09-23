@@ -9,7 +9,8 @@ import { SCENARIOS, TASK_IDS, PRIORITIES, type Priority, type TaskId } from '../
 import { browserLang, DEFAULT_LANG, isLang, LANG_COOKIE, LANGS, pagePath, type Lang, type Page } from '../i18n.js';
 import { priceHistory, listRuns, previousRun } from '../pipeline/store.js';
 import { describeChange, type Change } from '../engine/changes.js';
-import { homePage, methodPage, notFoundPage, sourcesPage, statusPage } from './html.js';
+import { goPage, homePage, methodPage, notFoundPage, sourcesPage, statusPage } from './html.js';
+import { comparePlan } from '../engine/plans.js';
 import { currentSnapshot, currentStatus } from './snapshot.js';
 
 type Query = Record<string, string | undefined>;
@@ -109,7 +110,7 @@ export async function buildServer() {
    * send anyone who has not asked for Italian from the Italian pages to the
    * English ones.
    */
-  const negotiate = (lang: Lang, page: 'home' | 'method' | 'sources' | 'status') =>
+  const negotiate = (lang: Lang, page: Page) =>
     async (req: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => {
       const query = { ...(req.query as Query) };
       const picked = isLang(query['lang']) ? query['lang'] : null;
@@ -125,11 +126,18 @@ export async function buildServer() {
       }
     };
 
-  const register = (lang: Lang, paths: { home: string; method: string; sources: string; status: string }) => {
+  const register = (lang: Lang, paths: Record<Page, string>) => {
     app.get(paths.home, { onRequest: negotiate(lang, 'home') }, async (req, reply) => {
       const { snapshot, request, rec, changes } = await compute(req.query as Query, lang);
+      const go = snapshot ? comparePlan(snapshot, 'opencode-go', request) : null;
       reply.type('text/html; charset=utf-8');
-      return homePage({ lang, rec, snapshot, request, changes });
+      return homePage({ lang, rec, snapshot, request, changes, go });
+    });
+    app.get(paths.go, { onRequest: negotiate(lang, 'go') }, async (req, reply) => {
+      const snapshot = await currentSnapshot();
+      const request = parseRequest(req.query as Query, lang);
+      reply.type('text/html; charset=utf-8');
+      return goPage({ lang, snapshot, request, go: snapshot ? comparePlan(snapshot, 'opencode-go', request) : null });
     });
     app.get(paths.method, { onRequest: negotiate(lang, 'method') }, async (_req, reply) => {
       reply.type('text/html; charset=utf-8');
@@ -145,8 +153,8 @@ export async function buildServer() {
     });
   };
 
-  register('it', { home: '/', method: '/metodo', sources: '/fonti', status: '/stato' });
-  register('en', { home: '/en', method: '/en/method', sources: '/en/sources', status: '/en/status' });
+  register('it', { home: pagePath('it', 'home'), method: pagePath('it', 'method'), go: pagePath('it', 'go'), sources: pagePath('it', 'sources'), status: pagePath('it', 'status') });
+  register('en', { home: pagePath('en', 'home'), method: pagePath('en', 'method'), go: pagePath('en', 'go'), sources: pagePath('en', 'sources'), status: pagePath('en', 'status') });
   // Trailing slash on the English home, so /en/ works like /en.
   app.get('/en/', async (req, reply) => reply.redirect('/en' + (req.raw.url?.includes('?') ? req.raw.url.slice(req.raw.url.indexOf('?')) : ''), 301));
 
@@ -199,6 +207,42 @@ export async function buildServer() {
     (await modelsData()).map((m) => ({ key: m.key, name: m.displayName, contextTokens: m.contextTokens, tools: m.toolCall })),
   );
   app.get('/api/scenarios', async () => SCENARIOS);
+  // The plan against the cheapest provider, per model, for the chosen kind of work.
+  app.get('/api/plans/opencode-go', async (req) => {
+    const q = req.query as Query;
+    const snapshot = await currentSnapshot();
+    if (!snapshot) return { error: 'No snapshot published yet.' };
+    const request = parseRequest(q, langOf(q));
+    const go = comparePlan(snapshot, 'opencode-go', request);
+    if (!go) return { error: 'No plan data published yet.' };
+    return {
+      plan: go.plan,
+      task: request.task,
+      mix: go.mix,
+      stale: go.stale,
+      summary: { usable: go.summary.usable, planCheaper: go.summary.planCheaper, best: go.summary.best?.planModelId ?? null },
+      rows: go.rows.map((r) => ({
+        model: r.planModelId,
+        modelKey: r.modelKey,
+        opencodeId: r.offer.opencodeId ?? null,
+        excluded: r.blocker,
+        quality: r.quality ? { value: r.quality.value, metric: r.quality.metric, measuredAt: r.quality.measuredAt } : null,
+        capUsd: r.terms.capUsd,
+        allowanceUsedUsd: r.month?.drawUsd ?? null,
+        coveredShare: r.month?.coveredShare ?? null,
+        planMonthUsd: r.month?.totalUsd ?? null,
+        overageFrom: r.overageFrom,
+        peakPrices: r.peakApplied,
+        cheapestProvider: r.direct ? { provider: r.direct.offer.providerName, offerId: r.direct.offer.id, monthUsd: r.direct.cost.totalUsd } : null,
+        savingUsd: r.savingUsd,
+        paysOffBetweenUsd: r.breakEven,
+        retentionDays: r.terms.retentionDays,
+        trainsOnData: r.terms.trainsOnData,
+        note: r.terms.note ?? null,
+      })),
+      updatedAt: snapshot.generatedAt,
+    };
+  });
   app.get('/api/history', async (req, reply) => {
     const model = (req.query as Query)['model'];
     if (!model) return reply.code(400).send({ error: 'Missing "model" parameter.' });
@@ -236,7 +280,7 @@ export async function buildServer() {
 
   /** Both languages, each page declared as the alternate of the other. */
   app.get('/sitemap.xml', async (_req, reply) => {
-    const pages: Page[] = ['home', 'method', 'sources', 'status'];
+    const pages: Page[] = ['home', 'go', 'method', 'sources', 'status'];
     const updated = ((await currentSnapshot())?.generatedAt ?? new Date().toISOString()).slice(0, 10);
     const url = (lang: Lang, page: Page) => `https://${SITE.domain}${pagePath(lang, page)}`;
     const entries = pages

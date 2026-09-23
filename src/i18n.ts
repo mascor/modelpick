@@ -45,6 +45,7 @@ export type ReasonCode =
   | 'offer-uptime'
   | 'incomplete-prices'
   | 'plan-based'
+  | 'capped-plan'
   | 'opencode-unknown';
 
 export interface Catalog {
@@ -52,7 +53,7 @@ export interface Catalog {
   htmlLang: string;
   siteDescription: string;
   siteTagline: string;
-  nav: { choice: string; method: string; sources: string; status: string; code: string; otherLang: string; otherLangCode: string };
+  nav: { choice: string; method: string; go: string; goShort: string; sources: string; status: string; code: string; otherLang: string; otherLangCode: string };
   home: {
     title: string;
     pricesVerified: (when: string) => string;
@@ -186,6 +187,42 @@ export interface Catalog {
     limits: string[];
     fullDetails: string;
   };
+  go: {
+    title: string;
+    description: string;
+    intro: (fee: string) => string;
+    answer: (task: string, n: string, total: string) => string;
+    answerBest: (model: string, score: string, go: string, direct: string, provider: string) => string;
+    answerNone: string;
+    cols: [string, string, string, string, string, string, string, string];
+    allowanceUsed: (pct: string, cap: string) => string;
+    covers: (pct: string) => string;
+    goCheaper: (amount: string) => string;
+    directCheaper: (amount: string) => string;
+    even: string;
+    range: (from: string, to: string) => string;
+    rangeOpen: (from: string) => string;
+    never: string;
+    noDirect: string;
+    unmeasured: string;
+    retentionZero: string;
+    retentionDays: (n: string) => string;
+    retentionUnknown: string;
+    training: string;
+    zdrUntil: (date: string) => string;
+    zdrEnded: (date: string) => string;
+    peak: string;
+    overageList: string;
+    howTitle: string;
+    how: (five: string, week: string) => string[];
+    setup: string;
+    source: (date: string) => string;
+    stale: (days: string) => string;
+    noPlan: string;
+    unusableTitle: (n: number) => string;
+    homeLink: string;
+    homeHint: (model: string, go: string, covered: string) => string;
+  };
   sources: { title: string; cols: [string, string, string, string, string]; active: string; failed: string; never: string };
   status: {
     title: string;
@@ -216,7 +253,7 @@ const it: Catalog = {
   siteTagline: 'Il modello giusto. Il provider più conveniente.',
   siteDescription:
     'Quale modello AI usare oggi per programmare, quale tenere per i problemi difficili e da quale provider conviene comprarlo. Prezzi verificati ogni giorno.',
-  nav: { choice: 'Scelta', method: 'Metodo', sources: 'Fonti', status: 'Stato', code: 'Codice', otherLang: 'EN', otherLangCode: 'en' },
+  nav: { choice: 'Scelta', method: 'Metodo', go: 'OpenCode Go', goShort: 'Go', sources: 'Fonti', status: 'Stato', code: 'Codice', otherLang: 'EN', otherLangCode: 'en' },
   home: {
     title: 'Che modello usi oggi',
     pricesVerified: (w) => `Prezzi verificati il ${w}`,
@@ -337,6 +374,7 @@ const it: Catalog = {
     'offer-uptime': 'disponibilità recente troppo bassa',
     'incomplete-prices': 'prezzi incompleti per questo scenario',
     'plan-based': 'offerta gratuita o inclusa in un piano: nessun prezzo per token pubblicato da confrontare',
+    'capped-plan': 'inclusa in un abbonamento con tetto (OpenCode Go): confrontata nella sua pagina, non come prezzo a consumo',
     'opencode-unknown': 'OpenCode non riconosce questo modello presso questo provider',
   },
   engine: {
@@ -416,6 +454,51 @@ const it: Catalog = {
     ],
     fullDetails: 'Tutti i dettagli, comprese le regole per associare i modelli, in METHODOLOGY.md',
   },
+  go: {
+    title: 'OpenCode Go o pagare a consumo?',
+    description: "Quanto costa lo stesso mese di lavoro con l'abbonamento OpenCode Go e con il provider più economico, modello per modello.",
+    intro: (fee) =>
+      `OpenCode Go costa ${fee} al mese e dà a ogni modello un tetto mensile, contato ai prezzi di listino di Go: 15, 30 o 60 USD a seconda del modello. Qui confrontiamo lo stesso mese di lavoro su Go e presso il provider più economico che monitoriamo.`,
+    answer: (task, n, total) => `Per ${task}, Go costa meno del provider più economico per ${n} dei ${total} modelli che include.`,
+    answerBest: (m, sc, go, d, p) => `Il suo miglior modello misurato, ${m} (${sc}), costa ${go} al mese su Go contro ${d} da ${p}.`,
+    answerNone: 'Nessun modello di Go è utilizzabile con i dati di oggi.',
+    cols: ['Modello', 'Coding Index', 'Tetto usato', 'Su Go', 'Provider più economico', 'Differenza', 'Go conviene fra', 'Dati'],
+    allowanceUsed: (pct, cap) => `${pct} di ${cap}`,
+    covers: (pct) => `il tetto copre il ${pct} del mese`,
+    goCheaper: (a) => `Go −${a}`,
+    directCheaper: (a) => `provider −${a}`,
+    even: 'pari',
+    range: (f, t) => `${f} e ${t} al mese dal provider`,
+    rangeOpen: (f) => `oltre ${f} al mese dal provider`,
+    never: 'mai, per questo tipo di lavoro',
+    noDirect: 'nessun provider utilizzabile',
+    unmeasured: 'non misurato',
+    retentionZero: 'nessuna conservazione',
+    retentionDays: (n) => `conservati ${n} giorni`,
+    retentionUnknown: 'conservati',
+    training: 'usati per addestrare',
+    zdrUntil: (d) => `accordo di conservazione zero fino al ${d}`,
+    zdrEnded: (d) => `accordo di conservazione zero scaduto il ${d}: rinnovo non confermato`,
+    peak: 'prezzi delle ore di punta',
+    overageList: 'oltre il tetto: prezzo di listino di Go (nessun prezzo a consumo trovato)',
+    howTitle: 'Come leggerla',
+    how: (five, week) => [
+      '«Tetto usato» è quanto del tetto mensile del modello si consuma con questo mese di lavoro. Oltre il 100% Go si ferma, a meno di attivare «Use balance»: allora il resto si paga ai prezzi a consumo di OpenCode Zen, ed è l\'importo che mostriamo.',
+      '«Go conviene fra» è la spesa mensile presso il provider più economico per cui Go costa meno, per lavoro dello stesso tipo in qualsiasi quantità. Sotto il limite inferiore il canone non si ripaga; sopra quello superiore il tetto è finito e il consumo costa più del provider.',
+      'La documentazione indica il tetto per ogni modello. Non dice esplicitamente se due modelli usati nello stesso mese hanno ciascuno il proprio tetto: ogni riga ipotizza un solo modello.',
+      `In 5 ore si può usare al massimo il ${five}% del tetto mensile, in una settimana il ${week}%: una giornata intensa incontra il limite delle 5 ore molto prima di quello mensile.`,
+      'I modelli DeepSeek costano di più nelle ore di punta (01–04 e 06–10 UTC, dal lunedì al venerdì): contiamo il tetto a quei prezzi, un limite superiore.',
+      'Alcuni modelli costano di più oltre una certa lunghezza di contesto (per esempio Grok oltre 200K token): come in tutto il sito, usiamo il prezzo base.',
+      'Un solo abbonato per workspace, e Go è pensato per il traffico di un agente di codice: non è un modo per far girare le chiamate API di una propria applicazione.',
+    ],
+    setup: 'Per usarlo: in OpenCode esegui /connect, scegli OpenCode Go e incolla la chiave della console. I modelli si chiamano opencode-go/<id>.',
+    source: (d) => `Condizioni lette dalla documentazione di OpenCode Go il ${d}.`,
+    stale: (n) => `Queste condizioni sono state lette ${n} giorni fa e potrebbero essere cambiate.`,
+    noPlan: "I dati del piano non sono ancora pubblicati: arrivano con il prossimo aggiornamento quotidiano.",
+    unusableTitle: (n) => `Modelli di Go esclusi oggi (${n})`,
+    homeLink: "Stai valutando OpenCode Go? Confronta l'abbonamento con i prezzi a consumo",
+    homeHint: (m, go, cov) => `${m} è incluso anche in OpenCode Go: ${go} al mese per questo lavoro, con il tetto che copre il ${cov} del mese.`,
+  },
   sources: {
     title: 'Fonti',
     cols: ['Fonte', 'Stato', 'Licenza o condizioni', 'Nota', 'Righe'],
@@ -452,7 +535,7 @@ const en: Catalog = {
   siteTagline: 'The right model. The cheapest provider.',
   siteDescription:
     'Which AI model to use for coding today, which one to keep for hard problems, and the cheapest provider selling it. Prices checked every day.',
-  nav: { choice: 'Pick', method: 'Method', sources: 'Sources', status: 'Status', code: 'Code', otherLang: 'IT', otherLangCode: 'it' },
+  nav: { choice: 'Pick', method: 'Method', go: 'OpenCode Go', goShort: 'Go', sources: 'Sources', status: 'Status', code: 'Code', otherLang: 'IT', otherLangCode: 'it' },
   home: {
     title: 'Which model to use today',
     pricesVerified: (w) => `Prices checked on ${w}`,
@@ -572,6 +655,7 @@ const en: Catalog = {
     'offer-uptime': 'recent availability too low',
     'incomplete-prices': 'prices incomplete for this scenario',
     'plan-based': 'free tier or bundled plan: no per-token price published to compare',
+    'capped-plan': 'part of a capped subscription (OpenCode Go): compared on its own page, not as a pay-per-token price',
     'opencode-unknown': 'OpenCode does not recognise this model at this provider',
   },
   engine: {
@@ -651,6 +735,51 @@ const en: Catalog = {
     ],
     fullDetails: 'All the details, including how models are matched, in METHODOLOGY.md',
   },
+  go: {
+    title: 'OpenCode Go or pay per token?',
+    description: 'What the same month of work costs on the OpenCode Go subscription and at the cheapest provider, model by model.',
+    intro: (fee) =>
+      `OpenCode Go costs ${fee} a month and gives each model a monthly allowance, counted at Go's own list prices: 15, 30 or 60 USD depending on the model. Here the same month of work is priced on Go and at the cheapest provider we track.`,
+    answer: (task, n, total) => `For ${task}, Go costs less than the cheapest provider for ${n} of the ${total} models it includes.`,
+    answerBest: (m, sc, go, d, p) => `Its best measured model, ${m} (${sc}), costs ${go} a month on Go against ${d} at ${p}.`,
+    answerNone: 'No Go model is usable with today\'s data.',
+    cols: ['Model', 'Coding Index', 'Allowance used', 'On Go', 'Cheapest provider', 'Difference', 'Go pays off between', 'Data'],
+    allowanceUsed: (pct, cap) => `${pct} of ${cap}`,
+    covers: (pct) => `allowance covers ${pct} of the month`,
+    goCheaper: (a) => `Go −${a}`,
+    directCheaper: (a) => `provider −${a}`,
+    even: 'even',
+    range: (f, t) => `${f} and ${t} a month at the provider`,
+    rangeOpen: (f) => `above ${f} a month at the provider`,
+    never: 'never, for this kind of work',
+    noDirect: 'no usable provider',
+    unmeasured: 'not measured',
+    retentionZero: 'not retained',
+    retentionDays: (n) => `kept ${n} days`,
+    retentionUnknown: 'retained',
+    training: 'used for training',
+    zdrUntil: (d) => `zero-retention agreement until ${d}`,
+    zdrEnded: (d) => `zero-retention agreement ended on ${d}: renewal not confirmed`,
+    peak: 'busy-hour prices',
+    overageList: "beyond the allowance: Go's own list price (no pay-as-you-go price found)",
+    howTitle: 'How to read it',
+    how: (five, week) => [
+      '"Allowance used" is how much of the model\'s monthly allowance this month of work takes. Past 100% Go stops unless "Use balance" is on: then the rest is billed at OpenCode Zen\'s pay-as-you-go prices, and that is the amount shown.',
+      '"Go pays off between" is the monthly spend at the cheapest provider for which Go costs less, for work of the same kind in any quantity. Below the lower end the fee does not pay for itself; above the upper end the allowance is used up and pay-as-you-go costs more than the provider.',
+      'The documentation states the allowance per model. It does not say in so many words whether two models used in the same month each have their own: every row assumes a single model.',
+      `No more than ${five}% of the monthly allowance in 5 hours and ${week}% in a week: an intense day hits the 5-hour window long before the monthly one.`,
+      'DeepSeek models cost more at busy hours (01–04 and 06–10 UTC, Monday to Friday): the allowance is counted at those prices, an upper bound.',
+      'Some models cost more beyond a context length (Grok above 200K tokens, for example): as everywhere on this site, the base price is used.',
+      'One subscriber per workspace, and Go is meant for coding-agent traffic: it is not a way to run your own application\'s API calls.',
+    ],
+    setup: 'To use it: in OpenCode run /connect, choose OpenCode Go and paste the key from the console. Models are called opencode-go/<id>.',
+    source: (d) => `Terms read from the OpenCode Go documentation on ${d}.`,
+    stale: (n) => `These terms were read ${n} days ago and may have changed.`,
+    noPlan: 'Plan data is not published yet: it arrives with the next daily update.',
+    unusableTitle: (n) => `Go models left out today (${n})`,
+    homeLink: 'Thinking about OpenCode Go? Compare the subscription with pay-per-token prices',
+    homeHint: (m, go, cov) => `${m} is also in OpenCode Go: ${go} a month for this work, with the allowance covering ${cov} of the month.`,
+  },
   sources: {
     title: 'Sources',
     cols: ['Source', 'State', 'Licence or terms', 'Note', 'Rows'],
@@ -682,12 +811,12 @@ const CATALOGS: Record<Lang, Catalog> = { it, en };
 export const t = (lang: Lang): Catalog => CATALOGS[lang] ?? CATALOGS[DEFAULT_LANG];
 export const isLang = (v: string | undefined): v is Lang => v === 'it' || v === 'en';
 
-export type Page = 'home' | 'method' | 'sources' | 'status';
+export type Page = 'home' | 'method' | 'go' | 'sources' | 'status';
 
 /** Italian pages live at the root with Italian slugs, English under /en. */
 const PATHS_BY_LANG: Record<Lang, Record<Page, string>> = {
-  it: { home: '/', method: '/metodo', sources: '/fonti', status: '/stato' },
-  en: { home: '/en', method: '/en/method', sources: '/en/sources', status: '/en/status' },
+  it: { home: '/', method: '/metodo', go: '/go', sources: '/fonti', status: '/stato' },
+  en: { home: '/en', method: '/en/method', go: '/en/go', sources: '/en/sources', status: '/en/status' },
 };
 
 export const pagePath = (lang: Lang, page: Page): string => PATHS_BY_LANG[lang][page];

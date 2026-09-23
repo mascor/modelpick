@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { PATHS, SOURCES, sourceById } from '../config.js';
 import { deprecatedKeys, successorOf } from '../engine/lineage.js';
 import { matchForm, hoursSince } from '../lib/normalize.js';
-import type { ModelRecord, Offer, ProviderProfile, QualityEvidence, Replacement, Snapshot, SourceStatus, UsageSignal } from '../types.js';
+import type { ModelRecord, Offer, Plan, ProviderProfile, QualityEvidence, Replacement, Snapshot, SourceStatus, UsageSignal } from '../types.js';
 import { fetchUsage } from '../sources/opencodedata.js';
 import { fetchCatalogue, fetchOffers } from '../sources/openrouter.js';
 import { fetchModelsDev } from '../sources/modelsdev.js';
@@ -29,6 +29,7 @@ export interface Collected {
   warnings: string[];
   replacements: Replacement[];
   usage: UsageSignal[];
+  plans: Plan[];
 }
 
 const baseStatus = (id: string): SourceStatus => {
@@ -349,6 +350,28 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     // The list is optional.
   }
 
+  // Capped subscription plans: their offers draw down an allowance instead of
+  // being billed per token, so they are tagged and compared on their own page.
+  let plans: Plan[] = [];
+  try {
+    const file = JSON.parse(await readFile(join(PATHS.curated, 'plans.json'), 'utf8')) as { plans?: Plan[] };
+    plans = file.plans ?? [];
+    for (const plan of plans) {
+      let tagged = 0;
+      for (const offer of offers) {
+        if (offer.providerId !== plan.providerId) continue;
+        offer.planId = plan.id;
+        tagged++;
+      }
+      const priced = new Set(offers.filter((o) => o.planId === plan.id).map((o) => o.remoteModelId));
+      const unpriced = Object.keys(plan.models).filter((id) => !priced.has(id));
+      if (unpriced.length) warnings.push(`${plan.name}: ${unpriced.length} models in the plan with no price from any source (${unpriced.slice(0, 3).join(', ')}).`);
+      if (!tagged) warnings.push(`${plan.name}: no offer from any source.`);
+    }
+  } catch {
+    // The list is optional.
+  }
+
   // OpenRouter's own endpoint list names the provider and its price, and lets
   // the configuration pin it. Where we have it, the generic OpenRouter price
   // models.dev reports (whichever provider OpenRouter happens to route to) is
@@ -409,5 +432,5 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     else replacements.push(row);
   }
 
-  return { opencodeVersion: registry?.version ?? null, models, providers, offers, evidence, statuses, warnings, replacements, usage };
+  return { opencodeVersion: registry?.version ?? null, models, providers, offers, evidence, statuses, warnings, replacements, usage, plans };
 }
