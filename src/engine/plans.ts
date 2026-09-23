@@ -88,6 +88,19 @@ export function breakEven(
   return { fromUsd: k * P, toUsd: null };
 }
 
+/**
+ * Which is the better deal for this month of work:
+ * - plan: the fee covers the whole month and the provider would cost more;
+ * - direct: the fee covers the month but the provider costs less;
+ * - not-enough: the allowance runs out before the month ends, so the fee does
+ *   not buy this month of work at all (the rest would be paid per token);
+ * - even: the difference is noise next to the estimate.
+ */
+export type PlanVerdict = 'plan' | 'direct' | 'not-enough' | 'even';
+
+/** Differences below this are noise next to the estimates they come from. */
+export const EVEN_USD = 0.5;
+
 export interface PlanRow {
   planModelId: string;
   terms: PlanModel;
@@ -105,8 +118,13 @@ export interface PlanRow {
   month: PlanMonth | null;
   /** The cheapest provider we would recommend for the same model and month of work. */
   direct: OfferView | null;
-  /** Provider bill minus plan bill: positive when the plan is cheaper. */
+  /**
+   * Provider bill minus the fee, only when the fee covers the whole month:
+   * positive when the plan is cheaper. Null when the allowance does not last
+   * the month, because then the fee is not what the month costs.
+   */
   savingUsd: number | null;
+  verdict: PlanVerdict | null;
   breakEven: { fromUsd: number; toUsd: number | null } | null;
   /** Spend at the provider that buys the same work as the whole allowance. */
   allowanceWorthUsd: number | null;
@@ -169,6 +187,17 @@ export function comparePlan(snapshot: Snapshot, planId: string, req: Recommendat
     const ranked = rankOffers(others, mix, req, minContext, now, model?.vendor ?? '', known);
     const direct = ranked.ready[0] ?? ranked.usable[0] ?? null;
     const P = direct?.cost.totalUsd ?? null;
+    const covered = month !== null && month.coveredShare >= 1;
+    const saving = covered && P !== null ? P - plan.monthlyFeeUsd : null;
+    const verdict: PlanVerdict | null = !month || P === null
+      ? null
+      : !covered
+        ? 'not-enough'
+        : Math.abs(saving!) < EVEN_USD
+          ? 'even'
+          : saving! > 0
+            ? 'plan'
+            : 'direct';
 
     rows.push({
       planModelId: offer.remoteModelId,
@@ -182,7 +211,8 @@ export function comparePlan(snapshot: Snapshot, planId: string, req: Recommendat
       overageFrom: overage === draw ? 'plan-list' : 'seller',
       month,
       direct,
-      savingUsd: month && P !== null ? P - month.totalUsd : null,
+      savingUsd: saving,
+      verdict,
       breakEven: month && P !== null ? breakEven(plan.monthlyFeeUsd, terms.capUsd, P, month.drawUsd, overage.totalUsd!) : null,
       allowanceWorthUsd: month && P !== null && month.drawUsd > 0 ? (terms.capUsd / month.drawUsd) * P : null,
     });
@@ -208,8 +238,9 @@ export function comparePlan(snapshot: Snapshot, planId: string, req: Recommendat
     checkedAgeDays,
     summary: {
       usable: usable.length,
-      planCheaper: usable.filter((r) => r.savingUsd !== null && r.savingUsd > 0).length,
-      best: usable.find((r) => r.quality) ?? null,
+      planCheaper: usable.filter((r) => r.verdict === 'plan').length,
+      // Rows come best score first: the best measured model the plan pays off with.
+      best: usable.find((r) => r.quality && r.verdict === 'plan') ?? null,
     },
   };
 }

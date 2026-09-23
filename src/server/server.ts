@@ -235,6 +235,7 @@ export async function buildServer() {
         peakPrices: r.peakApplied,
         cheapestProvider: r.direct ? { provider: r.direct.offer.providerName, offerId: r.direct.offer.id, monthUsd: r.direct.cost.totalUsd } : null,
         savingUsd: r.savingUsd,
+        verdict: r.verdict,
         paysOffBetweenUsd: r.breakEven,
         retentionDays: r.terms.retentionDays,
         trainsOnData: r.terms.trainsOnData,
