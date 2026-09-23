@@ -269,6 +269,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
     ${pick.cost.unquantifiedFees.length ? `<p class="alert">${esc(c.home.incompleteEstimate)}</p>` : ''}
     ${change?.moved ? `<p class="pick__change pick__change--moved">${esc(change.text)}</p>` : ''}
     <p class="pick__why">${esc(pick.reason)}</p>
+    ${pick.alternative ? `<p class="pick__alternative">${esc(c.home.alternative(modelName(pick.alternative.name), `${formatScore(pick.alternative.score, pick.quality.metric)}${pick.alternative.provisional ? ` (${c.home.provisionalShort})` : ''}`, usd(pick.alternative.totalUsd, lang)))}</p>` : ''}
     <details class="details details--actions">
       <summary>${esc(c.home.detailsFor(modelName(pick.model.displayName)))}</summary>
       <div class="details__body">

@@ -64,6 +64,8 @@ export interface Catalog {
     evidenceNoDate: string;
     incompleteEstimate: string;
     successor: (name: string) => string;
+    alternative: (name: string, score: string, price: string) => string;
+    provisionalShort: string;
     inherited: (from: string) => string;
     effort: (level: string) => string;
     replaced: (retired: string, successor: string) => string;
@@ -211,6 +213,8 @@ const it: Catalog = {
     replaced: (o, n) => `${o} è stato ritirato dal produttore. La versione nuova, ${n}, non è ancora misurata sul codice da Artificial Analysis: per questo non possiamo ancora confrontarla.`,
     inherited: (f) => `Punteggio provvisorio: Artificial Analysis non ha ancora misurato questa versione sul codice, quindi usiamo quello di ${f}, la versione precedente. Nel 95% dei casi misurati la versione nuova è stata almeno altrettanto buona.`,
     effort: (l) => `sforzo ${l}`,
+    alternative: (n, s, p) => `Alternativa molto vicina: ${n}, Coding Index ${s}, ${p} al mese.`,
+    provisionalShort: 'provvisorio',
     successor: (n) => `È uscito ${n}: Artificial Analysis non l'ha ancora misurato sul codice, per questo non possiamo confrontarlo.`,
     incompleteEstimate:
       'Stima incompleta: una commissione applicabile non è quantificabile, il confronto fra provider vicini può ribaltarsi.',
@@ -346,7 +350,7 @@ const it: Catalog = {
     title: 'Come scegliamo',
     intro: 'Ogni mattina alle 6:30 ripetiamo la scelta con prezzi e punteggi appena scaricati.',
     ruleTitle: 'La regola',
-    rule: 'Per ogni priorità c\'è un budget al mese. Nel budget vince il modello con il Coding Index più alto di Artificial Analysis. Se due modelli sono entro 1 punto, vince il più economico. Il modello per i problemi difficili si sceglie allo stesso modo con il budget più alto, e lo indichiamo solo se fa meglio di quello di ogni giorno.',
+    rule: 'Per ogni priorità c\'è un budget al mese. Nel budget vince il modello con il Coding Index più alto di Artificial Analysis. Se due modelli sono entro 1 punto, vince il più economico. Il modello per i problemi difficili si sceglie allo stesso modo con il budget più alto, e lo indichiamo solo se fa meglio di quello di ogni giorno. Se il secondo classificato nello stesso budget è entro 3 punti, lo mostriamo come alternativa.',
     budgetCols: ['Priorità', 'Ogni giorno', 'Problemi difficili'],
     budgetNote: 'Budget in USD al mese, sul tipo di lavoro che hai scelto.',
     costTitle: 'Come stimiamo il costo al mese',
@@ -424,6 +428,8 @@ const en: Catalog = {
     replaced: (o, n) => `${o} has been retired by its maker. Its newer version, ${n}, is not yet measured on code by Artificial Analysis, so we cannot compare it yet.`,
     inherited: (f) => `Provisional score: Artificial Analysis has not measured this version on code yet, so we use the one of ${f}, the previous version. In 95% of measured cases the newer version was at least as good.`,
     effort: (l) => `${l} effort`,
+    alternative: (n, s, p) => `A very close alternative: ${n}, Coding Index ${s}, ${p} per month.`,
+    provisionalShort: 'provisional',
     successor: (n) => `${n} is out: Artificial Analysis has not measured it on code yet, so we cannot compare it.`,
     incompleteEstimate:
       'Incomplete estimate: one applicable fee cannot be quantified, so a close call between providers could flip.',
@@ -558,7 +564,7 @@ const en: Catalog = {
     title: 'How we choose',
     intro: 'Every morning at 6:30 (Rome time) we repeat the choice on freshly downloaded prices and scores.',
     ruleTitle: 'The rule',
-    rule: 'Each priority has a monthly budget. Within the budget, the model with the highest Artificial Analysis Coding Index wins. If two models are within 1 point, the cheaper one wins. The model for hard problems is chosen the same way with the larger budget, and we only name it if it does better than the everyday one.',
+    rule: 'Each priority has a monthly budget. Within the budget, the model with the highest Artificial Analysis Coding Index wins. If two models are within 1 point, the cheaper one wins. The model for hard problems is chosen the same way with the larger budget, and we only name it if it does better than the everyday one. If the runner-up in the same budget is within 3 points, we show it as an alternative.',
     budgetCols: ['Priority', 'Every day', 'Hard problems'],
     budgetNote: 'Budgets in USD per month, on the kind of work you chose.',
     costTitle: 'How we estimate the monthly cost',

@@ -13,7 +13,7 @@ import { costOf, type CostBreakdown } from './cost.js';
 import { isIdentified, providerKey, usabilityOf, type Usability } from './usability.js';
 import { successorOf } from './lineage.js';
 import { OPENAI_EFFORTS } from './opencode.js';
-import { BUDGETS, TIE_POINTS, SCENARIOS, type Budget, type Priority, type TaskId, type TokenMix } from './scenarios.js';
+import { ALTERNATIVE_POINTS, BUDGETS, TIE_POINTS, SCENARIOS, type Budget, type Priority, type TaskId, type TokenMix } from './scenarios.js';
 import { t, type Lang, type ReasonCode } from '../i18n.js';
 
 
@@ -67,6 +67,8 @@ export interface Pick {
   offersCompared: number;
   provisional: boolean;
   provisionalReasons: string[];
+  /** The runner-up in the same budget, when its score is very close. */
+  alternative: { name: string; score: number; provisional: boolean; totalUsd: number } | null;
   /** A newer version of the same line, on sale but not yet measured on code. */
   successor: { key: string; name: string; releaseDate: string | null } | null;
 }
@@ -405,7 +407,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
    */
   const choiceOf = (c: Candidate): OfferView => c.ready[0] ?? c.offers[0]!;
 
-  const toPick = (cand: Candidate, role: 'everyday' | 'hard', other: Candidate | null): Pick => {
+  const toPick = (cand: Candidate, role: 'everyday' | 'hard', other: Candidate | null, runnerUp: Candidate | null = null): Pick => {
     const best = choiceOf(cand);
     const provisionalReasons: string[] = [];
     if (!cand.quality.comparable) provisionalReasons.push(c.engine.provisionalCrossHarness);
@@ -439,6 +441,14 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
       offersCompared: cand.offers.length,
       provisional: provisionalReasons.length > 0,
       provisionalReasons,
+      alternative: runnerUp
+        ? {
+            name: runnerUp.model.displayName,
+            score: runnerUp.quality.value,
+            provisional: Boolean(runnerUp.quality.inheritedFrom),
+            totalUsd: choiceOf(runnerUp).cost.totalUsd!,
+          }
+        : null,
       successor: (() => {
         const key = successorOf(cand.model.key, unmeasured);
         const m = key ? snapshot.models[key] : undefined;
@@ -466,8 +476,19 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   const hardCandidate =
     hardBest && everydayCandidate && hardBest.quality.value > everydayCandidate.quality.value + TIE_POINTS ? hardBest : null;
 
-  const everyday = everydayCandidate ? toPick(everydayCandidate, 'everyday', null) : null;
-  const hard = hardCandidate ? toPick(hardCandidate, 'hard', everydayCandidate) : null;
+  // The runner-up in the same budget, shown only when the data barely separates them.
+  const runnerUp = (winner: Candidate | null, limit: number, skip: (string | undefined)[]): Candidate | null => {
+    if (!winner) return null;
+    const next = bestWithin(limit, candidates.filter((c) => !skip.includes(c.model.key)));
+    return next && next.quality.value >= winner.quality.value - ALTERNATIVE_POINTS ? next : null;
+  };
+  const taken = [everydayCandidate?.model.key, hardCandidate?.model.key];
+  const everyday = everydayCandidate
+    ? toPick(everydayCandidate, 'everyday', null, runnerUp(everydayCandidate, budget.everyday, taken))
+    : null;
+  const hard = hardCandidate
+    ? toPick(hardCandidate, 'hard', everydayCandidate, runnerUp(hardCandidate, budget.hard, taken))
+    : null;
 
   const notes: string[] = [];
   if (!everyday) notes.push(c.engine.noWinner(budgetUsd(budget.everyday)));

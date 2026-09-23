@@ -78,3 +78,6 @@ export const BUDGETS: Record<Priority, Budget> = {
 
 /** Below this many points two scores are treated as equal, and the cheaper model wins. */
 export const TIE_POINTS = 1;
+
+/** A runner-up within this many points of a pick, in the same budget, is shown next to it. */
+export const ALTERNATIVE_POINTS = 3;

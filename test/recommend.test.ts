@@ -280,3 +280,21 @@ test('within the budget the highest score wins, and a tie within 1 point goes to
   const best = recommend(s, req({ priority: 'quality' })); // 50 and 250 USD
   assert.equal(best.hard?.model.key, 'v/great');
 });
+
+test('a runner-up within 3 points in the same budget is shown as the alternative', () => {
+  const cheapPrices = { inputPerMTok: 0.1, outputPerMTok: 0.4, cacheReadPerMTok: 0.01, cacheWritePerMTok: 0.1 };
+  const s = snapshot(
+    [model('v/first'), model('v/close'), model('v/far')],
+    [
+      offer({ id: 'f', modelKey: 'v/first', providerId: 'a', prices: cheapPrices }),
+      offer({ id: 'c', modelKey: 'v/close', providerId: 'b', prices: { ...cheapPrices, inputPerMTok: 0.12 } }),
+      offer({ id: 'x', modelKey: 'v/far', providerId: 'c', prices: cheapPrices }),
+    ],
+    [evidence('v/first', 71.5), evidence('v/close', 69.1), evidence('v/far', 60)],
+  );
+  const r = recommend(s, req({ priority: 'cheap' }));
+  assert.equal(r.everyday?.model.key, 'v/first');
+  assert.equal(r.everyday?.alternative?.score, 69.1);
+  const alone = recommend(snapshot([model('v/first'), model('v/far')], [s.offers[0]!, s.offers[2]!], [s.evidence[0]!, s.evidence[2]!]), req({ priority: 'cheap' }));
+  assert.equal(alone.everyday?.alternative, null); // 11.5 points behind is not "very close"
+});

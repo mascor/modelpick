@@ -188,6 +188,7 @@ a:focus-visible { outline: 2px solid var(--cs-color-accent); outline-offset: 2px
 .pick__model { font-size: clamp(21px, 4vw, 26px); margin-bottom: 4px; }
 .pick__provider { font-family: var(--cs-font-ui); font-size: 15px; color: var(--cs-text-muted); margin-bottom: 16px; }
 .pick__provider strong { color: var(--cs-text); }
+.pick__alternative { font-family: var(--cs-font-ui); font-size: 14px; color: var(--cs-text-muted); margin: -6px 0 14px; }
 .pick__why { margin-bottom: 16px; }
 
 .prices { display: grid; gap: 8px; margin: 0 0 16px; padding: 14px; background: var(--cs-surface-alt); border-radius: var(--cs-radius-md); }

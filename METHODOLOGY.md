@@ -34,7 +34,7 @@ The **reference group** is Artificial Analysis when present; failing that, the S
 
 ## 3. The choice rule
 
-**Each priority has a monthly budget. Within the budget, the model with the highest Artificial Analysis Coding Index wins. If two models are within 1 point, the cheaper one wins.** The model for hard problems is chosen the same way with the larger budget, and is named only if it scores more than 1 point above the everyday one.
+**Each priority has a monthly budget. Within the budget, the model with the highest Artificial Analysis Coding Index wins. If two models are within 1 point, the cheaper one wins.** The model for hard problems is chosen the same way with the larger budget, and is named only if it scores more than 1 point above the everyday one. When the runner-up in the same budget is within **3 points** of a pick, the card shows it as a close alternative, with its score and price: at that distance the data barely separates the two.
 
 | Priority | Every day | Hard problems |
 |---|---|---|
