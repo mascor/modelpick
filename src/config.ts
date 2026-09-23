@@ -65,8 +65,6 @@ export const THRESHOLDS = {
   minUptime30m: num(env.MODELPICK_MIN_UPTIME, 90),
   /** Minimum context an offer must serve to be usable with a coding agent. */
   minContextTokens: num(env.MODELPICK_MIN_CONTEXT, 100_000),
-  /** A backup must beat the everyday pick by at least this many points. */
-  backupQualityGapPoints: num(env.MODELPICK_BACKUP_GAP, 3),
 };
 
 /** Artificial Analysis API: private key, and a download at most once per update. */

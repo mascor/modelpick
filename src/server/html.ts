@@ -6,9 +6,9 @@
 import { SITE, THRESHOLDS, SOURCES } from '../config.js';
 import type { Snapshot, SourceStatus } from '../types.js';
 import type { OfferView, Pick, Recommendation, RecommendationRequest } from '../engine/recommend.js';
-import { formatScore, metricLabel, PRICE_CAP } from '../engine/recommend.js';
+import { formatScore, metricLabel } from '../engine/recommend.js';
 import type { Change } from '../engine/changes.js';
-import { SCENARIOS, TASK_IDS, PRIORITIES, gateFor } from '../engine/scenarios.js';
+import { SCENARIOS, TASK_IDS, PRIORITIES, BUDGETS } from '../engine/scenarios.js';
 import { accountName, usabilityLabel } from '../engine/usability.js';
 import { signupUrl } from '../engine/signup.js';
 import { configFor } from '../engine/opencode.js';
@@ -181,12 +181,9 @@ function renderComparison(pick: Pick, role: string, lang: Lang): string {
       </td>
       <td class="num nowrap"><strong>${esc(usd(o.cost.totalUsd, lang))}</strong></td>
       <td class="action">
-        ${link ? `<a class="row-link" href="${esc(link)}" target="_blank" rel="noopener">${esc(c.home.key)}</a>` : ''}
+        ${link && o.offer.sourceId !== 'openrouter' ? `<a class="row-link" href="${esc(link)}" target="_blank" rel="noopener">${esc(c.home.key)}</a>` : ''}
         <button class="button button--outline button--small" type="button" data-copy="#${esc(id)}">${esc(label)}</button>
-        <details class="preview">
-          <summary>${esc(c.home.showPreview)}</summary>
-          <pre class="code"><code id="${esc(id)}">${esc(payload)}</code></pre>
-        </details>
+        <pre hidden><code id="${esc(id)}">${esc(payload)}</code></pre>
       </td>
     </tr>`;
   };
@@ -266,7 +263,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
     <p class="pick__role">${esc(title)}</p>
     <h3 class="pick__model">${esc(modelName(pick.model.displayName))}</h3>
     <p class="pick__summary">${esc(c.home.perMonth('\u0000')).replace('\u0000', `<strong class="pick__price">${esc(usd(pick.cost.totalUsd, lang))}</strong>`)}</p>
-    <p class="pick__evidence">${esc(c.home.benchmark(formatScore(pick.quality.value, pick.quality.metric), pick.quality.metric === 'aa_coding_index' ? 'Coding Index' : metricLabel(pick.quality.metric), dateShort(pick.quality.measuredAt, lang)))}${pick.quality.effort ? ` · ${esc(c.home.effort(pick.quality.effort))}` : ''}${pick.quality.costPerTask !== null ? ` · ${esc(c.home.perTask(fmt(lang).n2.format(pick.quality.costPerTask)))}` : ''}${pick.quality.metric === 'aa_coding_index' ? ` · <a href="${esc(pick.quality.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>` : ''}</p>
+    <p class="pick__evidence">${esc(c.home.benchmark(formatScore(pick.quality.value, pick.quality.metric), pick.quality.metric === 'aa_coding_index' ? 'Coding Index' : metricLabel(pick.quality.metric), dateShort(pick.quality.measuredAt, lang)))}${pick.quality.effort ? ` · ${esc(c.home.effort(pick.quality.effort))}` : ''}${pick.quality.metric === 'aa_coding_index' ? ` · <a href="${esc(pick.quality.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>` : ''}</p>
     ${pick.quality.inheritedFrom ? `<p class="alert">${esc(c.home.inherited(modelName(snapshotName(pick.quality.inheritedFrom.modelKey, pick.quality.inheritedFrom.harness))))}</p>` : ''}
     ${pick.successor ? `<p class="alert">${esc(c.home.successor(modelName(pick.successor.name)))}</p>` : ''}
     ${pick.cost.unquantifiedFees.length ? `<p class="alert">${esc(c.home.incompleteEstimate)}</p>` : ''}
@@ -281,11 +278,14 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
         ${link ? `<a class="button button--outline button--small" href="${esc(link)}" target="_blank" rel="noopener">${esc(c.home.open)}</a>` : ''}
       </li>
       ${pick.offer.apiKeyEnv ? `<li class="step">
+        <span class="step__text">${esc(c.home.exportKey)}</span>
+      </li>
+      <li class="step step--config">
         <code class="step__code" id="key-${esc(role)}">export ${esc(pick.offer.apiKeyEnv)}="..."</code>
         <button class="button button--outline button--small" type="button" data-copy="#key-${esc(role)}">${esc(c.home.copy)}</button>
       </li>` : ''}
       ${conf.config ? `<li class="step">
-        <span class="step__text">${esc(c.home.saveConfig(pick.offer.providerName))}</span>
+        <span class="step__text">${esc(conf.pinNote ? c.home.savePinned(accountName(pick.offer), pick.offer.providerName) : c.home.saveEffort(pick.quality.effort ?? ''))}</span>
         <button class="button button--small" type="button" data-copy="#config-${esc(role)}">${esc(c.home.copyConfig)}</button>
       </li>
       <li class="step step--config">
@@ -294,11 +294,14 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
           <pre class="code"><code id="config-${esc(role)}">${esc(conf.config)}</code></pre>
         </details>
       </li>` : `<li class="step">
+        <span class="step__text">${esc(c.home.runCommand)}</span>
+      </li>
+      <li class="step step--config">
         <code class="step__code" id="config-${esc(role)}">${esc(conf.command)}</code>
         <button class="button button--small" type="button" data-copy="#config-${esc(role)}">${esc(c.home.copyCommand)}</button>
       </li>`}
     </ol>
-    ${conf.pinNote ? `<p class="steps__note">${esc(conf.pinNote)}</p>` : ''}
+    ${conf.pinNote && !conf.config ? `<p class="steps__note">${esc(conf.pinNote)}</p>` : ''}
     ${renderComparison(pick, role, lang)}
     ${renderDetails(pick, lang, opencodeVersion)}
       </div>
@@ -420,16 +423,14 @@ export function notFoundPage(lang: Lang): string {
   return layout({ lang, title: `${c.notFound.title} — ${SITE.name}`, description: c.siteDescription, body, active: 'home' });
 }
 
-export function methodPage(lang: Lang, snapshot: Snapshot | null = null): string {
+export function methodPage(lang: Lang): string {
   const c = t(lang);
   const m = c.method;
   const f = fmt(lang);
-  const ref = snapshot?.costReference ?? null;
-  const gates = PRIORITIES.map((p) => {
-    const g = gateFor('aa_coding_index', p);
-    const cap = ref ? `${f.n2.format(ref.meanPerTask * PRICE_CAP[p])} USD` : '—';
-    return `<tr><td>${esc(c.priorities[p] ?? p)}</td><td class="num">${g.everyday}</td><td class="num">${g.hard}</td><td class="num">${esc(cap)} <span class="meta">(${esc(f.n.format(PRICE_CAP[p]))}×)</span></td></tr>`;
-  }).join('');
+  const usd = (v: number) => `${f.n.format(v)} USD`;
+  const budgets = PRIORITIES.map((p) =>
+    `<tr><td>${esc(c.priorities[p] ?? p)}</td><td class="num">${esc(usd(BUDGETS[p].everyday))}</td><td class="num">${esc(usd(BUDGETS[p].hard))}</td></tr>`,
+  ).join('');
   // Millions throughout, so the columns read at a glance.
   const millions = (v: number) => `${f.n.format(Math.round(v / 100_000) / 10)} M`;
   const costs = TASK_IDS.map((id) => {
@@ -446,19 +447,18 @@ export function methodPage(lang: Lang, snapshot: Snapshot | null = null): string
   <div class="container method">
     <h1>${esc(m.title)}</h1>
     <p class="meta">${esc(m.intro)}</p>
-    <div class="card"><h2>${esc(m.stepsTitle)}</h2><ol class="list">${m.steps.map((x) => `<li>${x}</li>`).join('')}</ol></div>
     <div class="method__grid">
-      <div class="card"><h2>${esc(m.gatesTitle)}</h2>
-        <table class="table">${th(m.gatesCols)}<tbody>${gates}</tbody></table>
-        <p class="meta">${esc(m.gatesNote(String(THRESHOLDS.backupQualityGapPoints)))}</p>
-        <p class="meta">${esc(ref ? m.capNote(f.n2.format(ref.meanPerTask), f.n.format(ref.models), f.n.format(Math.round(ref.sinceDays / 30.5))) : m.capMissing)}</p>
+      <div class="card"><h2>${esc(m.ruleTitle)}</h2>
+        <p class="method__rule">${esc(m.rule)}</p>
+        <table class="table">${th(m.budgetCols)}<tbody>${budgets}</tbody></table>
+        <p class="meta">${esc(m.budgetNote)}</p>
       </div>
       <div class="card"><h2>${esc(m.costTitle)}</h2>
         <table class="table">${th(m.costCols)}<tbody>${costs}</tbody></table>
         <p class="meta">${esc(m.costNote)}</p>
       </div>
     </div>
-    <div class="card"><h2>${esc(m.rulesTitle)}</h2><ul class="list">${m.rules.map((x) => `<li>${x}</li>`).join('')}</ul></div>
+    <div class="card"><h2>${esc(m.guaranteesTitle)}</h2><ul class="list">${m.guarantees.map((x) => `<li>${x}</li>`).join('')}</ul></div>
     <div class="method__grid">
       <div class="card"><h2>${esc(m.excludedTitle)}</h2><ul class="list">${excluded.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
       <div class="card"><h2>${esc(m.limitsTitle)}</h2><ul class="list">${m.limits.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>

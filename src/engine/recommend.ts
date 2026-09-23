@@ -13,7 +13,7 @@ import { costOf, type CostBreakdown } from './cost.js';
 import { isIdentified, providerKey, usabilityOf, type Usability } from './usability.js';
 import { successorOf } from './lineage.js';
 import { OPENAI_EFFORTS } from './opencode.js';
-import { gateFor, SCENARIOS, type Priority, type TaskId, type TokenMix } from './scenarios.js';
+import { BUDGETS, TIE_POINTS, SCENARIOS, type Budget, type Priority, type TaskId, type TokenMix } from './scenarios.js';
 import { t, type Lang, type ReasonCode } from '../i18n.js';
 
 
@@ -84,7 +84,7 @@ export interface Recommendation {
   method: {
     referenceHarness: string | null;
     referenceHarnessModels: number;
-    gate: { everyday: number; hard: number };
+    budget: Budget;
     candidateModels: number;
     excluded: { reason: ReasonCode; count: number }[];
     snapshotAgeHours: number | null;
@@ -104,7 +104,9 @@ export interface Recommendation {
   notes: string[];
 }
 
-const fmtUsd = (v: number) => `${v < 10 ? v.toFixed(2) : v.toFixed(0)} USD`;
+/** Amounts in the page's language: "10,62 USD" in Italian, "10.62 USD" in English. */
+const moneyFormat = (lang: string, digits: number) =>
+  new Intl.NumberFormat(lang === 'en' ? 'en-GB' : 'it-IT', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
 /** How a metric is named on the page. */
 export const metricLabel = (metric: QualityEvidence['metric']): string =>
@@ -228,12 +230,6 @@ function deliverable(variants: QualityEvidence[], offer: Offer): QualityEvidence
   return [variants.reduce((a, b) => (b.value < a.value ? b : a))];
 }
 
-/** How far above the market's mean cost per task a pick may go, by priority. */
-export const PRICE_CAP: Record<Priority, number> = { cheap: 1.25, balanced: 1.25, quality: 5 };
-
-/** With "balanced", the everyday pick may cost up to this many times the cheapest one above the bar. */
-export const BALANCED_PRICE_FACTOR = 2;
-
 /** Offer-level eligibility. Returns null when usable, otherwise the reason it is not. */
 function offerBlocker(offer: Offer, req: RecommendationRequest, minContext: number, now: number): ReasonCode | null {
   void req;
@@ -325,8 +321,8 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   // Only recent evidence exists as far as the engine is concerned.
   const evidence = snapshot.evidence.filter((e) => isFresh(e, now));
   const ref = referenceGroup(evidence);
-  const gate = gateFor(ref.metric, req.priority);
-  const unit = (v: number) => (ref.metric === 'aa_coding_index' ? String(v) : `${v}%`);
+  const budget = BUDGETS[req.priority];
+  const budgetUsd = (v: number) => `${moneyFormat(req.lang, 0).format(v)} USD`;
 
   const offersByModel = new Map<string, Offer[]>();
   for (const o of snapshot.offers) {
@@ -388,28 +384,15 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     pending.push({ model, variants, usable, ready });
   }
 
-  // Price caps, as a multiple of the market's mean cost per task (Artificial
-  // Analysis, recent models). A variant with no published cost per task is
-  // held to the same multiple of the mean monthly cost of the candidates.
-  const taskCap = snapshot.costReference ? snapshot.costReference.meanPerTask * PRICE_CAP[req.priority] : null;
-  const monthly = pending.map((p) => p.usable[0]!.cost.totalUsd).filter((v): v is number => v !== null);
-  const monthlyCap = monthly.length ? (monthly.reduce((a, b) => a + b, 0) / monthly.length) * PRICE_CAP[req.priority] : null;
-  const affordable = (v: QualityEvidence, o: OfferView) =>
-    v.costPerTask != null ? taskCap === null || v.costPerTask <= taskCap : monthlyCap === null || (o.cost.totalUsd ?? Infinity) <= monthlyCap;
-
-  // Each offer gets the best variant its buyer can actually have, within the cap;
-  // offers that deliver the same variant form one candidate.
+  // Each offer gets the best variant its buyer can actually have; offers that
+  // deliver the same variant form one candidate.
   for (const p of pending) {
     const groups = new Map<QualityEvidence, OfferView[]>();
     for (const o of p.usable) {
-      const within = deliverable(p.variants, o.offer).filter((v) => affordable(v, o));
+      const within = deliverable(p.variants, o.offer);
       if (!within.length) continue;
       const best = within.reduce((a, b) => (b.value > a.value ? b : a));
       groups.set(best, [...(groups.get(best) ?? []), o]);
-    }
-    if (!groups.size) {
-      bump('over-price-cap');
-      continue;
     }
     for (const [variant, offers] of groups) {
       candidates.push({ model: p.model, quality: viewOf(variant, now), offers, ready: offers.filter((o) => p.ready.includes(o)) });
@@ -432,19 +415,15 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     if (cand.offers.length === 1) provisionalReasons.push(c.engine.provisionalSingle);
     if (!cand.ready.length) provisionalReasons.push(c.engine.provisionalUnidentified);
 
-    const price = fmtUsd(best.cost.totalUsd!);
+    const price = `${moneyFormat(req.lang, 2).format(best.cost.totalUsd!)} USD`;
     const label = metricLabel(cand.quality.metric);
     const score = formatScore(cand.quality.value, cand.quality.metric);
     const gap = other ? (cand.quality.value - other.quality.value).toFixed(1) : null;
 
     const reason =
       role === 'everyday'
-        ? req.priority === 'quality'
-          ? c.engine.everydayBest(score, label, price)
-          : req.priority === 'balanced'
-            ? c.engine.everydayBalanced(score, label, unit(gate.everyday), price)
-            : c.engine.everydayCheapest(score, label, unit(gate.everyday), price)
-        : c.engine.hardReason(score, label, gap);
+        ? c.engine.everydayReason(score, label, budgetUsd(budget.everyday), price)
+        : c.engine.hardReason(score, label, gap ?? '0', budgetUsd(budget.hard), price);
 
     const whenToUse = role === 'hard' ? c.engine.hardWhen : null;
 
@@ -469,57 +448,30 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   };
 
   /**
-   * The user's single choice changes what "best" means, which is the whole point
-   * of asking it:
-   * - spend less: the cheapest model that clears the quality gate;
-   * - balanced: the best score among those costing at most twice the cheapest;
-   * - best results: the highest measured score, with price only breaking ties
-   *   inside a band where the score difference is not meaningful.
-   * Every pick also stays under the price cap of its priority (PRICE_CAP).
+   * The whole rule: within the priority's monthly budget the highest score
+   * wins; scores within TIE_POINTS of the top are equal, and the cheaper wins.
    */
-  const everydayPool = candidates.filter((c) => c.quality.value >= gate.everyday);
   const byPrice = (a: Candidate, b: Candidate) => choiceOf(a).cost.totalUsd! - choiceOf(b).cost.totalUsd!;
-  let everydayCandidate: Candidate | null;
-  if (req.priority === 'quality') {
-    const top = everydayPool.reduce((max, c) => Math.max(max, c.quality.value), 0);
-    const band = everydayPool.filter((c) => c.quality.value >= top - 2).sort(byPrice);
-    everydayCandidate = band[0] ?? null;
-  } else if (req.priority === 'balanced') {
-    // Balanced: a little more money for clearly more quality. Among the models
-    // costing at most BALANCED_PRICE_FACTOR times the cheapest one, the best score wins.
-    const cheapest = [...everydayPool].sort(byPrice)[0];
-    const limit = cheapest ? choiceOf(cheapest).cost.totalUsd! * BALANCED_PRICE_FACTOR : 0;
-    const affordable = everydayPool.filter((c) => choiceOf(c).cost.totalUsd! <= limit);
-    everydayCandidate = affordable.sort((a, b) => b.quality.value - a.quality.value || byPrice(a, b))[0] ?? null;
-  } else {
-    everydayCandidate = [...everydayPool].sort(byPrice)[0] ?? null;
-  }
-
-  // Backup: documented superior capability, not merely a higher price.
-  const minHard = Math.max(
-    gate.hard,
-    (everydayCandidate?.quality.value ?? 0) + THRESHOLDS.backupQualityGapPoints,
+  const bestWithin = (limit: number, pool: Candidate[]): Candidate | null => {
+    const within = pool.filter((c) => choiceOf(c).cost.totalUsd! <= limit);
+    const top = within.reduce((max, c) => Math.max(max, c.quality.value), -Infinity);
+    return within.filter((c) => c.quality.value >= top - TIE_POINTS).sort(byPrice)[0] ?? null;
+  };
+  const everydayCandidate = bestWithin(budget.everyday, candidates);
+  // A second model only when the larger budget buys a higher score than the first.
+  const hardBest = bestWithin(
+    budget.hard,
+    candidates.filter((c) => c.model.key !== everydayCandidate?.model.key),
   );
-  const hardPool = candidates.filter((c) => c.quality.value >= minHard && c.model.key !== everydayCandidate?.model.key);
-  hardPool.sort((a, b) => b.quality.value - a.quality.value);
-  const topScore = hardPool[0]?.quality.value ?? 0;
-  // Within a 2-point band the difference is not meaningful, so prefer the cheaper one.
-  const topBand = hardPool.filter((c) => c.quality.value >= topScore - 2);
-  topBand.sort((a, b) => a.offers[0]!.cost.totalUsd! - b.offers[0]!.cost.totalUsd!);
-  const hardCandidate = topBand[0] ?? null;
+  const hardCandidate =
+    hardBest && everydayCandidate && hardBest.quality.value > everydayCandidate.quality.value + TIE_POINTS ? hardBest : null;
 
   const everyday = everydayCandidate ? toPick(everydayCandidate, 'everyday', null) : null;
   const hard = hardCandidate ? toPick(hardCandidate, 'hard', everydayCandidate) : null;
 
   const notes: string[] = [];
-  if (!everyday) notes.push(c.engine.noWinner(unit(gate.everyday)));
-  if (everyday && !hard) {
-    notes.push(
-      req.priority === 'quality'
-        ? c.engine.noBackupBest
-        : c.engine.noBackup(String(THRESHOLDS.backupQualityGapPoints)),
-    );
-  }
+  if (!everyday) notes.push(c.engine.noWinner(budgetUsd(budget.everyday)));
+  if (everyday && !hard) notes.push(c.engine.noBackup(budgetUsd(budget.hard)));
 
   // Savings are only claimed against a configuration the user actually declared.
   // Whatever the user picked, they get an answer: silence looks like a bug.
@@ -566,14 +518,14 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     replacements: (snapshot.replacements ?? []).filter(
       (r) =>
         r.retiredMetric === ref.metric &&
-        r.retiredScore >= gate.everyday &&
+        r.retiredScore >= (everyday?.quality.value ?? 0) &&
         r.successorKey !== everyday?.successor?.key &&
         r.successorKey !== hard?.successor?.key,
     ),
     method: {
       referenceHarness: ref.label,
       referenceHarnessModels: ref.size,
-      gate,
+      budget,
       candidateModels: candidates.length,
       excluded: [...excluded.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count),
       snapshotAgeHours: snapshotAge,

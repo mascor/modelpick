@@ -131,7 +131,7 @@ export async function buildServer() {
     });
     app.get(paths.method, { onRequest: negotiate(lang, 'method') }, async (_req, reply) => {
       reply.type('text/html; charset=utf-8');
-      return methodPage(lang, await currentSnapshot());
+      return methodPage(lang);
     });
     app.get(paths.sources, { onRequest: negotiate(lang, 'sources') }, async (_req, reply) => {
       reply.type('text/html; charset=utf-8');

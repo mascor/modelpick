@@ -27,7 +27,6 @@ export interface Collected {
   statuses: SourceStatus[];
   warnings: string[];
   replacements: Replacement[];
-  costReference: Snapshot['costReference'];
 }
 
 const baseStatus = (id: string): SourceStatus => {
@@ -95,7 +94,6 @@ const mergeModel = (into: Map<string, ModelRecord>, m: ModelRecord) => {
 export async function collect(previous: Snapshot | null, observedAt: string): Promise<Collected> {
   // Models their maker has deprecated: never shown, whoever still sells them.
   const retired = new Set<string>();
-  let costReference: Snapshot['costReference'] = previous?.costReference ?? null;
   const models = new Map<string, ModelRecord>();
   const providers = new Map<string, ProviderProfile>();
   const offers: Offer[] = [];
@@ -246,7 +244,6 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
       const dl = await downloadAa();
       const res = aaEvidence(dl, qualityKeys, observedAt, (key) => models.get(key)?.displayName ?? '');
       evidence.push(...res.evidence);
-      costReference = res.costReference ?? costReference;
       if (res.inherited.length) warnings.push(`Artificial Analysis: ${res.inherited.length} new versions carry the Coding Index of the version they follow, provisionally (${res.inherited.slice(0, 3).join('; ')}).`);
       statuses.push({ ...finish(st, res.evidence.length), servedFromCache: dl.fromCache, dataAgeHours: hoursSince(dl.fetchedAt) });
       if (!dl.fromCache) warnings.push(`Artificial Analysis: ${dl.models.length} models downloaded with ${dl.calls} calls.`);
@@ -381,5 +378,5 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     else replacements.push(row);
   }
 
-  return { opencodeVersion: registry?.version ?? null, models, providers, offers, evidence, statuses, warnings, replacements, costReference };
+  return { opencodeVersion: registry?.version ?? null, models, providers, offers, evidence, statuses, warnings, replacements };
 }

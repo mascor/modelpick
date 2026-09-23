@@ -154,15 +154,6 @@ export function aaModelKey(m: AaModel, knownKeys: Map<string, string>): string |
 /** "Claude Opus 5 (Adaptive Reasoning, Max Effort)" -> "Adaptive Reasoning, Max Effort". */
 const variantOf = (name: string): string | null => /\(([^)]*)\)\s*$/.exec(name)?.[1] ?? null;
 
-/** Mean cost per task over recent models: the reference for the price caps. */
-export interface CostReference {
-  meanPerTask: number;
-  models: number;
-  sinceDays: number;
-}
-
-const RECENT_DAYS = 183;
-
 /**
  * Coding Index evidence, one row per effort variant of each model of ours
  * (the engine chooses which variant a buyer actually gets), with the cost per
@@ -177,7 +168,7 @@ export function aaEvidence(
   knownKeys: Map<string, string>,
   observedAt: string,
   displayNameOf: (modelKey: string) => string = () => '',
-): { evidence: QualityEvidence[]; unmatched: string[]; wrongSnapshot: string[]; inherited: string[]; costReference: CostReference | null } {
+): { evidence: QualityEvidence[]; unmatched: string[]; wrongSnapshot: string[]; inherited: string[] } {
   const version = download.indexVersion !== null ? `v${download.indexVersion}` : 'undeclared version';
   const rows = new Map<string, { key: string; m: AaModel; value: number }>();
   const unscored: { key: string; m: AaModel }[] = [];
@@ -273,17 +264,7 @@ export function aaEvidence(
     done.add(key);
   }
 
-  // The price caps follow the market: mean cost per task of recent measured variants.
-  const cutoff = Date.parse(download.fetchedAt) - RECENT_DAYS * 86_400_000;
-  const costs = download.models
-    .filter((m) => typeof m.evaluations?.artificial_analysis_coding_index === 'number' && costOf(m) !== null)
-    .filter((m) => m.release_date && Date.parse(m.release_date) >= cutoff)
-    .map((m) => costOf(m)!);
-  const costReference = costs.length
-    ? { meanPerTask: costs.reduce((a, b) => a + b, 0) / costs.length, models: costs.length, sinceDays: RECENT_DAYS }
-    : null;
-
-  return { evidence, unmatched, wrongSnapshot, inherited, costReference };
+  return { evidence, unmatched, wrongSnapshot, inherited };
 }
 
 /** True when version a comes before version b ([4] before [4, 1]). */

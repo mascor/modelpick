@@ -65,22 +65,16 @@ export const TASK_IDS = Object.keys(SCENARIOS) as TaskId[];
 export const PRIORITIES: Priority[] = ['cheap', 'balanced', 'quality'];
 
 /**
- * Quality gate per priority, on the scale of the reference metric: the
- * Artificial Analysis Coding Index when available, SWE-bench Verified otherwise.
- * The AA gates keep roughly the selectivity the SWE-bench ones had (top ~50%,
- * ~35%, ~25% of measured models for the everyday pick).
- * Documented in METHODOLOGY.md; changing these changes the recommendations.
+ * The whole choice rule: each priority is a monthly budget, and within it the
+ * highest Coding Index wins (a tie within TIE_POINTS goes to the cheaper one).
+ * USD per month on the chosen usage scenario. Published on the method page.
  */
-export type Gate = { everyday: number; hard: number };
-export const QUALITY_GATE: Record<Priority, Gate> = {
-  cheap: { everyday: 45, hard: 62 },
-  balanced: { everyday: 55, hard: 68 },
-  quality: { everyday: 64, hard: 72 },
+export type Budget = { everyday: number; hard: number };
+export const BUDGETS: Record<Priority, Budget> = {
+  cheap: { everyday: 5, hard: 50 },
+  balanced: { everyday: 20, hard: 100 },
+  quality: { everyday: 50, hard: 250 },
 };
-export const AA_QUALITY_GATE: Record<Priority, Gate> = {
-  cheap: { everyday: 45, hard: 68 },
-  balanced: { everyday: 55, hard: 72 },
-  quality: { everyday: 65, hard: 75 },
-};
-export const gateFor = (metric: string | null, priority: Priority): Gate =>
-  (metric === 'aa_coding_index' ? AA_QUALITY_GATE : QUALITY_GATE)[priority];
+
+/** Below this many points two scores are treated as equal, and the cheaper model wins. */
+export const TIE_POINTS = 1;

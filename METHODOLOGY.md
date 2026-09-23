@@ -16,7 +16,7 @@ The main problem with public benchmarks is not finding them: it is not comparing
 
 Every measurement carries a **comparability group** (`harnessKey`) made of: agent name, its version, number of attempts allowed, reasoning effort. Two measurements belong to the same group only if all four match.
 
-**Primary source: the Artificial Analysis Coding Index.** It is downloaded from the Artificial Analysis API at every update (once only: the download is cached for 20 hours, so rerunning the update spends no calls). Every model is measured by the same organisation with the same method, so they form a single comparability group (`aa-coding-index|<index version>`). When the same model is published in several reasoning-effort variants, every variant is kept with its cost per task; which one counts depends on what the buyer can select (section 3). Values are reported as published, with the attribution "Source: Artificial Analysis (artificialanalysis.ai)" and a statement that the picks are ModelPick's and not Artificial Analysis'.
+**Primary source: the Artificial Analysis Coding Index.** It is downloaded from the Artificial Analysis API at every update (once only: the download is cached for 20 hours, so rerunning the update spends no calls). Every model is measured by the same organisation with the same method, so they form a single comparability group (`aa-coding-index|<index version>`). When the same model is published in several reasoning-effort variants, every variant is kept; which one counts depends on what the buyer can select (section 3). Values are reported as published, with the attribution "Source: Artificial Analysis (artificialanalysis.ai)" and a statement that the picks are ModelPick's and not Artificial Analysis'.
 
 **One model, one build.** A dated snapshot is part of a model's identity: "V4 Flash 0423" and "V4 Flash 0731" are different products. When the name on the source and the name in our catalogue both carry a date and the dates disagree, the score goes to our model with the source's date in its name (a score for "V4 Pro 0813" goes to `deepseek-v4-pro-0813`); if we sell no build with that date, the score is dropped rather than attached to another build, and the run says how many scores that cost.
 
@@ -32,28 +32,19 @@ Every measurement carries a **comparability group** (`harnessKey`) made of: agen
 
 The **reference group** is Artificial Analysis when present; failing that, the SWE-bench group that measured the most models. Only models in the reference group enter the comparison: a model measured elsewhere is excluded with an explicit reason, never converted or rescaled.
 
-## 3. Quality thresholds
+## 3. The choice rule
 
-The priority chosen by the user sets the minimum score on the Artificial Analysis Coding Index. The thresholds keep roughly the selectivity they had on SWE-bench: the everyday pick must be in the best half, best 35% or best 25% of measured models.
+**Each priority has a monthly budget. Within the budget, the model with the highest Artificial Analysis Coding Index wins. If two models are within 1 point, the cheaper one wins.** The model for hard problems is chosen the same way with the larger budget, and is named only if it scores more than 1 point above the everyday one.
 
-| Priority | Everyday | Hard problems |
+| Priority | Every day | Hard problems |
 |---|---|---|
-| Spend less | 45 | 68 |
-| Balanced | 55 | 72 |
-| Best results | 65 | 75 |
+| Spend less | 5 USD | 50 USD |
+| Balanced | 20 USD | 100 USD |
+| Best results | 50 USD | 250 USD |
 
-If the reference falls back to SWE-bench (Artificial Analysis unavailable), the thresholds are percentages of problems solved: 45/62, 55/68, 64/72.
+Budgets are USD per month on the chosen kind of work (section 5), for the cheapest usable offer of each model. At the same total price we prefer the offer whose provider the configuration can hold. If no measured model fits the budget, no winner is named and the site says so.
 
-What "best" means depends on the chosen priority, and that is the only question the site asks:
-
-- at the same total price we prefer the offer whose provider the configuration can hold: an unpinned broker route may be served by anyone, at another price;
-- with **spend less**, the everyday model is the **cheapest model-provider pair among those clearing the threshold**: an economical choice that reaches adequate quality, not the cheapest one outright;
-- with **balanced**, it is the **highest score among the pairs costing at most twice the cheapest** one clearing the threshold: a little more money for clearly more quality;
-- with **best results**, it is the **highest score** available; price only breaks ties between models within 2 points of the maximum, where the difference is not meaningful.
-- The **model for hard problems** must beat the everyday pick by at least **3 points** measured in the same comparability group. Within 2 points of the top score the cheaper one is preferred: below that gap the difference is not meaningful and not worth the cost.
-- If no model meets these conditions, **no winner is named** and the site says so.
-
-**Price caps.** No pick may cost more per task than a multiple of the market's mean cost per task: **1.25×** with spend less and balanced, **5×** with best results. The mean is recomputed at every update over the variants Artificial Analysis measured for models released in the last 6 months (its "cost per task", from its own runs at the maker's prices). A variant with no published cost per task is held to the same multiple of the candidates' mean monthly cost. The caps in force are shown on the method page.
+This replaces the earlier quality thresholds, price caps per task and bands: one rule a reader can check by hand. The cost per task that Artificial Analysis publishes is not used to choose, because it is computed at the maker's list prices, not at the price of the provider we send the reader to.
 
 **The reasoning effort the buyer can actually use.** A model's score and cost depend on its reasoning effort. A variant counts only if the buyer gets it: on OpenAI's own API OpenCode can set `reasoningEffort` (none to xhigh), so the configuration we publish sets it; on Anthropic's own API OpenCode uses "high" unless changed by hand, so the "high" variant counts; anywhere else the effort cannot be chosen through the configuration, so only the lowest measured variant counts.
 

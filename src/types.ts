@@ -192,8 +192,6 @@ export interface Snapshot {
   /** Which OpenCode version the commands were verified against. */
   opencodeVersion?: string | null;
   replacements?: Replacement[];
-  /** Mean cost per task of recent measured variants (Artificial Analysis): the price caps build on it. */
-  costReference?: { meanPerTask: number; models: number; sinceDays: number } | null;
   stats: {
     modelCount: number;
     offerCount: number;
