@@ -12,7 +12,7 @@ import { SCENARIOS, TASK_IDS, PRIORITIES, BUDGETS } from '../engine/scenarios.js
 import { accountName, usabilityLabel } from '../engine/usability.js';
 import { signupUrl } from '../engine/signup.js';
 import { configFor } from '../engine/opencode.js';
-import { retentionUntil, type PlanComparison, type PlanRow } from '../engine/plans.js';
+import { EVEN_USD, retentionUntil, type PlanComparison, type PlanRow } from '../engine/plans.js';
 import { t, pagePath, otherLang, type Lang } from '../i18n.js';
 import type { RunStatus } from '../pipeline/store.js';
 import { msUntilNextRun } from '../scheduler.js';
@@ -255,10 +255,10 @@ function renderDetails(pick: Pick, lang: Lang, opencodeVersion: string | null): 
 
 function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change | null, lang: Lang, empty: string, opencodeVersion: string | null, request: RecommendationRequest, go: PlanComparison | null = null): string {
   const c = t(lang);
-  // Only when the plan would actually cost less for this same month of work.
+  // Only when the fee alone covers this month of work and costs less than the pick.
   const planRow = pick ? go?.rows.find((r) => r.modelKey === pick.model.key && !r.blocker && r.month) : undefined;
-  const goHint = pick && planRow?.month && planRow.month.totalUsd < pick.cost.totalUsd!
-    ? c.go.homeHint(modelName(pick.model.displayName), usd(planRow.month.totalUsd, lang), percent(planRow.month.coveredShare, lang))
+  const goHint = pick && go && planRow?.month && planRow.month.coveredShare >= 1 && go.plan.monthlyFeeUsd + EVEN_USD <= pick.cost.totalUsd!
+    ? c.go.homeHint(modelName(pick.model.displayName), usd(go.plan.monthlyFeeUsd, lang))
     : null;
   const title = role === 'everyday' ? c.home.everyday : c.home.hard;
   if (!pick) {
@@ -449,9 +449,6 @@ function planDataWarning(row: PlanRow, lang: Lang, now = Date.now()): string | n
   return null;
 }
 
-/** Savings below this are noise next to the estimates they come from. */
-const EVEN_USD = 0.5;
-
 /**
  * Is Go worth it, and with which model: the answer in one sentence, then one
  * row per measured model with the two monthly bills and which one is lower.
@@ -477,8 +474,9 @@ export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: R
   const priced = go.rows.filter((r) => !r.blocker && r.month);
   const shown = priced.filter((r) => r.quality && r.direct);
   const more = go.rows.filter((r) => !shown.includes(r));
-  const winners = shown.filter((r) => r.savingUsd! >= EVEN_USD);
-  const losers = shown.filter((r) => !winners.includes(r));
+  const winners = shown.filter((r) => r.verdict === 'plan');
+  const losers = shown.filter((r) => r.verdict === 'direct' || r.verdict === 'even');
+  const notEnough = shown.filter((r) => r.verdict === 'not-enough');
 
   // Rows come best score first, so the first winner is the best model Go pays off with.
   const answer = !shown.length
@@ -489,17 +487,19 @@ export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: R
 
   const row = (r: PlanRow) => {
     const m = r.month!;
-    const saving = r.savingUsd!;
-    const verdict = Math.abs(saving) < EVEN_USD
-      ? `<span class="meta">${esc(g.even)}</span>`
-      : saving > 0
-        ? `<span class="label label--ok">${esc(g.goWins(usd(saving, lang)))}</span>`
-        : `<span class="label label--info">${esc(g.payWins(usd(-saving, lang)))}</span>`;
+    const covers = percent(m.coveredShare, lang);
+    const verdict = r.verdict === 'not-enough'
+      ? `<span class="label label--warning">${esc(g.notEnough(covers))}</span>`
+      : r.verdict === 'even'
+        ? `<span class="meta">${esc(g.even)}</span>`
+        : r.verdict === 'plan'
+          ? `<span class="label label--ok">${esc(g.goWins(usd(r.savingUsd!, lang)))}</span>`
+          : `<span class="label label--info">${esc(g.payWins(usd(-r.savingUsd!, lang)))}</span>`;
     const warning = planDataWarning(r, lang);
-    return `<tr${saving >= EVEN_USD ? ' class="chosen"' : ''}>
+    return `<tr${r.verdict === 'plan' ? ' class="chosen"' : ''}>
       <td class="stack__title">${esc(name(r))}${warning ? `<span class="label label--warning plan__warn">${esc(warning)}</span>` : ''}</td>
       <td class="num" data-label="${esc(g.cols[1])}">${esc(formatScore(r.quality!.value, r.quality!.metric))}</td>
-      <td class="num nowrap" data-label="${esc(g.cols[2])}"><strong>${esc(usd(m.totalUsd, lang))}</strong>${m.coveredShare < 1 ? `<span class="meta">${esc(g.overCap)}</span>` : ''}</td>
+      <td class="num nowrap" data-label="${esc(g.cols[2])}"><strong>${esc(usd(go.plan.monthlyFeeUsd, lang))}</strong>${m.coveredShare < 1 ? `<span class="meta">${esc(g.lasts(covers))}</span>` : ''}</td>
       <td class="num nowrap" data-label="${esc(g.cols[3])}"><strong>${esc(usd(r.direct!.cost.totalUsd, lang))}</strong><span class="meta">${esc(r.direct!.offer.providerName)}</span></td>
       <td data-label="${esc(g.cols[4])}">${verdict}</td>
     </tr>`;
@@ -532,9 +532,13 @@ export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: R
       <summary>${esc(g.losersTitle(losers.length))}</summary>
       <div class="details__body">${table(losers)}</div>
     </details>` : ''}
+    ${notEnough.length ? `<details class="details">
+      <summary>${esc(g.notEnoughTitle(notEnough.length))}</summary>
+      <div class="details__body">${table(notEnough)}</div>
+    </details>` : ''}
     ${more.length ? `<details class="details">
       <summary>${esc(g.moreTitle(more.length))}</summary>
-      <div class="details__body"><ul class="list">${more.map((r) => `<li><strong>${esc(name(r))}</strong>: ${esc(r.blocker ? c.reasons[r.blocker] : !r.quality ? g.unmeasured : !r.direct ? g.noDirect : c.reasons['incomplete-prices'])}${r.month && !r.blocker ? ` · ${esc(g.cols[2])} ${esc(usd(r.month.totalUsd, lang))}` : ''}</li>`).join('')}</ul></div>
+      <div class="details__body"><ul class="list">${more.map((r) => `<li><strong>${esc(name(r))}</strong>: ${esc(r.blocker ? c.reasons[r.blocker] : !r.quality ? g.unmeasured : !r.direct ? g.noDirect : c.reasons['incomplete-prices'])}${r.month && !r.blocker && r.month.coveredShare < 1 ? ` · ${esc(g.lasts(percent(r.month.coveredShare, lang)))}` : ''}</li>`).join('')}</ul></div>
     </details>` : ''}
     <details class="details">
       <summary>${esc(g.howTitle)}</summary>

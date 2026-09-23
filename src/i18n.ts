@@ -200,7 +200,9 @@ export interface Catalog {
     goWins: (amount: string) => string;
     payWins: (amount: string) => string;
     even: string;
-    overCap: string;
+    lasts: (pct: string) => string;
+    notEnough: (pct: string) => string;
+    notEnoughTitle: (n: number) => string;
     noDirect: string;
     retained: (days: string) => string;
     retainedUnknown: string;
@@ -215,7 +217,7 @@ export interface Catalog {
     stale: (days: string) => string;
     noPlan: string;
     homeLink: string;
-    homeHint: (model: string, go: string, covered: string) => string;
+    homeHint: (model: string, fee: string) => string;
   };
   sources: { title: string; cols: [string, string, string, string, string]; active: string; failed: string; never: string };
   status: {
@@ -454,14 +456,16 @@ const it: Catalog = {
     yes: (task, n, total, best) => `Per ${task}, sì con ${n} modelli su ${total}. Il migliore è ${best}.`,
     winnersTitle: 'Con questi modelli conviene Go',
     losersTitle: (n) => `Con altri ${n} modelli spendi meno pagando a consumo`,
+    notEnoughTitle: (n) => `Con altri ${n} modelli Go non basta per un mese di questo lavoro`,
     no: (task) => `Per ${task}, no: con ogni modello di Go spendi meno pagando a consumo.`,
     noData: 'Oggi nessun modello di Go è utilizzabile con i nostri dati.',
-    lead: (fee) => `Go costa ${fee} al mese. Ecco quanto spendi in un mese di lavoro con Go o pagando a consumo lo stesso modello.`,
+    lead: (fee) => `Go costa ${fee} al mese, ma ogni modello ha un tetto di consumo. Qui trovi i modelli con cui quei ${fee} bastano per tutto il mese e costano meno che pagare a consumo.`,
     cols: ['Modello', 'Qualità', 'Con Go', 'A consumo', 'Conviene'],
     goWins: (a) => `Go, risparmi ${a}`,
     payWins: (a) => `A consumo, risparmi ${a}`,
     even: 'Costano uguale',
-    overCap: 'supera il tetto: il resto a consumo',
+    lasts: (p) => `basta per il ${p} del mese`,
+    notEnough: (p) => `Go non basta: copre il ${p} del mese`,
     noDirect: 'nessun provider',
     retained: (n) => `dati conservati ${n} giorni`,
     retainedUnknown: 'dati conservati',
@@ -472,7 +476,7 @@ const it: Catalog = {
     howTitle: 'Come facciamo il conto',
     how: (task, fee, five, week) => [
       `Un mese di ${task} di una persona che usa un agente di codice ogni giorno: lo stesso scenario della pagina principale.`,
-      `Con Go: ${fee} al mese. Ogni modello ha un tetto mensile (15, 30 o 60 USD ai prezzi di Go); se lo superi e attivi «Use balance», il resto lo paghi a consumo su OpenCode Zen.`,
+      `Con Go paghi ${fee} al mese e ogni modello ha un tetto mensile (15, 30 o 60 USD ai prezzi di listino di Go). Diciamo che Go conviene solo se il tetto basta per tutto il mese: se finisce prima, Go si ferma, e il resto andrebbe pagato a consumo su OpenCode Zen («Use balance»), che non è l'abbonamento.`,
       'A consumo: il provider più economico che consigliamo per lo stesso modello, commissioni incluse.',
       `Ogni riga considera un solo modello alla volta. In 5 ore puoi usare al massimo il ${five}% del tetto, in una settimana il ${week}%. Per DeepSeek usiamo i prezzi delle ore di punta.`,
       'Un solo abbonato per workspace, e Go è pensato per un agente di codice, non per le chiamate API di una tua applicazione.',
@@ -482,7 +486,7 @@ const it: Catalog = {
     stale: (n) => `Queste condizioni sono state lette ${n} giorni fa e potrebbero essere cambiate.`,
     noPlan: 'I dati di Go non sono ancora pubblicati: arrivano con il prossimo aggiornamento quotidiano.',
     homeLink: "Stai valutando OpenCode Go? Guarda con quali modelli conviene",
-    homeHint: (m, go, cov) => `${m} è incluso anche in OpenCode Go: ${go} al mese per questo lavoro, con il tetto che copre il ${cov} del mese.`,
+    homeHint: (m, fee) => `${m} è incluso anche in OpenCode Go: con ${fee} al mese copri tutto questo lavoro.`,
   },
   sources: {
     title: 'Fonti',
@@ -726,14 +730,16 @@ const en: Catalog = {
     yes: (task, n, total, best) => `For ${task}, yes with ${n} of ${total} models. The best of them is ${best}.`,
     winnersTitle: 'With these models Go is the better deal',
     losersTitle: (n) => `With ${n} other models paying per token costs less`,
+    notEnoughTitle: (n) => `With ${n} other models Go is not enough for a month of this work`,
     no: (task) => `For ${task}, no: every Go model costs less paying per token.`,
     noData: 'No Go model is usable with our data today.',
-    lead: (fee) => `Go costs ${fee} a month. Here is what a month of work costs on Go or paying per token for the same model.`,
+    lead: (fee) => `Go costs ${fee} a month, but each model has a usage allowance. These are the models for which that ${fee} lasts the whole month and costs less than paying per token.`,
     cols: ['Model', 'Quality', 'On Go', 'Pay per token', 'Better deal'],
     goWins: (a) => `Go, you save ${a}`,
     payWins: (a) => `Per token, you save ${a}`,
     even: 'Same cost',
-    overCap: 'goes over the allowance: the rest per token',
+    lasts: (p) => `lasts ${p} of the month`,
+    notEnough: (p) => `Go is not enough: it covers ${p} of the month`,
     noDirect: 'no provider',
     retained: (n) => `data kept ${n} days`,
     retainedUnknown: 'data retained',
@@ -744,7 +750,7 @@ const en: Catalog = {
     howTitle: 'How we work it out',
     how: (task, fee, five, week) => [
       `A month of ${task} for one person using a coding agent every day: the same scenario as the main page.`,
-      `On Go: ${fee} a month. Each model has a monthly allowance (15, 30 or 60 USD at Go's prices); past it, with "Use balance" on, the rest is billed per token on OpenCode Zen.`,
+      `On Go you pay ${fee} a month and each model has a monthly allowance (15, 30 or 60 USD at Go's list prices). We only say Go pays off when the allowance lasts the whole month: if it runs out, Go stops, and the rest would be paid per token on OpenCode Zen ("Use balance"), which is not the subscription.`,
       'Per token: the cheapest provider we recommend for the same model, fees included.',
       `Each row assumes one model at a time. At most ${five}% of the allowance in 5 hours and ${week}% in a week. DeepSeek is priced at busy-hour rates.`,
       'One subscriber per workspace, and Go is meant for a coding agent, not for your own application\'s API calls.',
@@ -754,7 +760,7 @@ const en: Catalog = {
     stale: (n) => `These terms were read ${n} days ago and may have changed.`,
     noPlan: 'Go data is not published yet: it arrives with the next daily update.',
     homeLink: 'Thinking about OpenCode Go? See which models it pays off with',
-    homeHint: (m, go, cov) => `${m} is also in OpenCode Go: ${go} a month for this work, with the allowance covering ${cov} of the month.`,
+    homeHint: (m, fee) => `${m} is also in OpenCode Go: ${fee} a month covers all of this work.`,
   },
   sources: {
     title: 'Sources',

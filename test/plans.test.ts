@@ -119,3 +119,22 @@ test('terms read long ago are flagged as possibly out of date', () => {
   assert.equal(comparePlan(s, 'go', req)!.stale, true);
   assert.equal(comparePlan(fixture(), 'go', req)!.stale, false);
 });
+
+test('a month the allowance does not cover is "not enough", never a saving', () => {
+  const s = fixture();
+  s.plans![0]!.models.m!.capUsd = 3; // the month draws 6
+  const row = comparePlan(s, 'go', req)!.rows.find((r) => r.planModelId === 'm')!;
+  assert.equal(row.verdict, 'not-enough');
+  assert.equal(row.savingUsd, null);
+  close(row.month?.coveredShare, 0.5);
+});
+
+test('the plan wins only when the fee covers the month and the provider costs more', () => {
+  const s = fixture();
+  for (const id of ['cheap', 'dear']) s.offers.find((o) => o.id === id)!.prices = { inputPerMTok: 6, outputPerMTok: 6, cacheReadPerMTok: null, cacheWritePerMTok: null };
+  const cmp = comparePlan(s, 'go', req)!;
+  const row = cmp.rows.find((r) => r.planModelId === 'm')!;
+  assert.equal(row.verdict, 'plan');
+  close(row.savingUsd, 2); // 12 at the provider against the 10 fee
+  assert.equal(cmp.summary.best?.planModelId, 'm');
+});

@@ -115,6 +115,8 @@ For one month of the chosen work, with `C` the allowance the month uses (plan pr
 
 Beyond the allowance the plan stops unless "Use balance" is enabled; with it, OpenCode Go bills the rest from the OpenCode Zen balance, so `O` uses Zen's price for the same model when a source publishes one, otherwise the plan's own list price (stated on the row).
 
+**The verdict on the page.** The fee buys a month of work only if the allowance lasts the month. So the page says Go pays off only when `C ≤ T` **and** the cheapest provider costs more than the fee; when `C > T` the row says "Go is not enough" with the share of the month it covers, and no saving is claimed, because the rest of the month would be paid per token on Zen, not by the subscription. The plan month with overage (above) and the range below stay in the API for whoever wants them.
+
 **When the plan pays off.** Both bills grow with the amount of work: the provider's in a straight line, the plan's flat up to the allowance and then at `O`. The page gives the range of monthly spend at the provider in which the plan costs less:
 
 - if the allowance still covers the work when the provider reaches the fee (`fee / P ≤ T / C`): from the fee upwards, up to `P × (T·O/C − fee) / (O − P)` when `O > P`, with no upper end otherwise;
