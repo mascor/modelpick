@@ -66,6 +66,8 @@ export interface Catalog {
     successor: (name: string) => string;
     alternative: (name: string, score: string, price: string) => string;
     provisionalShort: string;
+    usage: (rate: string) => string;
+    opencodeSource: string;
     inherited: (from: string) => string;
     effort: (level: string) => string;
     replaced: (retired: string, successor: string) => string;
@@ -127,6 +129,7 @@ export interface Catalog {
   engine: {
     everydayReason: (value: string, metric: string, budget: string, price: string) => string;
     hardReason: (value: string, metric: string, gap: string, budget: string, price: string) => string;
+    usageReason: (value: string, metric: string, budget: string, price: string, points: string, rate: string) => string;
     hardWhen: string;
     noWinner: (budget: string) => string;
     noBackup: (budget: string) => string;
@@ -215,6 +218,8 @@ const it: Catalog = {
     effort: (l) => `sforzo ${l}`,
     alternative: (n, s, p) => `Alternativa molto vicina: ${n}, Coding Index ${s}, ${p} al mese.`,
     provisionalShort: 'provvisorio',
+    opencodeSource: 'Source: OpenCode (opencode.ai/data)',
+    usage: (r) => `${r}% degli utenti di OpenCode lo usa ancora la settimana dopo`,
     successor: (n) => `È uscito ${n}: Artificial Analysis non l'ha ancora misurato sul codice, per questo non possiamo confrontarlo.`,
     incompleteEstimate:
       'Stima incompleta: una commissione applicabile non è quantificabile, il confronto fra provider vicini può ribaltarsi.',
@@ -312,6 +317,8 @@ const it: Catalog = {
   engine: {
     everydayReason: (v, m, b, p) =>
       `Ottiene ${v} su ${m}: il punteggio più alto fra i modelli che costano al massimo ${b} al mese (questo costa ${p} sullo scenario scelto).`,
+    usageReason: (v, m, b, p, pts, r) =>
+      `Ottiene ${v} su ${m}, entro ${pts} punti dal migliore fra i modelli che costano al massimo ${b} al mese: a quella distanza i benchmark non li separano, e il ${r}% degli utenti di OpenCode lo usa ancora la settimana dopo, più degli altri. Costa ${p}.`,
     hardReason: (v, m, gap, b, p) =>
       `Ottiene ${v} su ${m}, ${gap} punti più del modello di ogni giorno: il punteggio più alto fra i modelli che costano al massimo ${b} al mese (questo costa ${p}).`,
     hardWhen:
@@ -350,7 +357,7 @@ const it: Catalog = {
     title: 'Come scegliamo',
     intro: 'Ogni mattina alle 6:30 ripetiamo la scelta con prezzi e punteggi appena scaricati.',
     ruleTitle: 'La regola',
-    rule: 'Per ogni priorità c\'è un budget al mese. Nel budget vince il modello con il Coding Index più alto di Artificial Analysis. Se due modelli sono entro 1 punto, vince il più economico. Il modello per i problemi difficili si sceglie allo stesso modo con il budget più alto, e lo indichiamo solo se fa meglio di quello di ogni giorno. Se il secondo classificato nello stesso budget è entro 3 punti, lo mostriamo come alternativa.',
+    rule: 'Per ogni priorità c\'è un budget al mese. Nel budget vince il modello con il Coding Index più alto di Artificial Analysis. Se un altro modello è entro 3 punti, i benchmark non bastano a separarli: vince quello che gli utenti di OpenCode continuano a usare di più la settimana dopo (senza questo dato, entro 1 punto vince il più economico). Il modello per i problemi difficili si sceglie allo stesso modo con il budget più alto, e lo indichiamo solo se fa meglio di quello di ogni giorno. Se il secondo classificato nello stesso budget è entro 3 punti, lo mostriamo come alternativa.',
     budgetCols: ['Priorità', 'Ogni giorno', 'Problemi difficili'],
     budgetNote: 'Budget in USD al mese, sul tipo di lavoro che hai scelto.',
     costTitle: 'Come stimiamo il costo al mese',
@@ -358,7 +365,7 @@ const it: Catalog = {
     costNote: "Token al mese per una persona che usa un agente di codice ogni giorno, moltiplicati per il prezzo del provider, commissioni incluse. Sono ipotesi dichiarate, non misure dei tuoi consumi. Un prezzo mancante non diventa mai zero: se manca quello della cache, quei token costano come l'input.",
     guaranteesTitle: 'Cosa garantiamo',
     guarantees: [
-      '<strong>Punteggi recenti.</strong> Contano solo misure degli ultimi 7 giorni.',
+      '<strong>Punteggi recenti.</strong> Contano solo misure degli ultimi 7 giorni, anche per i dati d\'uso di OpenCode.',
       '<strong>Niente modelli ritirati.</strong> Se il produttore ritira un modello non lo mostriamo più, neanche nelle versioni datate o nelle varianti dei rivenditori.',
       '<strong>Il punteggio che otterrai davvero.</strong> Lo stesso modello rende in modo diverso a seconda dello sforzo di ragionamento. Contiamo solo quello che puoi impostare: con l\'API diretta di OpenAI lo scriviamo nella configurazione, con quella di Anthropic vale "high", il predefinito di OpenCode; altrove contiamo il punteggio più basso misurato.',
       '<strong>Versioni nuove.</strong> Se una versione nuova non è ancora misurata sul codice, ma il suo Intelligence Index è almeno pari a quello della precedente, usa il punteggio della precedente, segnalato come provvisorio. Sui casi misurati la versione nuova è stata almeno altrettanto buona 95 volte su 100.',
@@ -430,6 +437,8 @@ const en: Catalog = {
     effort: (l) => `${l} effort`,
     alternative: (n, s, p) => `A very close alternative: ${n}, Coding Index ${s}, ${p} per month.`,
     provisionalShort: 'provisional',
+    opencodeSource: 'Source: OpenCode (opencode.ai/data)',
+    usage: (r) => `${r}% of OpenCode users still use it the following week`,
     successor: (n) => `${n} is out: Artificial Analysis has not measured it on code yet, so we cannot compare it.`,
     incompleteEstimate:
       'Incomplete estimate: one applicable fee cannot be quantified, so a close call between providers could flip.',
@@ -526,6 +535,8 @@ const en: Catalog = {
   engine: {
     everydayReason: (v, m, b, p) =>
       `Scores ${v} on ${m}: the highest score among the models costing at most ${b} per month (this one costs ${p} on the chosen scenario).`,
+    usageReason: (v, m, b, p, pts, r) =>
+      `Scores ${v} on ${m}, within ${pts} points of the best among the models costing at most ${b} per month: at that distance benchmarks do not separate them, and ${r}% of OpenCode users still use it the following week, more than the others. It costs ${p}.`,
     hardReason: (v, m, gap, b, p) =>
       `Scores ${v} on ${m}, ${gap} points above the everyday model: the highest score among the models costing at most ${b} per month (this one costs ${p}).`,
     hardWhen:
@@ -564,7 +575,7 @@ const en: Catalog = {
     title: 'How we choose',
     intro: 'Every morning at 6:30 (Rome time) we repeat the choice on freshly downloaded prices and scores.',
     ruleTitle: 'The rule',
-    rule: 'Each priority has a monthly budget. Within the budget, the model with the highest Artificial Analysis Coding Index wins. If two models are within 1 point, the cheaper one wins. The model for hard problems is chosen the same way with the larger budget, and we only name it if it does better than the everyday one. If the runner-up in the same budget is within 3 points, we show it as an alternative.',
+    rule: 'Each priority has a monthly budget. Within the budget, the model with the highest Artificial Analysis Coding Index wins. If another model is within 3 points, benchmarks cannot separate them: the one OpenCode users keep using most the following week wins (without that figure, within 1 point the cheaper one wins). The model for hard problems is chosen the same way with the larger budget, and we only name it if it does better than the everyday one. If the runner-up in the same budget is within 3 points, we show it as an alternative.',
     budgetCols: ['Priority', 'Every day', 'Hard problems'],
     budgetNote: 'Budgets in USD per month, on the kind of work you chose.',
     costTitle: 'How we estimate the monthly cost',
@@ -572,7 +583,7 @@ const en: Catalog = {
     costNote: "Tokens per month for one person using a coding agent every day, times the provider's price, fees included. They are stated assumptions, not measurements of your usage. A missing price never becomes zero: if the cache price is missing, those tokens cost as much as input.",
     guaranteesTitle: 'What we guarantee',
     guarantees: [
-      '<strong>Recent scores.</strong> Only measurements from the last 7 days count.',
+      '<strong>Recent scores.</strong> Only measurements from the last 7 days count, OpenCode usage figures included.',
       '<strong>No retired models.</strong> When the maker retires a model we no longer show it, nor its dated builds or resellers\' variants.',
       '<strong>The score you will actually get.</strong> The same model performs differently depending on its reasoning effort. We only count what you can set: with OpenAI\'s own API we write it into the configuration, with Anthropic\'s it is "high", OpenCode\'s default; elsewhere we count the lowest measured score.',
       '<strong>New versions.</strong> If a new version is not yet measured on code, but its Intelligence Index is at least that of the previous one, it uses the previous one\'s score, flagged as provisional. Across measured cases the new version was at least as good 95 times out of 100.',

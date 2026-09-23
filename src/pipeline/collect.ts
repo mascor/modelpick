@@ -8,7 +8,8 @@ import { join } from 'node:path';
 import { PATHS, SOURCES, sourceById } from '../config.js';
 import { deprecatedKeys, successorOf } from '../engine/lineage.js';
 import { matchForm, hoursSince } from '../lib/normalize.js';
-import type { ModelRecord, Offer, ProviderProfile, QualityEvidence, Replacement, Snapshot, SourceStatus } from '../types.js';
+import type { ModelRecord, Offer, ProviderProfile, QualityEvidence, Replacement, Snapshot, SourceStatus, UsageSignal } from '../types.js';
+import { fetchUsage } from '../sources/opencodedata.js';
 import { fetchCatalogue, fetchOffers } from '../sources/openrouter.js';
 import { fetchModelsDev } from '../sources/modelsdev.js';
 import { fetchSweBench } from '../sources/swebench.js';
@@ -27,6 +28,7 @@ export interface Collected {
   statuses: SourceStatus[];
   warnings: string[];
   replacements: Replacement[];
+  usage: UsageSignal[];
 }
 
 const baseStatus = (id: string): SourceStatus => {
@@ -262,6 +264,23 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     }
   }
 
+  // What OpenCode users keep using: it only breaks near-ties between scores.
+  let usage: UsageSignal[] = [];
+  if (enabled.has('opencodedata')) {
+    const st = baseStatus('opencodedata');
+    try {
+      const res = await fetchUsage(qualityKeys, observedAt);
+      usage = res.signals;
+      statuses.push(finish(st, usage.length));
+      if (res.unmatched.length) warnings.push(`OpenCode data: ${res.unmatched.length} models not matched to a known model (e.g. ${res.unmatched.slice(0, 3).join(', ')}).`);
+    } catch (err) {
+      // Yesterday's figures stay usable while they are recent.
+      usage = (previous?.usage ?? []).filter((u) => (hoursSince(u.observedAt) ?? Infinity) < 7 * 24);
+      statuses.push(fallback(st, err, usage.length, usage.length ? hoursSince(usage[0]!.observedAt) : null));
+      warnings.push('OpenCode data unreachable: usage figures from the last successful update.');
+    }
+  }
+
   // 4. Per-provider offers, asked only for models we could actually recommend:
   //    a model with no measured evidence cannot win, so its endpoints are noise.
   if (enabled.has('openrouter') && pathByKey.size) {
@@ -344,6 +363,7 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     const before = offers.length;
     offers.splice(0, offers.length, ...offers.filter((o) => !gone.has(o.modelKey)));
     evidence.splice(0, evidence.length, ...evidence.filter((e) => !gone.has(e.modelKey)));
+    usage = usage.filter((u) => !gone.has(u.modelKey));
     warnings.push(`${gone.size} deprecated models hidden with ${before - offers.length} offers (e.g. ${[...retired].slice(0, 3).join(', ')}).`);
   }
 
@@ -378,5 +398,5 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     else replacements.push(row);
   }
 
-  return { opencodeVersion: registry?.version ?? null, models, providers, offers, evidence, statuses, warnings, replacements };
+  return { opencodeVersion: registry?.version ?? null, models, providers, offers, evidence, statuses, warnings, replacements, usage };
 }

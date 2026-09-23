@@ -81,3 +81,9 @@ export const TIE_POINTS = 1;
 
 /** A runner-up within this many points of a pick, in the same budget, is shown next to it. */
 export const ALTERNATIVE_POINTS = 3;
+
+/**
+ * Within this many points of the best score in the budget, benchmarks do not
+ * really separate two models: the one OpenCode users keep using most wins.
+ */
+export const USAGE_POINTS = 3;

@@ -13,7 +13,7 @@ import { costOf, type CostBreakdown } from './cost.js';
 import { isIdentified, providerKey, usabilityOf, type Usability } from './usability.js';
 import { successorOf } from './lineage.js';
 import { OPENAI_EFFORTS } from './opencode.js';
-import { ALTERNATIVE_POINTS, BUDGETS, TIE_POINTS, SCENARIOS, type Budget, type Priority, type TaskId, type TokenMix } from './scenarios.js';
+import { ALTERNATIVE_POINTS, BUDGETS, TIE_POINTS, USAGE_POINTS, SCENARIOS, type Budget, type Priority, type TaskId, type TokenMix } from './scenarios.js';
 import { t, type Lang, type ReasonCode } from '../i18n.js';
 
 
@@ -67,6 +67,10 @@ export interface Pick {
   offersCompared: number;
   provisional: boolean;
   provisionalReasons: string[];
+  /** What OpenCode users do with this model, when OpenCode publishes it. */
+  usage: { retentionRate: number; eligibleUserWeeks: number } | null;
+  /** True when the pick won a near-tie on usage rather than on score alone. */
+  decidedByUsage: boolean;
   /** The runner-up in the same budget, when its score is very close. */
   alternative: { name: string; score: number; provisional: boolean; totalUsd: number } | null;
   /** A newer version of the same line, on sale but not yet measured on code. */
@@ -333,6 +337,13 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     offersByModel.set(o.modelKey, list);
   }
 
+  // Usage figures count while recent, like every other signal.
+  const usageOf = new Map(
+    (snapshot.usage ?? [])
+      .filter((u) => (hoursSince(u.observedAt, now) ?? Infinity) <= THRESHOLDS.evidenceMaxAgeDays * 24)
+      .map((u) => [u.modelKey, u]),
+  );
+
   // Models someone sells in a usable way but nobody has measured on code yet:
   // they cannot win, but a newer version of a pick must not go unmentioned.
   const measured = new Set(snapshot.evidence.map((e) => e.modelKey));
@@ -422,8 +433,10 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     const score = formatScore(cand.quality.value, cand.quality.metric);
     const gap = other ? (cand.quality.value - other.quality.value).toFixed(1) : null;
 
-    const reason =
-      role === 'everyday'
+    const usage = usageOf.get(cand.model.key);
+    const reason = decidedByUsage.has(cand) && usage
+      ? c.engine.usageReason(score, label, budgetUsd(role === 'everyday' ? budget.everyday : budget.hard), price, String(USAGE_POINTS), String(usage.retentionRate))
+      : role === 'everyday'
         ? c.engine.everydayReason(score, label, budgetUsd(budget.everyday), price)
         : c.engine.hardReason(score, label, gap ?? '0', budgetUsd(budget.hard), price);
 
@@ -441,6 +454,11 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
       offersCompared: cand.offers.length,
       provisional: provisionalReasons.length > 0,
       provisionalReasons,
+      usage: (() => {
+        const u = usageOf.get(cand.model.key);
+        return u ? { retentionRate: u.retentionRate, eligibleUserWeeks: u.eligibleUserWeeks } : null;
+      })(),
+      decidedByUsage: decidedByUsage.has(cand),
       alternative: runnerUp
         ? {
             name: runnerUp.model.displayName,
@@ -462,9 +480,20 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
    * wins; scores within TIE_POINTS of the top are equal, and the cheaper wins.
    */
   const byPrice = (a: Candidate, b: Candidate) => choiceOf(a).cost.totalUsd! - choiceOf(b).cost.totalUsd!;
+  // Within USAGE_POINTS of the top the one OpenCode users keep most wins; without
+  // usage figures, scores within TIE_POINTS are equal and the cheaper wins.
+  const retention = (c: Candidate) => usageOf.get(c.model.key)?.retentionRate ?? null;
+  const decidedByUsage = new Set<Candidate>();
   const bestWithin = (limit: number, pool: Candidate[]): Candidate | null => {
     const within = pool.filter((c) => choiceOf(c).cost.totalUsd! <= limit);
     const top = within.reduce((max, c) => Math.max(max, c.quality.value), -Infinity);
+    const near = within.filter((c) => c.quality.value >= top - USAGE_POINTS && retention(c) !== null);
+    if (near.length) {
+      const pick = near.sort((a, b) => retention(b)! - retention(a)! || b.quality.value - a.quality.value || byPrice(a, b))[0]!;
+      const byScore = within.filter((c) => c.quality.value >= top - TIE_POINTS).sort(byPrice)[0];
+      if (pick !== byScore) decidedByUsage.add(pick);
+      return pick;
+    }
     return within.filter((c) => c.quality.value >= top - TIE_POINTS).sort(byPrice)[0] ?? null;
   };
   const everydayCandidate = bestWithin(budget.everyday, candidates);

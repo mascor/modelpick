@@ -182,6 +182,20 @@ export const SOURCES: SourceConfig[] = [
     },
   },
   {
+    id: 'opencodedata',
+    name: 'OpenCode Data',
+    url: 'https://opencode.ai/data/',
+    enabled: bool(env.SOURCE_OPENCODEDATA, true),
+    licence: 'OpenCode Terms of Service',
+    attribution: 'Source: OpenCode (opencode.ai/data)',
+    note: "Quanti utenti di OpenCode continuano a usare un modello la settimana dopo. Decide solo fra modelli con Coding Index entro 3 punti. La pagina viene letta una volta al giorno.",
+    en: {
+      licence: 'OpenCode Terms of Service',
+      attribution: 'Source: OpenCode (opencode.ai/data)',
+      note: 'How many OpenCode users keep using a model the following week. It only decides between models whose Coding Index is within 3 points. The page is read once a day.',
+    },
+  },
+  {
     id: 'pricepertoken',
     name: 'Price Per Token',
     url: 'https://pricepertoken.com/',

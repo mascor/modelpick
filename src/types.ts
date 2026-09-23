@@ -178,6 +178,19 @@ export interface Replacement {
   successorName: string;
 }
 
+/** What people who code with OpenCode keep using (opencode.ai/data). */
+export interface UsageSignal {
+  modelKey: string;
+  /** The model as OpenCode names it. */
+  name: string;
+  /** Share of user-weeks followed by another week of use, 0-100. */
+  retentionRate: number;
+  eligibleUserWeeks: number;
+  /** Mean cost of a session, USD, when published. */
+  sessionCostUsd: number | null;
+  observedAt: Iso;
+}
+
 export interface Snapshot {
   version: 1;
   runId: string;
@@ -192,6 +205,7 @@ export interface Snapshot {
   /** Which OpenCode version the commands were verified against. */
   opencodeVersion?: string | null;
   replacements?: Replacement[];
+  usage?: UsageSignal[];
   stats: {
     modelCount: number;
     offerCount: number;

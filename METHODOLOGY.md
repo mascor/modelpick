@@ -34,7 +34,7 @@ The **reference group** is Artificial Analysis when present; failing that, the S
 
 ## 3. The choice rule
 
-**Each priority has a monthly budget. Within the budget, the model with the highest Artificial Analysis Coding Index wins. If two models are within 1 point, the cheaper one wins.** The model for hard problems is chosen the same way with the larger budget, and is named only if it scores more than 1 point above the everyday one. When the runner-up in the same budget is within **3 points** of a pick, the card shows it as a close alternative, with its score and price: at that distance the data barely separates the two.
+**Each priority has a monthly budget. Within the budget, the model with the highest Artificial Analysis Coding Index wins. If another model is within 3 points, the one OpenCode users keep using most wins.** Without usage figures for the models in that range, scores within 1 point are a tie and the cheaper one wins. The model for hard problems is chosen the same way with the larger budget, and is named only if it scores more than 1 point above the everyday one. When the runner-up in the same budget is within **3 points** of a pick, the card shows it as a close alternative, with its score and price: at that distance the data barely separates the two.
 
 | Priority | Every day | Hard problems |
 |---|---|---|
@@ -43,6 +43,8 @@ The **reference group** is Artificial Analysis when present; failing that, the S
 | Best results | 50 USD | 250 USD |
 
 Budgets are USD per month on the chosen kind of work (section 5), for the cheapest usable offer of each model. At the same total price we prefer the offer whose provider the configuration can hold. If no measured model fits the budget, no winner is named and the site says so.
+
+**Usage, from OpenCode.** OpenCode publishes, at opencode.ai/data, how many of the people who used a model in a week were still using it the next week. It is read once per daily update (the page has no API; the site owner chose to read it, with attribution) and only models with at least 1,000 eligible user-weeks count. Within 3 points benchmarks do not really separate two models; what people who code with the same tool keep using does. Beyond 3 points the score always wins.
 
 This replaces the earlier quality thresholds, price caps per task and bands: one rule a reader can check by hand. The cost per task that Artificial Analysis publishes is not used to choose, because it is computed at the maker's list prices, not at the price of the provider we send the reader to.
 

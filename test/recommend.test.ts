@@ -298,3 +298,19 @@ test('a runner-up within 3 points in the same budget is shown as the alternative
   const alone = recommend(snapshot([model('v/first'), model('v/far')], [s.offers[0]!, s.offers[2]!], [s.evidence[0]!, s.evidence[2]!]), req({ priority: 'cheap' }));
   assert.equal(alone.everyday?.alternative, null); // 11.5 points behind is not "very close"
 });
+
+test('within 3 points the model OpenCode users keep most wins; beyond 3 points the score wins', () => {
+  const prices = { inputPerMTok: 0.1, outputPerMTok: 0.4, cacheReadPerMTok: 0.01, cacheWritePerMTok: 0.1 };
+  const usage = (modelKey: string, retentionRate: number) => ({ modelKey, name: modelKey, retentionRate, eligibleUserWeeks: 20000, sessionCostUsd: null, observedAt: now.toISOString() });
+  const make = (loved: number) =>
+    snapshot(
+      [model('v/top'), model('v/loved')],
+      [offer({ id: 't', modelKey: 'v/top', providerId: 'a', prices }), offer({ id: 'l', modelKey: 'v/loved', providerId: 'b', prices: { ...prices, inputPerMTok: 0.12 } })],
+      [evidence('v/top', 71.5), evidence('v/loved', loved)],
+      { usage: [usage('v/top', 40), usage('v/loved', 85)] },
+    );
+  const near = recommend(make(69.1), req({ priority: 'cheap' }));
+  assert.equal(near.everyday?.model.key, 'v/loved');
+  assert.equal(near.everyday?.decidedByUsage, true);
+  assert.equal(recommend(make(66), req({ priority: 'cheap' })).everyday?.model.key, 'v/top');
+});
