@@ -14,7 +14,7 @@ import type { ModelRecord, Offer, Plan, PlanModel, Snapshot } from '../types.js'
 import type { ReasonCode } from '../i18n.js';
 import { costOf } from './cost.js';
 import type { TokenMix } from './scenarios.js';
-import { SCENARIOS } from './scenarios.js';
+import { CLOSE_POINTS, SCENARIOS } from './scenarios.js';
 import {
   deliverable,
   isFresh,
@@ -130,10 +130,46 @@ export interface PlanRow {
   allowanceWorthUsd: number | null;
 }
 
+/** One way to spend a month: a model on the plan, or a model paid per token. */
+export interface ChoiceOption {
+  kind: 'plan' | 'per-token';
+  modelKey: string;
+  model: ModelRecord | null;
+  quality: QualityView;
+  /** The month's cost: the fee for the plan, the cheapest provider's bill otherwise. */
+  costUsd: number;
+  providerName: string;
+  offer: Offer;
+}
+
+/**
+ * The answer to "what should I use", with the plan as one option among all.
+ * The same rule as the main page, with the plan's fee as the budget: the
+ * highest score within budget; options within CLOSE_POINTS of it count as
+ * equal and the cheapest wins. The alternative is the best option of the
+ * other kind, so the plan always gets its fair line.
+ */
+export interface PlanChoice {
+  budgetUsd: number;
+  recommended: ChoiceOption | null;
+  alternative: ChoiceOption | null;
+  /** Options compared, both kinds. */
+  compared: number;
+}
+
+export function chooseWithin(options: ChoiceOption[], budgetUsd: number): ChoiceOption | null {
+  const within = options.filter((o) => o.costUsd <= budgetUsd + 1e-9);
+  if (!within.length) return null;
+  const top = Math.max(...within.map((o) => o.quality.value));
+  const close = within.filter((o) => o.quality.value >= top - CLOSE_POINTS);
+  return close.sort((a, b) => a.costUsd - b.costUsd || b.quality.value - a.quality.value)[0]!;
+}
+
 export interface PlanComparison {
   plan: Plan;
   mix: TokenMix;
   rows: PlanRow[];
+  choice: PlanChoice;
   /** The documentation was read too long ago to vouch for the figures. */
   stale: boolean;
   checkedAgeDays: number | null;
@@ -228,12 +264,63 @@ export function comparePlan(snapshot: Snapshot, planId: string, req: Recommendat
   );
 
   const usable = rows.filter((r) => !r.blocker && r.month);
+
+  // Every measured model paid per token, at its cheapest usable provider.
+  const perToken: ChoiceOption[] = [];
+  const offersByModel = new Map<string, Offer[]>();
+  for (const o of snapshot.offers) {
+    if (o.planId) continue;
+    const list = offersByModel.get(o.modelKey) ?? [];
+    list.push(o);
+    offersByModel.set(o.modelKey, list);
+  }
+  for (const model of Object.values(snapshot.models)) {
+    if (model.toolCall === false || (model.contextTokens !== null && model.contextTokens < minContext)) continue;
+    const variants = evidence.filter((e) => e.modelKey === model.key && e.harnessKey === ref.key);
+    if (!variants.length) continue;
+    const ranked = rankOffers(offersByModel.get(model.key) ?? [], mix, req, minContext, now, model.vendor, known);
+    const best = ranked.ready[0] ?? ranked.usable[0];
+    if (!best) continue;
+    const within = deliverable(variants, best.offer);
+    if (!within.length) continue;
+    perToken.push({
+      kind: 'per-token',
+      modelKey: model.key,
+      model,
+      quality: viewOf(within.reduce((a, b) => (b.value > a.value ? b : a)), now),
+      costUsd: best.cost.totalUsd!,
+      providerName: best.offer.providerName,
+      offer: best.offer,
+    });
+  }
+  // The plan only counts where its fee buys the whole month.
+  const onPlan: ChoiceOption[] = usable
+    .filter((r) => r.quality && r.month!.coveredShare >= 1)
+    .map((r) => ({
+      kind: 'plan' as const,
+      modelKey: r.modelKey,
+      model: r.model,
+      quality: r.quality!,
+      costUsd: plan.monthlyFeeUsd,
+      providerName: plan.name,
+      offer: r.offer,
+    }));
+  const recommended = chooseWithin([...perToken, ...onPlan], plan.monthlyFeeUsd);
+  // As an alternative, the plan is only offered for a model it actually serves
+  // better than paying per token: never "the same model for 10 USD instead of 2".
+  const planWins = new Set(usable.filter((r) => r.verdict === 'plan').map((r) => r.offer.id));
+  const onPlanWinning = onPlan.filter((o) => planWins.has(o.offer.id) && o.modelKey !== recommended?.modelKey);
+  const alternative = recommended?.kind === 'plan'
+    ? chooseWithin(perToken.filter((o) => o.modelKey !== recommended.modelKey), plan.monthlyFeeUsd)
+    : chooseWithin(onPlanWinning, plan.monthlyFeeUsd);
+
   const checkedAgeHours = hoursSince(`${plan.checkedAt}T00:00:00Z`, now);
   const checkedAgeDays = checkedAgeHours === null ? null : Math.floor(checkedAgeHours / 24);
   return {
     plan,
     mix,
     rows,
+    choice: { budgetUsd: plan.monthlyFeeUsd, recommended, alternative, compared: perToken.length + onPlan.length },
     stale: checkedAgeDays === null || checkedAgeDays > THRESHOLDS.planMaxAgeDays,
     checkedAgeDays,
     summary: {
@@ -249,4 +336,9 @@ export function comparePlan(snapshot: Snapshot, planId: string, req: Recommendat
 export function retentionUntil(note: string | null | undefined): string | null {
   const m = /^ZDR_UNTIL:(\d{4}-\d{2}-\d{2})$/.exec(note ?? '');
   return m ? m[1]! : null;
+}
+
+/** Promotions still running on the given day; an expired one is never applied. */
+export function activePromotions(plan: Plan, now = Date.now()): NonNullable<Plan['promotions']> {
+  return (plan.promotions ?? []).filter((p) => now <= Date.parse(`${p.until}T23:59:59-12:00`));
 }
