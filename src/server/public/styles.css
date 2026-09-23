@@ -486,6 +486,9 @@ pre.code {
 .plan .card { margin-bottom: 20px; overflow-x: auto; }
 .plan__table td .meta { display: block; font-size: 11px; font-weight: 400; margin-top: 2px; }
 .plan__table td .label { display: inline-block; }
+.plan__table .plan__warn { display: table; margin-top: 4px; font-size: 11px; font-weight: 400; }
+.plan .details { margin-bottom: 12px; }
+.plan__title { font-size: 17px; margin: 0 0 8px; }
 .plan__table code { font-size: 11px; }
 .plan__table td.nowrap, .plan__table .nowrap { white-space: nowrap; }
 .plan__table tr.chosen td { background: var(--cs-success-soft); }
