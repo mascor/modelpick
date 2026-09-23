@@ -90,12 +90,20 @@ const newer = (a: number[], b: number[]): boolean => {
  * The most recent version of the same line among `candidates`, newer than
  * `key`. Candidates are the models on sale that have no quality measurement.
  */
-export function successorOf(key: string, candidates: Iterable<string>): string | null {
+export function successorOf(
+  key: string,
+  candidates: Iterable<string>,
+  releasedAt: (key: string) => string | null = () => null,
+): string | null {
   const own = lineOf(key);
   if (!own) return null;
+  const mine = releasedAt(key);
   let best: { key: string; version: number[] } | null = null;
   for (const k of candidates) {
     if (k === key) continue;
+    // "Grok 4.20" is a bigger number than "Grok 4.7" but came out before it.
+    const theirs = releasedAt(k);
+    if (mine && theirs && theirs <= mine) continue;
     const other = lineOf(k);
     if (!other || other.line !== own.line || !newer(other.version, own.version)) continue;
     if (!best || newer(other.version, best.version)) best = { key: k, version: other.version };

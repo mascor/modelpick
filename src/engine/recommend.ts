@@ -481,7 +481,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
           }
         : null,
       successor: (() => {
-        const key = successorOf(cand.model.key, unmeasured);
+        const key = successorOf(cand.model.key, unmeasured, (k) => snapshot.models[k]?.releaseDate ?? null);
         const m = key ? snapshot.models[key] : undefined;
         return m ? { key: m.key, name: m.displayName, releaseDate: m.releaseDate } : null;
       })(),

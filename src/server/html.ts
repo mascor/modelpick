@@ -304,7 +304,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
         <code class="step__code" id="quick-${esc(role)}">${esc(conf.command)}</code>
         <button class="button button--outline button--small" type="button" data-copy="#quick-${esc(role)}">${esc(c.home.copyCommand)}</button>
       </li>
-      <li class="step"><span class="steps__note">${esc(conf.pinNote ? c.home.quickPinLost(accountName(pick.offer)) : c.home.quickEffortLost)}</span></li>` : `<li class="step">
+      <li class="step step--config"><span class="steps__note">${esc(conf.pinNote ? c.home.quickPinLost(accountName(pick.offer)) : c.home.quickEffortLost)}</span></li>` : `<li class="step">
         <span class="step__text">${esc(c.home.runCommand)}</span>
       </li>
       <li class="step step--config">

@@ -297,13 +297,13 @@ pre.code {
 
 /* Three steps to get started */
 .steps { list-style: none; counter-reset: step; margin: 0 0 20px; padding: 14px; background: var(--cs-surface-alt); border-radius: var(--cs-radius-md); display: grid; gap: 8px; }
-.step { counter-increment: step; display: flex; align-items: center; gap: 10px; font-family: var(--cs-font-ui); font-size: 14px; }
+.step { counter-increment: step; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font-family: var(--cs-font-ui); font-size: 14px; }
 .step::before {
   content: counter(step); flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%;
   background: var(--cs-border-strong); color: var(--cs-text); font-size: 12px; font-weight: 700;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.step__text { flex: 1 1 auto; }
+.step__text { flex: 1 1 260px; }
 .step__code {
   flex: 1 1 auto; min-width: 0; overflow-x: auto; white-space: nowrap; font-size: 13px;
   padding: 7px 10px; border-radius: var(--cs-radius-sm); background: var(--cs-surface); border: 1px solid var(--cs-border);

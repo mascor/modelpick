@@ -22,7 +22,7 @@ Every measurement carries a **comparability group** (`harnessKey`) made of: agen
 
 **Retired models are never shown.** A model is retired when its maker lists it as deprecated on its own price list in models.dev, or when OpenRouter gives it a retirement date. The model goes with its dated builds and the variants resellers publish under it ("-0731", ":thinking", "-flex", "@eu"), but not with a different version ("gpt-4" retired does not touch GPT-4.1). An offer a seller lists as deprecated is left out too.
 
-**A newer version is always mentioned.** A model on sale with no Coding Index, measured or provisional, cannot win. When a pick has a newer version of the same line on sale (DeepSeek V4 Flash → V4.1 Flash), its card says so; and when a retired model would have cleared the bar, the page names its newer version and says it is not measured yet.
+**A newer version is always mentioned.** A model on sale with no Coding Index, measured or provisional, cannot win. When a pick has a newer version of the same line on sale (DeepSeek V4 Flash → V4.1 Flash; newer means a higher version number and a later release date, so Grok 4.20, older than Grok 4.7, is not its successor), its card says so; and when a retired model would have cleared the bar, the page names its newer version and says it is not measured yet.
 
 **One spelling, one model.** Scores are matched after every price source is in. When several of our models share a spelling, the score goes to the one sold by the most providers, so a single provider's private copy of a model never takes the score of the model everyone else sells. Pairs the rules miss are corrected by hand in `data/curated/aliases.json`, each with its reason; the file also lists the pairs we deliberately leave unmatched.
 

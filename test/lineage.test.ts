@@ -59,3 +59,9 @@ test('a full date in the name is not a version', () => {
   assert.equal(lineOf('openai/gpt-4o-2024-05-13')?.version.join('.'), undefined);
   assert.equal(successorOf('openai/gpt-4o-2024-05-13', ['openai/gpt-4o-2024-11-20']), null);
 });
+
+test('a successor must also have come out later, not only have a bigger number', () => {
+  const dates: Record<string, string> = { 'x-ai/grok-4-7': '2026-09-21', 'x-ai/grok-4-20': '2026-02-17' };
+  assert.equal(successorOf('x-ai/grok-4-7', ['x-ai/grok-4-20'], (k) => dates[k] ?? null), null);
+  assert.equal(successorOf('x-ai/grok-4-7', ['x-ai/grok-4-20']), 'x-ai/grok-4-20'); // without dates only the number counts
+});

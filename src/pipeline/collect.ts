@@ -394,7 +394,7 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
   const unmeasured = [...onSale].filter((k) => !measured.has(k));
   const replacements: Replacement[] = [];
   for (const [key, e] of retiredScores) {
-    const next = successorOf(key, unmeasured);
+    const next = successorOf(key, unmeasured, (k) => models.get(k)?.releaseDate ?? null);
     if (!next || replacements.some((r) => r.successorKey === next && r.retiredScore >= e.value)) continue;
     const i = replacements.findIndex((r) => r.successorKey === next);
     const row: Replacement = {
