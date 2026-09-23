@@ -436,29 +436,31 @@ ${renderAnswer(rec, snapshot, request, lang)}
   });
 }
 
-/** Privacy terms of one plan model, in plain words. */
-function planPrivacy(row: PlanRow, lang: Lang, now = Date.now()): string {
+/** Only what should give a buyer pause about their data; nothing when the model keeps nothing. */
+function planDataWarning(row: PlanRow, lang: Lang, now = Date.now()): string | null {
   const c = t(lang).go;
-  const parts: string[] = [];
   const r = row.terms.retentionDays;
-  parts.push(r === 0 ? c.retentionZero : r === null ? c.retentionUnknown : c.retentionDays(String(r)));
-  if (row.terms.trainsOnData) parts.push(c.training);
+  if (row.terms.trainsOnData) return c.training;
+  if (r === null) return c.retainedUnknown;
+  if (r > 0) return c.retained(String(r));
   const until = retentionUntil(row.terms.note);
-  if (until) {
-    // The agreement covers the whole last day, in any time zone.
-    const ended = now > Date.parse(`${until}T23:59:59-12:00`);
-    parts.push(ended ? c.zdrEnded(dateDay(until, lang)) : c.zdrUntil(dateDay(until, lang)));
-  }
-  const risky = r !== 0 || row.terms.trainsOnData || (until !== null && now > Date.parse(`${until}T23:59:59-12:00`));
-  return `<span class="${risky ? 'label label--warning' : 'meta'}">${esc(parts.join(' · '))}</span>`;
+  // The agreement covers the whole last day, in any time zone.
+  if (until && now > Date.parse(`${until}T23:59:59-12:00`)) return c.zdrEnded(dateDay(until, lang));
+  return null;
 }
 
-/** The plan against the cheapest provider, one model per row. */
+/** Savings below this are noise next to the estimates they come from. */
+const EVEN_USD = 0.5;
+
+/**
+ * Is Go worth it, and with which model: the answer in one sentence, then one
+ * row per measured model with the two monthly bills and which one is lower.
+ * Everything else (allowance, windows, assumptions) sits behind "How we work it out".
+ */
 export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: RecommendationRequest; go: PlanComparison | null }): string {
   const { lang, request, go } = opts;
   const c = t(lang);
   const g = c.go;
-  const cols = g.cols;
   const taskName = (c.tasks[request.task] ?? SCENARIOS[request.task].label).toLowerCase();
   const choices = `<div class="choices">
       <span class="choices__label">${esc(c.home.workType)}</span>
@@ -471,78 +473,76 @@ export function goPage(opts: { lang: Lang; snapshot: Snapshot | null; request: R
     return layout({ lang, title: `${g.title} — ${SITE.name}`, description: g.description, body, active: 'go' });
   }
 
-  const fee = usd(go.plan.monthlyFeeUsd, lang);
-  const best = go.summary.best;
-  const answer = go.summary.usable
-    ? `${g.answer(taskName, String(go.summary.planCheaper), String(go.summary.usable))}${best?.month && best.direct && best.quality
-        ? ` ${g.answerBest(modelName(best.model?.displayName ?? best.planModelId), formatScore(best.quality.value, best.quality.metric), usd(best.month.totalUsd, lang), usd(best.direct.cost.totalUsd, lang), best.direct.offer.providerName)}`
-        : ''}`
-    : g.answerNone;
+  const name = (r: PlanRow) => modelName(r.model?.displayName ?? r.planModelId);
+  const priced = go.rows.filter((r) => !r.blocker && r.month);
+  const shown = priced.filter((r) => r.quality && r.direct);
+  const more = go.rows.filter((r) => !shown.includes(r));
+  const winners = shown.filter((r) => r.savingUsd! >= EVEN_USD);
+  const losers = shown.filter((r) => !winners.includes(r));
+
+  // Rows come best score first, so the first winner is the best model Go pays off with.
+  const answer = !shown.length
+    ? g.noData
+    : winners.length
+      ? g.yes(taskName, String(winners.length), String(shown.length), name(winners[0]!))
+      : g.no(taskName);
 
   const row = (r: PlanRow) => {
     const m = r.month!;
-    const name = modelName(r.model?.displayName ?? r.planModelId);
-    const used = m.capUsd > 0 ? m.drawUsd / m.capUsd : 0;
-    const diff = r.savingUsd === null
-      ? '—'
-      : Math.abs(r.savingUsd) < 0.005
-        ? esc(g.even)
-        : r.savingUsd > 0
-          ? `<span class="label label--ok">${esc(g.goCheaper(usd(r.savingUsd, lang)))}</span>`
-          : `<span class="label label--info">${esc(g.directCheaper(usd(-r.savingUsd, lang)))}</span>`;
-    const range = !r.direct
-      ? '—'
-      : !r.breakEven
-        ? esc(g.never)
-        : r.breakEven.toUsd === null
-          ? esc(g.rangeOpen(usd(r.breakEven.fromUsd, lang)))
-          : esc(g.range(usd(r.breakEven.fromUsd, lang), usd(r.breakEven.toUsd, lang)));
-    const notes = [
-      r.peakApplied ? g.peak : null,
-      r.overageFrom === 'plan-list' && m.coveredShare < 1 ? g.overageList : null,
-    ].filter(Boolean) as string[];
-    return `<tr${r.savingUsd !== null && r.savingUsd > 0 ? ' class="chosen"' : ''}>
-      <td class="stack__title">${esc(name)}<span class="meta"><code>${esc(r.offer.opencodeId ?? `opencode-go/${r.planModelId}`)}</code></span></td>
-      <td class="num" data-label="${esc(cols[1])}">${r.quality ? esc(formatScore(r.quality.value, r.quality.metric)) : `<span class="meta">${esc(g.unmeasured)}</span>`}</td>
-      <td class="num" data-label="${esc(cols[2])}">${esc(g.allowanceUsed(percent(used, lang), usd(m.capUsd, lang)))}${m.coveredShare < 1 ? `<span class="meta">${esc(g.covers(percent(m.coveredShare, lang)))}</span>` : ''}</td>
-      <td class="num nowrap" data-label="${esc(cols[3])}"><strong>${esc(usd(m.totalUsd, lang))}</strong></td>
-      <td data-label="${esc(cols[4])}">${r.direct ? `${esc(r.direct.offer.providerName)} <span class="nowrap">${esc(usd(r.direct.cost.totalUsd, lang))}</span>` : `<span class="meta">${esc(g.noDirect)}</span>`}</td>
-      <td data-label="${esc(cols[5])}">${diff}</td>
-      <td data-label="${esc(cols[6])}">${range}</td>
-      <td data-label="${esc(cols[7])}">${planPrivacy(r, lang)}${notes.length ? `<span class="meta">${esc(notes.join(' · '))}</span>` : ''}</td>
+    const saving = r.savingUsd!;
+    const verdict = Math.abs(saving) < EVEN_USD
+      ? `<span class="meta">${esc(g.even)}</span>`
+      : saving > 0
+        ? `<span class="label label--ok">${esc(g.goWins(usd(saving, lang)))}</span>`
+        : `<span class="label label--info">${esc(g.payWins(usd(-saving, lang)))}</span>`;
+    const warning = planDataWarning(r, lang);
+    return `<tr${saving >= EVEN_USD ? ' class="chosen"' : ''}>
+      <td class="stack__title">${esc(name(r))}${warning ? `<span class="label label--warning plan__warn">${esc(warning)}</span>` : ''}</td>
+      <td class="num" data-label="${esc(g.cols[1])}">${esc(formatScore(r.quality!.value, r.quality!.metric))}</td>
+      <td class="num nowrap" data-label="${esc(g.cols[2])}"><strong>${esc(usd(m.totalUsd, lang))}</strong>${m.coveredShare < 1 ? `<span class="meta">${esc(g.overCap)}</span>` : ''}</td>
+      <td class="num nowrap" data-label="${esc(g.cols[3])}"><strong>${esc(usd(r.direct!.cost.totalUsd, lang))}</strong><span class="meta">${esc(r.direct!.offer.providerName)}</span></td>
+      <td data-label="${esc(g.cols[4])}">${verdict}</td>
     </tr>`;
   };
 
-  const usable = go.rows.filter((r) => !r.blocker && r.month);
-  const left = go.rows.filter((r) => r.blocker || !r.month);
+  const table = (rows: PlanRow[]) => `<table class="table table--stack plan__table">
+        <thead><tr>${g.cols.map((h, i) => `<th${i >= 1 && i <= 3 ? ' class="num"' : ''}>${esc(h)}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map(row).join('')}</tbody>
+      </table>`;
+
   const f = fmt(lang);
+  const fee = usd(go.plan.monthlyFeeUsd, lang);
   const body = `<section class="answer">
   <div class="container">
     <h1 class="answer__title">${esc(g.title)}</h1>
     <p class="answer__line">${esc(answer)}</p>
-    <p class="answer__date">${esc(g.intro(fee))}</p>
+    <p class="answer__date">${esc(g.lead(fee))}</p>
     ${choices}
   </div>
 </section>
 <section class="section">
   <div class="container plan">
     ${go.stale ? `<div class="notice">${esc(g.stale(f.n.format(go.checkedAgeDays ?? 0)))}</div>` : ''}
-    <div class="card">
-      <table class="table table--stack plan__table">
-        <thead><tr>${cols.map((h, i) => `<th${i >= 1 && i <= 3 ? ' class="num"' : ''}>${esc(h)}</th>`).join('')}</tr></thead>
-        <tbody>${usable.map(row).join('')}</tbody>
-      </table>
-      <p class="meta">${esc(g.source(dateDay(go.plan.checkedAt, lang)))} <a href="${esc(go.plan.sourceUrl)}" rel="noopener">opencode.ai/docs/go</a> · ${esc(c.home.aaDisclaimer)}</p>
-    </div>
-    ${left.length ? `<details class="details">
-      <summary>${esc(g.unusableTitle(left.length))}</summary>
-      <div class="details__body"><ul class="list">${left.map((r) => `<li><strong>${esc(modelName(r.model?.displayName ?? r.planModelId))}</strong>: ${esc(r.blocker ? c.reasons[r.blocker] : c.reasons['incomplete-prices'])}</li>`).join('')}</ul></div>
+    ${winners.length ? `<div class="card">
+      <h2 class="plan__title">${esc(g.winnersTitle)}</h2>
+      ${table(winners)}
+      <p class="meta">${esc(g.cols[1])}: Artificial Analysis Coding Index. ${esc(g.setup)}</p>
+    </div>` : ''}
+    ${losers.length ? `<details class="details"${winners.length ? '' : ' open'}>
+      <summary>${esc(g.losersTitle(losers.length))}</summary>
+      <div class="details__body">${table(losers)}</div>
     </details>` : ''}
-    <div class="card">
-      <h2>${esc(g.howTitle)}</h2>
-      <ul class="list">${g.how(f.n.format(go.plan.fiveHourPercent), f.n.format(go.plan.weeklyPercent)).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
-      <p>${esc(g.setup)}</p>
-    </div>
+    ${more.length ? `<details class="details">
+      <summary>${esc(g.moreTitle(more.length))}</summary>
+      <div class="details__body"><ul class="list">${more.map((r) => `<li><strong>${esc(name(r))}</strong>: ${esc(r.blocker ? c.reasons[r.blocker] : !r.quality ? g.unmeasured : !r.direct ? g.noDirect : c.reasons['incomplete-prices'])}${r.month && !r.blocker ? ` · ${esc(g.cols[2])} ${esc(usd(r.month.totalUsd, lang))}` : ''}</li>`).join('')}</ul></div>
+    </details>` : ''}
+    <details class="details">
+      <summary>${esc(g.howTitle)}</summary>
+      <div class="details__body">
+        <ul class="list">${g.how(taskName, fee, f.n.format(go.plan.fiveHourPercent), f.n.format(go.plan.weeklyPercent)).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
+        <p class="meta">${esc(g.source(dateDay(go.plan.checkedAt, lang)))} <a href="${esc(go.plan.sourceUrl)}" rel="noopener">opencode.ai/docs/go</a> · ${esc(c.home.aaDisclaimer)}</p>
+      </div>
+    </details>
   </div>
 </section>`;
   return layout({ lang, title: `${g.title} — ${SITE.name}`, description: g.description, body, active: 'go' });
