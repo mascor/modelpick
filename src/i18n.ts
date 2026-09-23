@@ -85,6 +85,10 @@ export interface Catalog {
     saveEffort: (effort: string) => string;
     runCommand: string;
     orQuick: string;
+    privacyOff: (router: string) => string;
+    privacyOn: (router: string, provider: string) => string;
+    privacyEnable: string;
+    privacyDisable: string;
     quickPinLost: (router: string) => string;
     quickEffortLost: string;
     downloadFile: string;
@@ -237,6 +241,10 @@ const it: Catalog = {
     saveEffort: (e) => `Salva questa configurazione come opencode.json nella cartella del progetto. Imposta lo sforzo di ragionamento "${e}", quello con cui è stato misurato il punteggio.`,
     runCommand: 'Avvia OpenCode con questo modello:',
     orQuick: 'Oppure avvia subito OpenCode con questo modello, senza file:',
+    privacyOff: (r) => `Non vuoi che il tuo codice venga conservato? Con la privacy attiva ${r} usa solo provider che non conservano quello che invii; il prezzo può cambiare.`,
+    privacyOn: (r, p) => `Privacy attiva: ${r} usa solo provider che non conservano quello che invii. Se ${p} non lo garantisce, passa a un altro, e il prezzo può essere diverso da quello indicato.`,
+    privacyEnable: 'Attiva la privacy',
+    privacyDisable: 'Disattiva la privacy',
     quickPinLost: (r) => `Senza il file ${r} sceglie il provider da solo: il prezzo può essere diverso da quello indicato.`,
     quickEffortLost: 'Senza il file resta lo sforzo di ragionamento predefinito, non quello del punteggio indicato.',
     downloadFile: 'Scarica opencode.json',
@@ -399,7 +407,7 @@ const it: Catalog = {
       'Copriamo i provider raggiunti dalle nostre fonti, non tutto il mercato.',
       'Un benchmark misura compiti standard: è un indizio serio, non una garanzia sul tuo codice.',
       'Tutti i punteggi vengono da Artificial Analysis: gli altri benchmark che conosciamo pubblicano misure vecchie di mesi.',
-      'OpenRouter non pubblica quali provider conservano i dati inviati. Se ti serve, escludili una volta per tutte dalle impostazioni privacy del tuo account OpenRouter.',
+      'OpenRouter non pubblica quali provider conservano i dati inviati. Nella scheda puoi attivare la privacy: la configurazione chiede a OpenRouter di usare solo provider che non li conservano, e se quello indicato non lo garantisce ne sceglie un altro, anche a un prezzo diverso. Di base è spenta. Per gli acquisti diretti vale la politica del venditore.',
       'OpenCode non passa da solo al modello per i problemi difficili: va scelto a mano con /models.',
     ],
     fullDetails: 'Tutti i dettagli, comprese le regole per associare i modelli, in METHODOLOGY.md',
@@ -467,6 +475,10 @@ const en: Catalog = {
     saveEffort: (e) => `Save this configuration as opencode.json in the project folder. It sets the reasoning effort to "${e}", the one the score was measured with.`,
     runCommand: 'Start OpenCode with this model:',
     orQuick: 'Or start OpenCode with this model right away, no file:',
+    privacyOff: (r) => `Do not want your code retained? With privacy on, ${r} only uses providers that do not retain what you send; the price may change.`,
+    privacyOn: (r, p) => `Privacy on: ${r} only uses providers that do not retain what you send. If ${p} does not guarantee it, it moves to another one, and the price may differ from the one shown.`,
+    privacyEnable: 'Turn privacy on',
+    privacyDisable: 'Turn privacy off',
     quickPinLost: (r) => `Without the file ${r} picks the provider itself: the price may differ from the one shown.`,
     quickEffortLost: 'Without the file the default reasoning effort applies, not the one the score was measured with.',
     downloadFile: 'Download opencode.json',
@@ -628,7 +640,7 @@ const en: Catalog = {
       'We cover the providers our sources reach, not the whole market.',
       'A benchmark measures standard tasks: a serious signal, not a guarantee about your code.',
       'Every score comes from Artificial Analysis: the other benchmarks we know publish measurements that are months old.',
-      'OpenRouter does not publish which providers retain what you send. If you need that, exclude them once for your whole account in your OpenRouter privacy settings.',
+      'OpenRouter does not publish which providers retain what you send. On the card you can turn privacy on: the configuration asks OpenRouter to use only providers that do not retain it, and if the one shown does not guarantee that it picks another, possibly at another price. It is off by default. For direct purchases the seller\'s own policy applies.',
       'OpenCode does not switch to the model for hard problems on its own: pick it by hand with /models.',
     ],
     fullDetails: 'All the details, including how models are matched, in METHODOLOGY.md',

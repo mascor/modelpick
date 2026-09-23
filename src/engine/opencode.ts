@@ -55,7 +55,7 @@ export const OPENAI_EFFORTS = new Set(['none', 'minimal', 'low', 'medium', 'high
  *        the configuration asks for it: without it the buyer would get another
  *        variant than the one we quoted.
  */
-export function configFor(offer: Offer, lang: Lang = 'it', effort: string | null = null): PickConfig {
+export function configFor(offer: Offer, lang: Lang = 'it', effort: string | null = null, privacy = false): PickConfig {
   const c = t(lang).engine;
   const modelId = modelIdFor(offer);
   const command = `opencode -m ${modelId}`;
@@ -91,7 +91,13 @@ export function configFor(offer: Offer, lang: Lang = 'it', effort: string | null
       openrouter: {
         models: {
           [offer.remoteModelId ?? '']: {
-            options: { provider: { order: [offer.routingSlug], allow_fallbacks: false } },
+            // With privacy on, OpenRouter may move to another provider that does
+            // not retain prompts: better than every request being refused.
+            options: {
+              provider: privacy
+                ? { order: [offer.routingSlug], allow_fallbacks: true, data_collection: 'deny' }
+                : { order: [offer.routingSlug], allow_fallbacks: false },
+            },
           },
         },
       },
@@ -111,11 +117,12 @@ export function configFor(offer: Offer, lang: Lang = 'it', effort: string | null
 export function buildOpenCodeConfig(
   everyday: { model: ModelRecord; offer: Offer; effort?: string | null } | null,
   hard: { model: ModelRecord; offer: Offer; effort?: string | null } | null,
+  privacy = false,
 ): OpenCodeConfigResult | null {
   if (!everyday) return null;
 
-  const eConf = configFor(everyday.offer, 'it', everyday.effort ?? null);
-  const hConf = hard ? configFor(hard.offer, 'it', hard.effort ?? null) : null;
+  const eConf = configFor(everyday.offer, 'it', everyday.effort ?? null, privacy);
+  const hConf = hard ? configFor(hard.offer, 'it', hard.effort ?? null, privacy) : null;
 
   // One file for both picks: each provider is pinned under its own model id,
   // so choosing the backup with /models keeps the provider we quoted a price for.

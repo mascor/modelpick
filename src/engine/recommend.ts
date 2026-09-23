@@ -25,6 +25,8 @@ export interface RecommendationRequest {
   usage?: Partial<TokenMix> | null;
   currentModelKey?: string | null;
   currentOfferId?: string | null;
+  /** Ask OpenRouter to use only providers that do not retain prompts. Off by default. */
+  privacy?: boolean;
 }
 
 export interface QualityView {

@@ -164,11 +164,11 @@ export function layout(opts: { lang: Lang; title: string; description: string; b
 const snapshotName = (_key: string, harness: string): string => harness.replace(/\s*\([^)]*\)\s*$/, '');
 
 /** The provider comparison: the answer to "where do I buy this". */
-function renderComparison(pick: Pick, role: string, lang: Lang): string {
+function renderComparison(pick: Pick, role: string, lang: Lang, privacy = false): string {
   const c = t(lang);
   const row = (o: OfferView, i: number, chosen: boolean) => {
     const id = `cmd-${role}-${i}`;
-    const conf = configFor(o.offer, lang, pick.quality.effort);
+    const conf = configFor(o.offer, lang, pick.quality.effort, privacy);
     // Rows routed through OpenRouter share the same command: what changes is
     // the pinned provider, so the configuration is what gets copied.
     const payload = conf.config ?? conf.command;
@@ -257,7 +257,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
       <div class="notice notice--neutral">${esc(empty)}</div>
     </article>`;
   }
-  const conf = configFor(pick.offer, lang, pick.quality.effort);
+  const conf = configFor(pick.offer, lang, pick.quality.effort, request.privacy ?? false);
   const link = signupUrl(pick.offer);
   return `<article class="card pick pick--${role}" id="${esc(role)}">
     <p class="pick__role">${esc(title)}</p>
@@ -289,7 +289,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
       ${conf.config ? `<li class="step">
         <span class="step__text">${esc(conf.pinNote ? c.home.savePinned(accountName(pick.offer), pick.offer.providerName) : c.home.saveEffort(pick.quality.effort ?? ''))}</span>
         <button class="button button--small" type="button" data-copy="#config-${esc(role)}">${esc(c.home.copyConfig)}</button>
-        <a class="button button--outline button--small" href="/opencode.json?${esc(new URLSearchParams({ task: request.task, priority: request.priority, role }).toString())}">${esc(c.home.downloadFile)}</a>
+        <a class="button button--outline button--small" href="/opencode.json?${esc(new URLSearchParams({ task: request.task, priority: request.priority, role, ...(request.privacy ? { privacy: '1' } : {}) }).toString())}">${esc(c.home.downloadFile)}</a>
       </li>
       <li class="step step--config">
         <details class="details details--copy">
@@ -313,7 +313,8 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
       </li>`}
     </ol>
     ${conf.pinNote && !conf.config ? `<p class="steps__note">${esc(conf.pinNote)}</p>` : ''}
-    ${renderComparison(pick, role, lang)}
+    ${conf.config && conf.pinNote ? `<p class="steps__privacy">${esc(request.privacy ? c.home.privacyOn(accountName(pick.offer), pick.offer.providerName) : c.home.privacyOff(accountName(pick.offer)))} <a href="${esc(withParams(request, lang, { privacy: request.privacy ? '0' : '1' }))}#${esc(role)}">${esc(request.privacy ? c.home.privacyDisable : c.home.privacyEnable)}</a></p>` : ''}
+    ${renderComparison(pick, role, lang, request.privacy ?? false)}
     ${renderDetails(pick, lang, opencodeVersion)}
       </div>
     </details>
@@ -355,7 +356,9 @@ const withParams = (req: RecommendationRequest, lang: Lang, overrides: Record<st
     input: req.usage?.input, output: req.usage?.output, cacheRead: req.usage?.cacheRead, cacheWrite: req.usage?.cacheWrite,
   })) if (v !== undefined && v !== null) q.set(k, String(v));
   if (req.currentModelKey) q.set('currentModel', req.currentModelKey);
+  if (req.privacy) q.set('privacy', '1');
   for (const [k, v] of Object.entries(overrides)) q.set(k, v);
+  if (q.get('privacy') === '0') q.delete('privacy');
   return `${pagePath(lang, 'home')}?${q.toString()}`;
 };
 

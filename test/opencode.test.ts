@@ -36,3 +36,11 @@ test('we do not promise an automatic switch to the backup model', () => {
 test('without an everyday model no configuration is generated', () => {
   assert.equal(buildOpenCodeConfig(null, hard), null);
 });
+
+test('with privacy on, OpenRouter is told to avoid data retention and may fall back', () => {
+  const routed = offer({ id: 'r', modelKey: 'v/a', providerId: 'deepinfra', sourceId: 'openrouter', routingSlug: 'deepinfra', remoteModelId: 'v/a' });
+  const pinned = JSON.parse(buildOpenCodeConfig({ model: model('v/a'), offer: routed }, null)!.json);
+  assert.deepEqual(pinned.provider.openrouter.models['v/a'].options.provider, { order: ['deepinfra'], allow_fallbacks: false });
+  const privateOne = JSON.parse(buildOpenCodeConfig({ model: model('v/a'), offer: routed }, null, true)!.json);
+  assert.deepEqual(privateOne.provider.openrouter.models['v/a'].options.provider, { order: ['deepinfra'], allow_fallbacks: true, data_collection: 'deny' });
+});

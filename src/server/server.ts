@@ -50,6 +50,7 @@ export function parseRequest(q: Query, lang: Lang = DEFAULT_LANG): Recommendatio
     usage: hasUsage ? usage : null,
     currentModelKey: q['currentModel'] || null,
     currentOfferId: q['currentOffer'] || null,
+    privacy: q['privacy'] === '1',
   };
 }
 
@@ -72,6 +73,7 @@ export async function buildServer() {
     const config = buildOpenCodeConfig(
       rec.everyday ? { model: rec.everyday.model, offer: rec.everyday.offer, effort: rec.everyday.quality.effort } : null,
       rec.hard ? { model: rec.hard.model, offer: rec.hard.offer, effort: rec.hard.quality.effort } : null,
+      request.privacy ?? false,
     );
     // What moved since the previous published update: the reason to open the
     // page in the morning at all.
@@ -155,7 +157,7 @@ export async function buildServer() {
     const q = req.query as Query;
     const { config: both, rec } = await compute(q, langOf(q));
     const one = q['role'] === 'everyday' ? rec?.everyday : q['role'] === 'hard' ? rec?.hard : null;
-    const config = one ? buildOpenCodeConfig({ model: one.model, offer: one.offer, effort: one.quality.effort }, null) : both;
+    const config = one ? buildOpenCodeConfig({ model: one.model, offer: one.offer, effort: one.quality.effort }, null, rec?.request.privacy ?? false) : both;
     if (!config) return reply.code(404).send({ error: 'No recommendation available.' });
     reply.header('content-disposition', 'attachment; filename="opencode.json"');
     reply.type('application/json; charset=utf-8');
