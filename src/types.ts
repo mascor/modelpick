@@ -55,6 +55,8 @@ export interface Offer {
   /** Weight precision actually served; different quantizations are NOT the same offer. */
   quantization: string | null;
   uptime30m: number | null;
+  /** Availability over the last day, when the source publishes it. */
+  uptime1d?: number | null;
   throughputTps: number | null;
   latencyS: number | null;
   /** ISO-3166 alpha-2 codes, or 'global', or null when unknown. */

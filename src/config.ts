@@ -63,6 +63,8 @@ export const THRESHOLDS = {
   maxPricePerMTok: num(env.MODELPICK_MAX_PRICE, 2_000),
   /** Offers below this uptime are not eligible to win. */
   minUptime30m: num(env.MODELPICK_MIN_UPTIME, 90),
+  /** Over a whole day an agent needs a provider that almost never fails. */
+  minUptime1d: num(env.MODELPICK_MIN_UPTIME_DAY, 98),
   /** Minimum context an offer must serve to be usable with a coding agent. */
   minContextTokens: num(env.MODELPICK_MIN_CONTEXT, 100_000),
 };

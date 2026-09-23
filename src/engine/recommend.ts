@@ -13,7 +13,7 @@ import { costOf, type CostBreakdown } from './cost.js';
 import { isIdentified, providerKey, usabilityOf, type Usability } from './usability.js';
 import { successorOf } from './lineage.js';
 import { OPENAI_EFFORTS } from './opencode.js';
-import { ALTERNATIVE_POINTS, BUDGETS, TIE_POINTS, USAGE_POINTS, SCENARIOS, type Budget, type Priority, type TaskId, type TokenMix } from './scenarios.js';
+import { BUDGETS, CLOSE_POINTS, SCENARIOS, type Budget, type Priority, type TaskId, type TokenMix } from './scenarios.js';
 import { t, type Lang, type ReasonCode } from '../i18n.js';
 
 
@@ -236,6 +236,9 @@ function deliverable(variants: QualityEvidence[], offer: Offer): QualityEvidence
   return [variants.reduce((a, b) => (b.value < a.value ? b : a))];
 }
 
+/** Direct offers that need a cloud account: through OpenRouter the account is OpenRouter's. */
+const CLOUD_PLATFORMS = new Set(['amazon-bedrock', 'google-vertex', 'google-vertex-anthropic', 'azure', 'azure-cognitive-services']);
+
 /** Offer-level eligibility. Returns null when usable, otherwise the reason it is not. */
 function offerBlocker(offer: Offer, req: RecommendationRequest, minContext: number, now: number): ReasonCode | null {
   void req;
@@ -250,6 +253,10 @@ function offerBlocker(offer: Offer, req: RecommendationRequest, minContext: numb
   if (offer.supportsTools === false) return 'offer-no-tools';
   if (offer.contextTokens !== null && offer.contextTokens < minContext) return 'offer-context';
   if (offer.uptime30m !== null && offer.uptime30m < THRESHOLDS.minUptime30m) return 'offer-uptime';
+  if (offer.uptime1d != null && offer.uptime1d < THRESHOLDS.minUptime1d) return 'offer-uptime';
+  // Buying straight from a cloud platform needs a cloud account, billing and
+  // model access requests: not something to recommend as a plain sign-up.
+  if (offer.sourceId !== 'openrouter' && CLOUD_PLATFORMS.has(offer.providerId)) return 'cloud-account';
   return null;
 }
 
@@ -434,9 +441,13 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
     const gap = other ? (cand.quality.value - other.quality.value).toFixed(1) : null;
 
     const usage = usageOf.get(cand.model.key);
-    const reason = decidedByUsage.has(cand) && usage
-      ? c.engine.usageReason(score, label, budgetUsd(role === 'everyday' ? budget.everyday : budget.hard), price, String(USAGE_POINTS), String(usage.retentionRate))
-      : role === 'everyday'
+    const decided = decidedBy.get(cand);
+    const roleBudget = budgetUsd(role === 'everyday' ? budget.everyday : budget.hard);
+    const reason = decided?.how === 'usage' && usage
+      ? c.engine.usageReason(score, label, roleBudget, price, String(CLOSE_POINTS), String(usage.retentionRate))
+      : decided?.how === 'price'
+        ? c.engine.closeCheaper(score, label, roleBudget, price, String(CLOSE_POINTS), formatScore(decided.top, cand.quality.metric))
+        : role === 'everyday'
         ? c.engine.everydayReason(score, label, budgetUsd(budget.everyday), price)
         : c.engine.hardReason(score, label, gap ?? '0', budgetUsd(budget.hard), price);
 
@@ -458,7 +469,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
         const u = usageOf.get(cand.model.key);
         return u ? { retentionRate: u.retentionRate, eligibleUserWeeks: u.eligibleUserWeeks } : null;
       })(),
-      decidedByUsage: decidedByUsage.has(cand),
+      decidedByUsage: decidedBy.get(cand)?.how === 'usage',
       alternative: runnerUp
         ? {
             name: runnerUp.model.displayName,
@@ -476,40 +487,41 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   };
 
   /**
-   * The whole rule: within the priority's monthly budget the highest score
-   * wins; scores within TIE_POINTS of the top are equal, and the cheaper wins.
+   * The whole rule: within the priority's monthly budget, the models within
+   * CLOSE_POINTS of the best score are close enough to let usage and price
+   * decide. With OpenCode usage figures the one users keep most wins (the
+   * cheaper on equal retention); without them, the cheapest of the close ones.
    */
   const byPrice = (a: Candidate, b: Candidate) => choiceOf(a).cost.totalUsd! - choiceOf(b).cost.totalUsd!;
-  // Within USAGE_POINTS of the top the one OpenCode users keep most wins; without
-  // usage figures, scores within TIE_POINTS are equal and the cheaper wins.
   const retention = (c: Candidate) => usageOf.get(c.model.key)?.retentionRate ?? null;
-  const decidedByUsage = new Set<Candidate>();
+  const decidedBy = new Map<Candidate, { how: 'usage' | 'price'; top: number }>();
   const bestWithin = (limit: number, pool: Candidate[]): Candidate | null => {
     const within = pool.filter((c) => choiceOf(c).cost.totalUsd! <= limit);
+    if (!within.length) return null;
     const top = within.reduce((max, c) => Math.max(max, c.quality.value), -Infinity);
-    const near = within.filter((c) => c.quality.value >= top - USAGE_POINTS && retention(c) !== null);
-    if (near.length) {
-      const pick = near.sort((a, b) => retention(b)! - retention(a)! || b.quality.value - a.quality.value || byPrice(a, b))[0]!;
-      const byScore = within.filter((c) => c.quality.value >= top - TIE_POINTS).sort(byPrice)[0];
-      if (pick !== byScore) decidedByUsage.add(pick);
-      return pick;
-    }
-    return within.filter((c) => c.quality.value >= top - TIE_POINTS).sort(byPrice)[0] ?? null;
+    const close = within.filter((c) => c.quality.value >= top - CLOSE_POINTS);
+    const withUsage = close.filter((c) => retention(c) !== null);
+    const pick = withUsage.length
+      ? withUsage.sort((a, b) => retention(b)! - retention(a)! || byPrice(a, b))[0]!
+      : close.sort(byPrice)[0]!;
+    if (pick.quality.value < top) decidedBy.set(pick, { how: withUsage.length ? 'usage' : 'price', top });
+    return pick;
   };
   const everydayCandidate = bestWithin(budget.everyday, candidates);
-  // A second model only when the larger budget buys a higher score than the first.
-  const hardBest = bestWithin(
-    budget.hard,
-    candidates.filter((c) => c.model.key !== everydayCandidate?.model.key),
-  );
-  const hardCandidate =
-    hardBest && everydayCandidate && hardBest.quality.value > everydayCandidate.quality.value + TIE_POINTS ? hardBest : null;
+  // A second model only among those scoring more than CLOSE_POINTS above the
+  // first: the larger budget has to buy a difference the rule counts.
+  const hardCandidate = everydayCandidate
+    ? bestWithin(
+        budget.hard,
+        candidates.filter((c) => c.model.key !== everydayCandidate.model.key && c.quality.value > everydayCandidate.quality.value + CLOSE_POINTS),
+      )
+    : null;
 
   // The runner-up in the same budget, shown only when the data barely separates them.
   const runnerUp = (winner: Candidate | null, limit: number, skip: (string | undefined)[]): Candidate | null => {
     if (!winner) return null;
     const next = bestWithin(limit, candidates.filter((c) => !skip.includes(c.model.key)));
-    return next && next.quality.value >= winner.quality.value - ALTERNATIVE_POINTS ? next : null;
+    return next && next.quality.value >= winner.quality.value - CLOSE_POINTS ? next : null;
   };
   const taken = [everydayCandidate?.model.key, hardCandidate?.model.key];
   const everyday = everydayCandidate

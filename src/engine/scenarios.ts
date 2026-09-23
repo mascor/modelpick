@@ -66,7 +66,8 @@ export const PRIORITIES: Priority[] = ['cheap', 'balanced', 'quality'];
 
 /**
  * The whole choice rule: each priority is a monthly budget, and within it the
- * highest Coding Index wins (a tie within TIE_POINTS goes to the cheaper one).
+ * highest Coding Index wins; models within CLOSE_POINTS of it are treated as
+ * close enough for usage and price to decide.
  * USD per month on the chosen usage scenario. Published on the method page.
  */
 export type Budget = { everyday: number; hard: number };
@@ -76,14 +77,9 @@ export const BUDGETS: Record<Priority, Budget> = {
   quality: { everyday: 50, hard: 250 },
 };
 
-/** Below this many points two scores are treated as equal, and the cheaper model wins. */
-export const TIE_POINTS = 1;
-
-/** A runner-up within this many points of a pick, in the same budget, is shown next to it. */
-export const ALTERNATIVE_POINTS = 3;
-
 /**
- * Within this many points of the best score in the budget, benchmarks do not
- * really separate two models: the one OpenCode users keep using most wins.
+ * A project choice, not a statistical margin: scores this close are treated as
+ * close enough to let usage and price decide. The same threshold is used for
+ * the choice, for naming a second model and for showing an alternative.
  */
-export const USAGE_POINTS = 3;
+export const CLOSE_POINTS = 3;

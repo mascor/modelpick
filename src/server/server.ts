@@ -150,8 +150,12 @@ export async function buildServer() {
 
   const langOf = (q: Query): Lang => (isLang(q['lang']) ? q['lang'] : DEFAULT_LANG);
 
+  // role=everyday|hard downloads the file for that pick alone; without it, both.
   app.get('/opencode.json', async (req, reply) => {
-    const { config } = await compute(req.query as Query, langOf(req.query as Query));
+    const q = req.query as Query;
+    const { config: both, rec } = await compute(q, langOf(q));
+    const one = q['role'] === 'everyday' ? rec?.everyday : q['role'] === 'hard' ? rec?.hard : null;
+    const config = one ? buildOpenCodeConfig({ model: one.model, offer: one.offer, effort: one.quality.effort }, null) : both;
     if (!config) return reply.code(404).send({ error: 'No recommendation available.' });
     reply.header('content-disposition', 'attachment; filename="opencode.json"');
     reply.type('application/json; charset=utf-8');

@@ -58,6 +58,7 @@ interface OrEndpoint {
   quantization?: string | null;
   status?: number | null;
   uptime_last_30m?: number | null;
+  uptime_last_1d?: number | null;
   throughput_last_30m?: number | null;
   latency_last_30m?: number | null;
   supported_parameters?: string[];
@@ -163,6 +164,7 @@ export async function fetchOffers(
         supportsTools: (ep.supported_parameters ?? []).includes('tools'),
         quantization: ep.quantization ?? null,
         uptime30m: ep.uptime_last_30m ?? null,
+        uptime1d: ep.uptime_last_1d ?? null,
         throughputTps: ep.throughput_last_30m ?? null,
         latencyS: ep.latency_last_30m ?? null,
         regions: null,

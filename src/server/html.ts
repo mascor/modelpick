@@ -248,7 +248,7 @@ function renderDetails(pick: Pick, lang: Lang, opencodeVersion: string | null): 
   </details>`;
 }
 
-function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change | null, lang: Lang, empty: string, opencodeVersion: string | null): string {
+function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change | null, lang: Lang, empty: string, opencodeVersion: string | null, request: RecommendationRequest): string {
   const c = t(lang);
   const title = role === 'everyday' ? c.home.everyday : c.home.hard;
   if (!pick) {
@@ -289,13 +289,22 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
       ${conf.config ? `<li class="step">
         <span class="step__text">${esc(conf.pinNote ? c.home.savePinned(accountName(pick.offer), pick.offer.providerName) : c.home.saveEffort(pick.quality.effort ?? ''))}</span>
         <button class="button button--small" type="button" data-copy="#config-${esc(role)}">${esc(c.home.copyConfig)}</button>
+        <a class="button button--outline button--small" href="/opencode.json?${esc(new URLSearchParams({ task: request.task, priority: request.priority, role }).toString())}">${esc(c.home.downloadFile)}</a>
       </li>
       <li class="step step--config">
         <details class="details details--copy">
           <summary>${esc(c.home.showConfig)}</summary>
           <pre class="code"><code id="config-${esc(role)}">${esc(conf.config)}</code></pre>
         </details>
-      </li>` : `<li class="step">
+      </li>
+      <li class="step">
+        <span class="step__text">${esc(c.home.orQuick)}</span>
+      </li>
+      <li class="step step--config">
+        <code class="step__code" id="quick-${esc(role)}">${esc(conf.command)}</code>
+        <button class="button button--outline button--small" type="button" data-copy="#quick-${esc(role)}">${esc(c.home.copyCommand)}</button>
+      </li>
+      <li class="step"><span class="steps__note">${esc(conf.pinNote ? c.home.quickPinLost(accountName(pick.offer)) : c.home.quickEffortLost)}</span></li>` : `<li class="step">
         <span class="step__text">${esc(c.home.runCommand)}</span>
       </li>
       <li class="step step--config">
@@ -395,8 +404,8 @@ ${renderAnswer(rec, snapshot, request, lang)}
     ${rec?.replacements.map((r) => `<p class="alert">${esc(c.home.replaced(modelName(r.retiredName), modelName(r.successorName)))}</p>`).join('') ?? ''}
     ${renderCurrentModel(rec, lang)}
     <div class="results">
-      ${renderPick(rec?.everyday ?? null, 'everyday', changes.everyday, lang, c.home.noEveryday, snapshot?.opencodeVersion ?? null)}
-      ${renderPick(rec?.hard ?? null, 'hard', changes.hard, lang, c.home.noHard, snapshot?.opencodeVersion ?? null)}
+      ${renderPick(rec?.everyday ?? null, 'everyday', changes.everyday, lang, c.home.noEveryday, snapshot?.opencodeVersion ?? null, request)}
+      ${renderPick(rec?.hard ?? null, 'hard', changes.hard, lang, c.home.noHard, snapshot?.opencodeVersion ?? null, request)}
     </div>
   </div>
 </section>
@@ -442,6 +451,7 @@ export function methodPage(lang: Lang): string {
   const excluded = m.excluded({
     offerHours: String(THRESHOLDS.offerStaleHours),
     uptime: `${f.n.format(THRESHOLDS.minUptime30m)}%`,
+    uptimeDay: `${f.n.format(THRESHOLDS.minUptime1d)}%`,
     jump: f.n.format(THRESHOLDS.priceJumpFactor),
   });
   const th = (cols: string[]) => `<thead><tr>${cols.map((x, k) => `<th${k ? ' class="num"' : ''}>${esc(x)}</th>`).join('')}</tr></thead>`;
