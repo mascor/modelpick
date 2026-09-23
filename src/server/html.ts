@@ -6,7 +6,7 @@
 import { SITE, THRESHOLDS, SOURCES } from '../config.js';
 import type { Snapshot, SourceStatus } from '../types.js';
 import type { OfferView, Pick, Recommendation, RecommendationRequest } from '../engine/recommend.js';
-import { formatScore, metricLabel } from '../engine/recommend.js';
+import { formatScore, metricLabel, workFactor } from '../engine/recommend.js';
 import type { Change } from '../engine/changes.js';
 import { SCENARIOS, TASK_IDS, PRIORITIES, BUDGETS } from '../engine/scenarios.js';
 import { accountName, usabilityLabel } from '../engine/usability.js';
@@ -263,7 +263,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
     <p class="pick__role">${esc(title)}</p>
     <h3 class="pick__model">${esc(modelName(pick.model.displayName))}</h3>
     <p class="pick__summary">${esc(c.home.perMonth('\u0000')).replace('\u0000', `<strong class="pick__price">${esc(usd(pick.cost.totalUsd, lang))}</strong>`)}</p>
-    <p class="pick__evidence">${esc(c.home.benchmark(formatScore(pick.quality.value, pick.quality.metric), pick.quality.metric === 'aa_coding_index' ? 'Coding Index' : metricLabel(pick.quality.metric), dateShort(pick.quality.measuredAt, lang)))}${pick.quality.effort ? ` · ${esc(c.home.effort(pick.quality.effort))}` : ''}${pick.usage ? `<br>${esc(c.home.usage(fmt(lang).n.format(pick.usage.retentionRate)))} · <a href="https://opencode.ai/data/" rel="noopener">${esc(c.home.opencodeSource)}</a>` : ''}${pick.quality.metric === 'aa_coding_index' ? ` · <a href="${esc(pick.quality.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>` : ''}</p>
+    <p class="pick__evidence">${esc(c.home.benchmark(formatScore(pick.quality.value, pick.quality.metric), pick.quality.metric === 'aa_coding_index' ? 'Coding Index' : metricLabel(pick.quality.metric), dateShort(pick.quality.measuredAt, lang)))}${pick.quality.effort ? ` · ${esc(c.home.effort(pick.quality.effort))}` : ''}${pick.usage ? `<br>${esc(c.home.usage(fmt(lang).n.format(pick.usage.retentionRate)))}${pick.usage.sessionCostUsd !== null ? ` · ${esc(c.home.sessionCost((pick.usage.sessionCostUsd < 0.01 ? fmt(lang).n4 : fmt(lang).n2).format(pick.usage.sessionCostUsd)))}` : ''} · <a href="https://opencode.ai/data/" rel="noopener">${esc(c.home.opencodeSource)}</a>` : ''}${pick.quality.metric === 'aa_coding_index' ? ` · <a href="${esc(pick.quality.sourceUrl)}" rel="noopener">${esc(c.home.aaSource)}</a>` : ''}</p>
     ${pick.quality.inheritedFrom ? `<p class="alert">${esc(c.home.inherited(modelName(snapshotName(pick.quality.inheritedFrom.modelKey, pick.quality.inheritedFrom.harness))))}</p>` : ''}
     ${pick.successor ? `<p class="alert">${esc(c.home.successor(modelName(pick.successor.name)))}</p>` : ''}
     ${pick.cost.unquantifiedFees.length ? `<p class="alert">${esc(c.home.incompleteEstimate)}</p>` : ''}
@@ -287,7 +287,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
         <button class="button button--outline button--small" type="button" data-copy="#key-${esc(role)}">${esc(c.home.copy)}</button>
       </li>` : ''}
       ${conf.config ? `<li class="step">
-        <span class="step__text">${esc(conf.pinNote ? c.home.savePinned(accountName(pick.offer), pick.offer.providerName) : c.home.saveEffort(pick.quality.effort ?? ''))}</span>
+        <span class="step__text">${esc(conf.requiresFile ? c.home.saveCustom(pick.offer.customProvider?.name ?? pick.offer.providerName) : conf.pinNote ? c.home.savePinned(accountName(pick.offer), pick.offer.providerName) : c.home.saveEffort(pick.quality.effort ?? ''))}</span>
         <button class="button button--small" type="button" data-copy="#config-${esc(role)}">${esc(c.home.copyConfig)}</button>
         <a class="button button--outline button--small" href="/opencode.json?${esc(new URLSearchParams({ task: request.task, priority: request.priority, role, ...(request.privacy ? { privacy: '1' } : {}) }).toString())}">${esc(c.home.downloadFile)}</a>
       </li>
@@ -297,14 +297,14 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
           <pre class="code"><code id="config-${esc(role)}">${esc(conf.config)}</code></pre>
         </details>
       </li>
-      <li class="step">
+      ${conf.requiresFile ? '' : `      <li class="step">
         <span class="step__text">${esc(c.home.orQuick)}</span>
       </li>
       <li class="step step--config">
         <code class="step__code" id="quick-${esc(role)}">${esc(conf.command)}</code>
         <button class="button button--outline button--small" type="button" data-copy="#quick-${esc(role)}">${esc(c.home.copyCommand)}</button>
       </li>
-      <li class="step step--config"><span class="steps__note">${esc(conf.pinNote ? c.home.quickPinLost(accountName(pick.offer)) : c.home.quickEffortLost)}</span></li>` : `<li class="step">
+      <li class="step step--config"><span class="steps__note">${esc(conf.pinNote ? c.home.quickPinLost(accountName(pick.offer)) : c.home.quickEffortLost)}</span></li>`}` : `<li class="step">
         <span class="step__text">${esc(c.home.runCommand)}</span>
       </li>
       <li class="step step--config">
@@ -437,7 +437,7 @@ export function notFoundPage(lang: Lang): string {
   return layout({ lang, title: `${c.notFound.title} — ${SITE.name}`, description: c.siteDescription, body, active: 'home' });
 }
 
-export function methodPage(lang: Lang): string {
+export function methodPage(lang: Lang, snapshot: Snapshot | null = null): string {
   const c = t(lang);
   const m = c.method;
   const f = fmt(lang);
@@ -449,7 +449,8 @@ export function methodPage(lang: Lang): string {
   const millions = (v: number) => `${f.n.format(Math.round(v / 100_000) / 10)} M`;
   const costs = TASK_IDS.map((id) => {
     const mix = SCENARIOS[id].monthly;
-    return `<tr><td>${esc(c.tasks[id] ?? SCENARIOS[id].label)}</td><td class="num">${esc(millions(mix.input))}</td><td class="num">${esc(millions(mix.output))}</td><td class="num">${esc(millions(mix.cacheRead))}</td></tr>`;
+    const factor = snapshot ? workFactor(snapshot, mix) : null;
+    return `<tr><td>${esc(c.tasks[id] ?? SCENARIOS[id].label)}</td><td class="num">${esc(millions(mix.input))}</td><td class="num">${esc(millions(mix.output))}</td><td class="num">${esc(millions(mix.cacheRead))}</td><td class="num">${factor === null ? '—' : `${esc(f.n2.format(factor))}×`}</td></tr>`;
   }).join('');
   const excluded = m.excluded({
     offerHours: String(THRESHOLDS.offerStaleHours),

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { recommend, type RecommendationRequest } from '../src/engine/recommend.js';
+import { budgetFor, recommend, type RecommendationRequest } from '../src/engine/recommend.js';
 import { evidence, model, now, offer, snapshot } from './fixtures.js';
 
 const req = (over: Partial<RecommendationRequest> = {}): RecommendationRequest => ({
@@ -313,4 +313,12 @@ test('within 3 points the model OpenCode users keep most wins; beyond 3 points t
   assert.equal(near.everyday?.model.key, 'v/loved');
   assert.equal(near.everyday?.decidedByUsage, true);
   assert.equal(recommend(make(66), req({ priority: 'cheap' })).everyday?.model.key, 'v/top');
+});
+
+test('budgets grow with the kind of work, so heavier work does not get a weaker model', () => {
+  const s = base();
+  const bug = budgetFor(s, 'balanced', { input: 8_000_000, output: 900_000, cacheRead: 40_000_000, cacheWrite: 4_000_000 });
+  const analysis = budgetFor(s, 'balanced', { input: 20_000_000, output: 600_000, cacheRead: 90_000_000, cacheWrite: 9_000_000 });
+  assert.deepEqual(bug, { everyday: 20, hard: 100 });
+  assert.ok(analysis.everyday > bug.everyday && analysis.hard > bug.hard);
 });

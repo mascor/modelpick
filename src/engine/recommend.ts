@@ -70,7 +70,7 @@ export interface Pick {
   provisional: boolean;
   provisionalReasons: string[];
   /** What OpenCode users do with this model, when OpenCode publishes it. */
-  usage: { retentionRate: number; eligibleUserWeeks: number } | null;
+  usage: { retentionRate: number; eligibleUserWeeks: number; sessionCostUsd: number | null } | null;
   /** True when the pick won a near-tie on usage rather than on score alone. */
   decidedByUsage: boolean;
   /** The runner-up in the same budget, when its score is very close. */
@@ -241,6 +241,40 @@ function deliverable(variants: QualityEvidence[], offer: Offer): QualityEvidence
 /** Direct offers that need a cloud account: through OpenRouter the account is OpenRouter's. */
 const CLOUD_PLATFORMS = new Set(['amazon-bedrock', 'google-vertex', 'google-vertex-anthropic', 'azure', 'azure-cognitive-services']);
 
+/**
+ * How much more a month of this kind of work costs than a month of bug fixing:
+ * the median, over the priced offers of measured models, of the two totals.
+ * Budgets are set for bug fixing and grow in that proportion, so a heavier
+ * kind of work does not get a weaker model for the same priority.
+ */
+const factorCache = new Map<string, number>();
+export function workFactor(snapshot: Snapshot, mix: TokenMix): number {
+  const bug = SCENARIOS.bug.monthly;
+  const id = `${snapshot.runId}|${mix.input}|${mix.output}|${mix.cacheRead}|${mix.cacheWrite}`;
+  const cached = factorCache.get(id);
+  if (cached !== undefined) return cached;
+  const measured = new Set(snapshot.evidence.map((e) => e.modelKey));
+  const ratios: number[] = [];
+  for (const o of snapshot.offers) {
+    if (!measured.has(o.modelKey) || o.opencodeVerified === false) continue;
+    const base = costOf(o, bug).totalUsd;
+    const here = costOf(o, mix).totalUsd;
+    if (base && here) ratios.push(here / base);
+  }
+  ratios.sort((a, b) => a - b);
+  const factor = ratios.length ? ratios[Math.floor(ratios.length / 2)]! : 1;
+  if (factorCache.size > 50) factorCache.clear();
+  factorCache.set(id, factor);
+  return factor;
+}
+
+/** The priority's budgets for this kind of work, in whole dollars. */
+export function budgetFor(snapshot: Snapshot, priority: Priority, mix: TokenMix): Budget {
+  const f = workFactor(snapshot, mix);
+  const round = (v: number) => Math.max(1, Math.round(v * f));
+  return { everyday: round(BUDGETS[priority].everyday), hard: round(BUDGETS[priority].hard) };
+}
+
 /** Offer-level eligibility. Returns null when usable, otherwise the reason it is not. */
 function offerBlocker(offer: Offer, req: RecommendationRequest, minContext: number, now: number): ReasonCode | null {
   void req;
@@ -336,7 +370,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
   // Only recent evidence exists as far as the engine is concerned.
   const evidence = snapshot.evidence.filter((e) => isFresh(e, now));
   const ref = referenceGroup(evidence);
-  const budget = BUDGETS[req.priority];
+  const budget = budgetFor(snapshot, req.priority, mix);
   const budgetUsd = (v: number) => `${moneyFormat(req.lang, 0).format(v)} USD`;
 
   const offersByModel = new Map<string, Offer[]>();
@@ -469,7 +503,7 @@ export function recommend(snapshot: Snapshot, req: RecommendationRequest): Recom
       provisionalReasons,
       usage: (() => {
         const u = usageOf.get(cand.model.key);
-        return u ? { retentionRate: u.retentionRate, eligibleUserWeeks: u.eligibleUserWeeks } : null;
+        return u ? { retentionRate: u.retentionRate, eligibleUserWeeks: u.eligibleUserWeeks, sessionCostUsd: u.sessionCostUsd } : null;
       })(),
       decidedByUsage: decidedBy.get(cand)?.how === 'usage',
       alternative: runnerUp

@@ -57,6 +57,12 @@ export interface Offer {
   uptime30m: number | null;
   /** Availability over the last day, when the source publishes it. */
   uptime1d?: number | null;
+  /**
+   * A provider OpenCode does not ship with, added by the configuration we
+   * publish (OpenAI-compatible API, from models.dev): the offer is usable only
+   * with that file.
+   */
+  customProvider?: { id: string; name: string; npm: string; baseURL: string; env: string } | null;
   throughputTps: number | null;
   latencyS: number | null;
   /** ISO-3166 alpha-2 codes, or 'global', or null when unknown. */

@@ -23,6 +23,8 @@ export interface PickConfig {
   config: string | null;
   /** Why a pin is needed, or why it cannot be done. */
   pinNote: string | null;
+  /** True when the command only works with the configuration file in place. */
+  requiresFile?: boolean;
 }
 
 export interface OpenCodeConfigResult {
@@ -60,6 +62,23 @@ export function configFor(offer: Offer, lang: Lang = 'it', effort: string | null
   const modelId = modelIdFor(offer);
   const command = `opencode -m ${modelId}`;
   const routed = offer.sourceId === 'openrouter';
+
+  if (offer.customProvider) {
+    const p = offer.customProvider;
+    const config = {
+      $schema: 'https://opencode.ai/config.json',
+      provider: {
+        [p.id]: {
+          npm: p.npm,
+          name: p.name,
+          options: { baseURL: p.baseURL, apiKey: `{env:${p.env}}` },
+          models: { [offer.remoteModelId ?? '']: { name: offer.remoteModelId ?? '' } },
+        },
+      },
+      model: modelId,
+    };
+    return { modelId, command, commandIsExact: false, config: JSON.stringify(config, null, 2), pinNote: null, requiresFile: true };
+  }
 
   if (!routed && effort && offer.providerId === 'openai' && OPENAI_EFFORTS.has(effort)) {
     const config = {

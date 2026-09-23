@@ -45,7 +45,9 @@ export function applyRegistry(offers: Offer[], registry: Registry | null): { ver
       offer.opencodeVerified = false;
       continue;
     }
-    offer.opencodeVerified = registry.ids.has(id);
+    // A provider we add through the configuration is known to OpenCode once the
+    // file is in place: the file is what makes the command valid.
+    offer.opencodeVerified = registry.ids.has(id) || Boolean(offer.customProvider);
     if (offer.opencodeVerified) verified++;
     else rejected++;
   }

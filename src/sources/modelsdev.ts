@@ -77,8 +77,17 @@ interface MdProvider {
   doc?: string;
   env?: string[];
   npm?: string;
+  /** Base URL of an OpenAI-compatible API. */
+  api?: string;
   models?: Record<string, MdModel>;
 }
+
+/**
+ * Providers OpenCode does not ship with that we add through the published
+ * configuration, one by one on request: each needs an OpenAI-compatible API
+ * whose address, client and key name models.dev states.
+ */
+const CUSTOM_PROVIDERS = new Set(['siliconflow']);
 
 export interface ModelsDevResult {
   models: ModelRecord[];
@@ -193,6 +202,10 @@ export async function fetchModelsDev(observedAt: string, knownKeys: Map<string, 
         regions: null,
         dataPolicy: { trainsOnData: null, zeroRetention: null, note: null },
         remoteModelId: modelId,
+        customProvider:
+          CUSTOM_PROVIDERS.has(providerId) && provider.api && provider.npm === '@ai-sdk/openai-compatible' && provider.env?.[0]
+            ? { id: providerId, name: provider.name ?? providerId, npm: provider.npm, baseURL: provider.api, env: provider.env[0] }
+            : null,
         apiKeyEnv: provider.env?.[0] ?? null,
         providerDocUrl: provider.doc ?? null,
         routingSlug: null,

@@ -69,6 +69,7 @@ export interface Catalog {
     provisionalShort: string;
     usage: (rate: string) => string;
     opencodeSource: string;
+    sessionCost: (usd: string) => string;
     inherited: (from: string) => string;
     effort: (level: string) => string;
     replaced: (retired: string, successor: string) => string;
@@ -83,6 +84,7 @@ export interface Catalog {
     stepsIntro: (seller: string, model: string) => string;
     savePinned: (router: string, provider: string) => string;
     saveEffort: (effort: string) => string;
+    saveCustom: (provider: string) => string;
     runCommand: string;
     orQuick: string;
     privacyOff: (router: string) => string;
@@ -174,7 +176,7 @@ export interface Catalog {
     budgetCols: [string, string, string];
     budgetNote: string;
     costTitle: string;
-    costCols: [string, string, string, string];
+    costCols: [string, string, string, string, string];
     costNote: string;
     guaranteesTitle: string;
     guarantees: string[];
@@ -230,6 +232,7 @@ const it: Catalog = {
     alternative: (n, s, p) => `Alternativa molto vicina: ${n}, Coding Index ${s}, ${p} al mese.`,
     provisionalShort: 'provvisorio',
     opencodeSource: 'Source: OpenCode (opencode.ai/data)',
+    sessionCost: (u) => `nell'uso reale su OpenCode costa in media ${u} USD a sessione`,
     usage: (r) => `${r}% degli utenti di OpenCode lo usa ancora la settimana dopo`,
     successor: (n) => `È uscito ${n}: Artificial Analysis non l'ha ancora misurato sul codice, per questo non possiamo confrontarlo.`,
     incompleteEstimate:
@@ -238,6 +241,7 @@ const it: Catalog = {
     exportKey: 'Mettila nel terminale, prima di avviare OpenCode:',
     stepsIntro: (s, m) => `Ti servono due cose: OpenCode, il programma con cui scrivi codice insieme al modello, e un account su ${s}, che ti vende l'uso di ${m} e te lo fa pagare.`,
     savePinned: (r, p) => `Salva questa configurazione come opencode.json nella cartella del progetto: dice a ${r} di usare sempre ${p}, il provider del prezzo indicato.`,
+    saveCustom: (p) => `Salva questa configurazione come opencode.json nella cartella del progetto: aggiunge ${p} a OpenCode, che non lo conosce di serie. Senza il file il comando non funziona.`,
     saveEffort: (e) => `Salva questa configurazione come opencode.json nella cartella del progetto. Imposta lo sforzo di ragionamento "${e}", quello con cui è stato misurato il punteggio.`,
     runCommand: 'Avvia OpenCode con questo modello:',
     orQuick: 'Oppure avvia subito OpenCode con questo modello, senza file:',
@@ -382,10 +386,10 @@ const it: Catalog = {
     ruleTitle: 'La regola',
     rule: 'Per ogni priorità c\'è un budget al mese. Nel budget guardiamo il Coding Index di Artificial Analysis: i modelli entro 3 punti dal migliore li consideriamo abbastanza vicini, ed è una scelta nostra, non una misura dell\'incertezza. Fra questi vince quello che gli utenti di OpenCode continuano a usare di più la settimana dopo (a parità, il più economico); se il dato d\'uso manca, vince il più economico. Il modello per i problemi difficili si sceglie allo stesso modo con il budget più alto, e lo indichiamo solo se fa più di 3 punti in più. Se il secondo classificato è entro 3 punti, lo mostriamo come alternativa.',
     budgetCols: ['Priorità', 'Ogni giorno', 'Problemi difficili'],
-    budgetNote: 'Budget in USD al mese, sul tipo di lavoro che hai scelto.',
+    budgetNote: 'Budget in USD al mese per la Correzione di bug. Per gli altri tipi di lavoro cresce in proporzione ai token: vedi la colonna «Budget» nella tabella accanto.',
     costTitle: 'Come stimiamo il costo al mese',
-    costCols: ['Tipo di lavoro', 'Input', 'Output', 'Dalla cache'],
-    costNote: "Token al mese per una persona che usa un agente di codice ogni giorno, moltiplicati per il prezzo del provider, commissioni incluse. Sono ipotesi dichiarate, non misure dei tuoi consumi. Un prezzo mancante non diventa mai zero: se manca quello della cache, quei token costano come l'input.",
+    costCols: ['Tipo di lavoro', 'Input', 'Output', 'Dalla cache', 'Budget'],
+    costNote: "Token al mese per una persona che usa un agente di codice ogni giorno, moltiplicati per il prezzo del provider, commissioni incluse. Sono ipotesi dichiarate, non misure dei tuoi consumi, e sono le stesse per tutti i modelli: chi ragiona a lungo può consumare di più e costare più della stima. La colonna «Budget» dice quanto costa quel lavoro rispetto alla Correzione di bug, come mediana delle offerte di oggi. Un prezzo mancante non diventa mai zero: se manca quello della cache, quei token costano come l'input.",
     guaranteesTitle: 'Cosa garantiamo',
     guarantees: [
       '<strong>Dati recenti.</strong> Contano solo dati letti negli ultimi 7 giorni, anche quelli d\'uso di OpenCode. Artificial Analysis non pubblica quando ha fatto una prova: la data è quella in cui leggiamo il punteggio.',
@@ -399,7 +403,7 @@ const it: Catalog = {
       `Il provider è stato disponibile meno del ${t.uptime} nell'ultima mezz'ora, o meno del ${t.uptimeDay} nell'ultimo giorno. Chi vende direttamente spesso non lo pubblica: in quel caso il dato manca, non lo consideriamo buono.`,
       'Si compra direttamente da una piattaforma cloud (Amazon Bedrock, Google Vertex, Azure): servono un account cloud e permessi in più. Passando da OpenRouter invece l\'account è OpenRouter.',
       'Il contesto è troppo piccolo per il tipo di lavoro scelto.',
-      'OpenCode non riconosce la coppia modello-provider: il comando non partirebbe.',
+      'OpenCode non riconosce la coppia modello-provider: il comando non partirebbe. Fa eccezione SiliconFlow, che OpenCode non ha di serie: lo aggiunge la configurazione che pubblichiamo.',
       `Il prezzo è cambiato più di ${t.jump} volte dall'aggiornamento precedente: resta in attesa di conferma.`,
     ],
     limitsTitle: 'Limiti',
@@ -464,6 +468,7 @@ const en: Catalog = {
     alternative: (n, s, p) => `A very close alternative: ${n}, Coding Index ${s}, ${p} per month.`,
     provisionalShort: 'provisional',
     opencodeSource: 'Source: OpenCode (opencode.ai/data)',
+    sessionCost: (u) => `in real use on OpenCode it costs ${u} USD per session on average`,
     usage: (r) => `${r}% of OpenCode users still use it the following week`,
     successor: (n) => `${n} is out: Artificial Analysis has not measured it on code yet, so we cannot compare it.`,
     incompleteEstimate:
@@ -472,6 +477,7 @@ const en: Catalog = {
     exportKey: 'Put it in your terminal before starting OpenCode:',
     stepsIntro: (s, m) => `You need two things: OpenCode, the program you write code with together with the model, and an account on ${s}, which sells you the use of ${m} and bills you for it.`,
     savePinned: (r, p) => `Save this configuration as opencode.json in the project folder: it tells ${r} to always use ${p}, the provider of the price shown.`,
+    saveCustom: (p) => `Save this configuration as opencode.json in the project folder: it adds ${p} to OpenCode, which does not ship with it. Without the file the command does not work.`,
     saveEffort: (e) => `Save this configuration as opencode.json in the project folder. It sets the reasoning effort to "${e}", the one the score was measured with.`,
     runCommand: 'Start OpenCode with this model:',
     orQuick: 'Or start OpenCode with this model right away, no file:',
@@ -615,10 +621,10 @@ const en: Catalog = {
     ruleTitle: 'The rule',
     rule: 'Each priority has a monthly budget. Within it we look at the Artificial Analysis Coding Index: models within 3 points of the best are treated as close enough, a choice of ours rather than a measure of uncertainty. Among them, the one OpenCode users keep using most the following week wins (the cheaper on a tie); without usage figures, the cheapest wins. The model for hard problems is chosen the same way with the larger budget, and named only if it scores more than 3 points higher. If the runner-up is within 3 points, we show it as an alternative.',
     budgetCols: ['Priority', 'Every day', 'Hard problems'],
-    budgetNote: 'Budgets in USD per month, on the kind of work you chose.',
+    budgetNote: 'Budgets in USD per month for bug fixing. For other kinds of work they grow with the tokens: see the «Budget» column in the table alongside.',
     costTitle: 'How we estimate the monthly cost',
-    costCols: ['Kind of work', 'Input', 'Output', 'From cache'],
-    costNote: "Tokens per month for one person using a coding agent every day, times the provider's price, fees included. They are stated assumptions, not measurements of your usage. A missing price never becomes zero: if the cache price is missing, those tokens cost as much as input.",
+    costCols: ['Kind of work', 'Input', 'Output', 'From cache', 'Budget'],
+    costNote: "Tokens per month for one person using a coding agent every day, times the provider's price, fees included. They are stated assumptions, not measurements of your usage, and they are the same for every model: one that reasons at length may use more and cost more than the estimate. The «Budget» column says how much that work costs compared with bug fixing, as the median of today's offers. A missing price never becomes zero: if the cache price is missing, those tokens cost as much as input.",
     guaranteesTitle: 'What we guarantee',
     guarantees: [
       '<strong>Recent data.</strong> Only data read in the last 7 days counts, OpenCode usage figures included. Artificial Analysis does not publish when it ran a test: the date is when we read the score.',
@@ -632,7 +638,7 @@ const en: Catalog = {
       `The provider was available less than ${t.uptime} in the last half hour, or less than ${t.uptimeDay} over the last day. Direct sellers often do not publish it: then the figure is missing, and we do not treat it as good.`,
       'It is bought straight from a cloud platform (Amazon Bedrock, Google Vertex, Azure): that needs a cloud account and extra permissions. Through OpenRouter the account is OpenRouter\'s.',
       'The context is too small for the chosen kind of work.',
-      'OpenCode does not recognise the model-provider pair: the command would not start.',
+      'OpenCode does not recognise the model-provider pair: the command would not start. SiliconFlow is the exception: OpenCode does not ship with it, and the configuration we publish adds it.',
       `The price changed more than ${t.jump} times since the previous update: it waits for confirmation.`,
     ],
     limitsTitle: 'Limits',
