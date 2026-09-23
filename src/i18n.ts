@@ -79,6 +79,7 @@ export interface Catalog {
     copyBlocked: string;
     copyConfig: string;
     exportKey: string;
+    stepsIntro: (seller: string, model: string) => string;
     savePinned: (router: string, provider: string) => string;
     saveEffort: (effort: string) => string;
     runCommand: string;
@@ -225,6 +226,7 @@ const it: Catalog = {
       'Stima incompleta: una commissione applicabile non è quantificabile, il confronto fra provider vicini può ribaltarsi.',
     getKey: (a) => `Crea un account su ${a} e una chiave API: è lì che paghi.`,
     exportKey: 'Mettila nel terminale, prima di avviare OpenCode:',
+    stepsIntro: (s, m) => `Ti servono due cose: OpenCode, il programma con cui scrivi codice insieme al modello, e un account su ${s}, che ti vende l'uso di ${m} e te lo fa pagare.`,
     savePinned: (r, p) => `Salva questa configurazione come opencode.json nella cartella del progetto. Dice a ${r} di usare sempre ${p}, il provider con il prezzo che vedi: senza, ${r} può sceglierne un altro, a un altro prezzo.`,
     saveEffort: (e) => `Salva questa configurazione come opencode.json nella cartella del progetto. Imposta lo sforzo di ragionamento "${e}", quello con cui è stato misurato il punteggio.`,
     runCommand: 'Avvia OpenCode con questo modello:',
@@ -444,6 +446,7 @@ const en: Catalog = {
       'Incomplete estimate: one applicable fee cannot be quantified, so a close call between providers could flip.',
     getKey: (a) => `Create an account on ${a} and an API key: that is who bills you.`,
     exportKey: 'Put it in your terminal before starting OpenCode:',
+    stepsIntro: (s, m) => `You need two things: OpenCode, the program you write code with together with the model, and an account on ${s}, which sells you the use of ${m} and bills you for it.`,
     savePinned: (r, p) => `Save this configuration as opencode.json in the project folder. It tells ${r} to always use ${p}, the provider with the price you see: without it, ${r} may pick another one, at another price.`,
     saveEffort: (e) => `Save this configuration as opencode.json in the project folder. It sets the reasoning effort to "${e}", the one the score was measured with.`,
     runCommand: 'Start OpenCode with this model:',

@@ -12,7 +12,9 @@ export interface Change {
   moved: boolean;
 }
 
-const usd = (v: number) => `${v.toFixed(2)} USD`;
+/** Amounts in the page's language: "13,18 USD" in Italian. */
+const money = (v: number, lang: Lang) =>
+  `${new Intl.NumberFormat(lang === 'en' ? 'en-GB' : 'it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)} USD`;
 const shortName = (raw: string) => {
   const i = raw.indexOf(': ');
   return i > 0 ? raw.slice(i + 2) : raw;
@@ -27,12 +29,12 @@ export function describeChange(before: Pick | null, now: Pick | null, lang: Lang
     return { text: c.modelChanged(shortName(before.model.displayName), before.offer.providerName), moved: true };
   }
   if (before.offer.providerId !== now.offer.providerId) {
-    return { text: c.providerChanged(before.offer.providerName, usd(before.cost.totalUsd!)), moved: true };
+    return { text: c.providerChanged(before.offer.providerName, money(before.cost.totalUsd!, lang)), moved: true };
   }
   const a = before.cost.totalUsd;
   const b = now.cost.totalUsd;
   if (a !== null && b !== null && a > 0 && Math.abs(b - a) / a > 0.01) {
-    return { text: c.priceMoved(b < a, usd(a), usd(b)), moved: true };
+    return { text: c.priceMoved(b < a, money(a, lang), money(b, lang)), moved: true };
   }
   return { text: c.unchanged, moved: false };
 }

@@ -349,6 +349,17 @@ export async function collect(previous: Snapshot | null, observedAt: string): Pr
     // The list is optional.
   }
 
+  // OpenRouter's own endpoint list names the provider and its price, and lets
+  // the configuration pin it. Where we have it, the generic OpenRouter price
+  // models.dev reports (whichever provider OpenRouter happens to route to) is
+  // not a price anyone can be sure to pay.
+  {
+    const routed = new Set(offers.filter((o) => o.sourceId === 'openrouter').map((o) => o.modelKey));
+    const before = offers.length;
+    offers.splice(0, offers.length, ...offers.filter((o) => !(o.sourceId === 'modelsdev' && o.providerId === 'openrouter' && routed.has(o.modelKey))));
+    if (before > offers.length) warnings.push(`${before - offers.length} generic OpenRouter prices left out: OpenRouter lists the actual providers for those models.`);
+  }
+
   // A deprecated model goes with its dated builds and the variants sellers
   // publish under it, from every source and from yesterday's fallback data.
   let gone = new Set<string>();

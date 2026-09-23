@@ -273,6 +273,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
     <details class="details details--actions">
       <summary>${esc(c.home.detailsFor(modelName(pick.model.displayName)))}</summary>
       <div class="details__body">
+    <p class="steps__intro">${esc(c.home.stepsIntro(accountName(pick.offer), modelName(pick.model.displayName)))}</p>
     <ol class="steps">
       <li class="step">
         <span class="step__text">${esc(c.home.getKey(accountName(pick.offer)))}</span>
