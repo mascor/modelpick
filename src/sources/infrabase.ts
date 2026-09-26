@@ -6,22 +6,22 @@
  * agents at a public JSON API, the data is CC-BY-4.0, and attribution is
  * required, so we carry it through to the sources page.
  *
- * The API caps `limit` at 50 with no pagination, so we widen coverage with
- * several narrow queries and merge the results.
+ * The API returns at most 50 rows a page and paginates with `offset`,
+ * `total` and `next_offset` (null on the last page), so each listing is read
+ * to the end.
  */
 import { fetchJson, pooled } from '../lib/http.js';
 
 const API = 'https://infrabase.ai/api/query';
 
-/** Queries chosen to spread across the directory despite the 50-row cap. */
-const QUERIES: string[] = [
-  'category=inference-apis&limit=50&sort=name&order=asc',
-  'category=inference-apis&limit=50&sort=name&order=desc',
-  'category=inference-apis&limit=50&sort=updated&order=desc',
-  'category=inference-apis&limit=50&sort=github_stars&order=desc',
-  'category=inference-apis&gdpr=true&limit=50',
-  'job=hosted-inference-api&limit=50',
-];
+/** Listings read in full: together they cover the providers we quote. */
+const LISTINGS: string[] = ['category=inference-apis', 'job=hosted-inference-api'];
+const PAGE = 50;
+/** Guard against a cursor that never ends: 20 pages is 1000 rows. */
+const MAX_PAGES = 20;
+
+type Page = { results?: Row[]; next_offset?: number | null };
+type Get = (url: string) => Promise<Page>;
 
 export interface ProviderProfile {
   /** Normalised key used to match against the provider names in our offers. */
@@ -65,40 +65,58 @@ export function findProfile<T extends { key: string }>(profiles: Iterable<T>, pr
   return near.length === 1 ? near[0]! : null;
 }
 
+/** Every row of one listing, following next_offset to the last page. */
+export async function readListing(query: string, get: Get = fetchJson<Page>): Promise<Row[]> {
+  const rows: Row[] = [];
+  let offset: number | null | undefined = 0;
+  for (let page = 0; offset != null && page < MAX_PAGES; page++) {
+    const body: Page = await get(`${API}?${query}&limit=${PAGE}&offset=${offset}`);
+    rows.push(...(body.results ?? []));
+    // Stop on a cursor that does not move forward, as well as on the last page.
+    offset = body.next_offset != null && body.next_offset > offset ? body.next_offset : null;
+  }
+  return rows;
+}
+
 /**
- * @param lookFor provider names seen in our offers. The directory caps a query
- *        at 50 rows with no pagination, so the broad sweeps above are followed
- *        by one targeted search per provider we actually quote.
+ * @param lookFor provider names seen in our offers. Those the full listings do
+ *        not cover get one targeted search each.
  */
-export async function fetchInfrabase(lookFor: string[] = []): Promise<{ providers: ProviderProfile[]; queries: number }> {
-  const targeted = [...new Set(lookFor)]
-    .filter((n) => n.trim().length > 2)
-    .slice(0, 80)
-    .map((n) => `category=inference-apis&limit=5&q=${encodeURIComponent(n)}`);
-
-  const results = await pooled([...QUERIES, ...targeted], async (qs) => fetchJson<{ results?: Row[] }>(`${API}?${qs}`), 3);
-
+export async function fetchInfrabase(lookFor: string[] = [], get: Get = fetchJson<Page>): Promise<{ providers: ProviderProfile[]; queries: number }> {
   const byKey = new Map<string, ProviderProfile>();
-  let ok = 0;
-  for (const r of results) {
-    if (r.status === 'rejected') continue;
-    ok++;
-    for (const row of r.value.results ?? []) {
+  const add = (rows: Row[]) => {
+    for (const row of rows) {
       if (!row.name) continue;
       const key = providerKey(row.name);
       // First write wins; later queries only fill gaps left by earlier ones.
       const existing = byKey.get(key);
-      const profile: ProviderProfile = {
+      byKey.set(key, {
         key,
-        name: row.name,
-        siteUrl: row.site_url ?? existing?.siteUrl ?? null,
-        hqCountry: row.hq_country ?? existing?.hqCountry ?? null,
-        gdpr: row.gdpr ?? existing?.gdpr ?? null,
-        directoryUrl: row.infrabase_url ?? existing?.directoryUrl ?? null,
-        updatedAt: row.updated_at ?? existing?.updatedAt ?? null,
-      };
-      byKey.set(key, profile);
+        name: existing?.name ?? row.name,
+        siteUrl: existing?.siteUrl ?? row.site_url ?? null,
+        hqCountry: existing?.hqCountry ?? row.hq_country ?? null,
+        gdpr: existing?.gdpr ?? row.gdpr ?? null,
+        directoryUrl: existing?.directoryUrl ?? row.infrabase_url ?? null,
+        updatedAt: existing?.updatedAt ?? row.updated_at ?? null,
+      });
     }
+  };
+
+  let ok = 0;
+  for (const r of await pooled(LISTINGS, (q) => readListing(q, get), 2)) {
+    if (r.status === 'rejected') continue;
+    ok++;
+    add(r.value);
+  }
+
+  const missing = [...new Set(lookFor)]
+    .filter((n) => n.trim().length > 2 && !findProfile(byKey.values(), n))
+    .slice(0, 80);
+  const searches = await pooled(missing, (n) => get(`${API}?category=inference-apis&limit=5&q=${encodeURIComponent(n)}`), 3);
+  for (const r of searches) {
+    if (r.status === 'rejected') continue;
+    ok++;
+    add(r.value.results ?? []);
   }
 
   if (!ok) throw new Error('No Infrabase query succeeded');
