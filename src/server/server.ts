@@ -11,7 +11,8 @@ import { priceHistory, listRuns, previousRun } from '../pipeline/store.js';
 import { describeChange, type Change } from '../engine/changes.js';
 import { goPage, homePage, methodPage, notFoundPage, sourcesPage, statusPage } from './html.js';
 import { comparePlan } from '../engine/plans.js';
-import { currentSnapshot, currentStatus } from './snapshot.js';
+import { currentHistory, currentSnapshot, currentStatus } from './snapshot.js';
+import { seriesFor } from '../pipeline/history.js';
 
 type Query = Record<string, string | undefined>;
 
@@ -136,8 +137,10 @@ export async function buildServer() {
       const others = snapshot
         ? PRIORITIES.filter((p) => p !== request.priority).map((priority) => ({ priority, pick: recommend(snapshot, { ...request, priority }).everyday }))
         : [];
+      // The history is priced on the scenario: with usage of your own it would not match the card.
+      const history = rec?.everyday && !rec.usingCustomUsage ? seriesFor(await currentHistory(), rec.everyday.model.key, request.task) : [];
       reply.type('text/html; charset=utf-8');
-      return homePage({ lang, rec, snapshot, request, changes, go, others });
+      return homePage({ lang, rec, snapshot, request, changes, go, others, history });
     });
     app.get(paths.go, { onRequest: negotiate(lang, 'go') }, async (req, reply) => {
       const snapshot = await currentSnapshot();

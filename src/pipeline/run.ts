@@ -8,6 +8,7 @@ import type { Snapshot } from '../types.js';
 import { collect } from './collect.js';
 import { validateOffers } from './validate.js';
 import { loadCurrent, publish, pruneRuns, writeStatus, type RunStatus } from './store.js';
+import { recordHistory } from './history.js';
 
 export async function runUpdate(): Promise<RunStatus> {
   const startedAt = new Date().toISOString();
@@ -66,6 +67,9 @@ export async function runUpdate(): Promise<RunStatus> {
     } else {
       await publish(snapshot);
       published = true;
+      // Before pruning: a first build of the index reads every run still on disk.
+      // The chart is not worth failing an update for.
+      await recordHistory(snapshot).catch((err) => warnings.push(`Price history not updated: ${err instanceof Error ? err.message : String(err)}`));
       const pruned = await pruneRuns();
       message = `Published ${snapshot.offers.length} offers across ${snapshot.stats.modelCount} models, ${snapshot.evidence.length} quality evidence items.${pruned ? ` ${pruned} old runs removed.` : ''}`;
       if (failedSources.length) ok = false;

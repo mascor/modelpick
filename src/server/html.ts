@@ -429,6 +429,65 @@ function renderFinder(rec: Recommendation | null, snapshot: Snapshot | null, req
   </aside>`;
 }
 
+const HISTORY_RANGES = [['30d', 30], ['3m', 92], ['1y', 366]] as const;
+const DAY_MS = 86_400_000;
+
+/**
+ * The monthly cost of the recommended model over time, one chart per range the
+ * data actually covers. The range switch is radio buttons and CSS: it works
+ * without JavaScript.
+ */
+function renderHistory(series: { at: string; usd: number }[], taskName: string, lang: Lang): string {
+  if (series.length < 2) return '';
+  const c = t(lang);
+  const last = Date.parse(series[series.length - 1]!.at);
+  const first = Date.parse(series[0]!.at);
+  // A range is offered only when the data reaches past the shorter one before it.
+  const ranges = HISTORY_RANGES.filter(([, days], i) => {
+    const shorter = i === 0 ? 0 : HISTORY_RANGES[i - 1]![1];
+    return last - first > shorter * DAY_MS;
+  }).map(([id, days]) => ({ id, points: series.filter((p) => Date.parse(p.at) >= last - days * DAY_MS) }))
+    .filter((r) => r.points.length >= 2);
+  if (!ranges.length) return '';
+
+  const W = 320, H = 110, L = 4, R = 4, T = 8, B = 8;
+  const chart = (points: { at: string; usd: number }[], id: string) => {
+    const xs = points.map((p) => Date.parse(p.at));
+    const ys = points.map((p) => p.usd);
+    const x0 = xs[0]!, x1 = xs[xs.length - 1]!;
+    let lo = Math.min(...ys), hi = Math.max(...ys);
+    if (hi - lo < 0.01) { lo -= 1; hi += 1; }
+    const pad = (hi - lo) * 0.1;
+    lo = Math.max(0, lo - pad); hi += pad;
+    const px = (x: number) => L + ((x - x0) / Math.max(1, x1 - x0)) * (W - L - R);
+    const py = (y: number) => T + (1 - (y - lo) / (hi - lo)) * (H - T - B);
+    const line = points.map((p, i) => `${i ? 'L' : 'M'}${px(xs[i]!).toFixed(1)},${py(p.usd).toFixed(1)}`).join(' ');
+    const area = `${line} L${px(x1).toFixed(1)},${H - B} L${px(x0).toFixed(1)},${H - B} Z`;
+    const day = (iso: string) => id === '1y'
+      ? new Date(iso).toLocaleDateString(lang === 'en' ? 'en-GB' : 'it-IT', { month: 'short', year: 'numeric', timeZone: 'Europe/Rome' })
+      : dateShort(iso, lang);
+    const summary = c.home.historySummary(day(points[0]!.at), day(points[points.length - 1]!.at), usd(Math.min(...ys), lang), usd(Math.max(...ys), lang), usd(ys[ys.length - 1]!, lang));
+    return `<figure class="history__panel history__panel--${id}">
+      <div class="history__plot">
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(summary)}">
+          <path class="history__area" d="${area}"/>
+          <path class="history__line" d="${line}" vector-effect="non-scaling-stroke"/>
+        </svg>
+      </div>
+      <figcaption class="history__x meta" aria-hidden="true"><span>${esc(day(points[0]!.at))}</span><span>${esc(`${fmt(lang).n2.format(Math.min(...ys))}–${usd(Math.max(...ys), lang)}`)}</span><span>${esc(day(points[points.length - 1]!.at))}</span></figcaption>
+    </figure>`;
+  };
+
+  return `<div class="history">
+    <div class="history__head">
+      <h3 class="history__title">${esc(c.home.historyTitle)}</h3>
+      ${ranges.length > 1 ? `<fieldset class="history__ranges"><legend class="visually-hidden">${esc(c.home.historyRangeLabel)}</legend>${ranges.map((r, i) => `<input class="visually-hidden history__radio history__radio--${r.id}" type="radio" name="history-range" id="history-${r.id}"${i === 0 ? ' checked' : ''}><label for="history-${r.id}">${esc(c.home.historyRanges[r.id])}</label>`).join('')}</fieldset>` : ''}
+    </div>
+    <div class="history__panels">${ranges.map((r) => chart(r.points, r.id)).join('')}</div>
+    <p class="meta">${esc(c.home.historyNote(taskName))}</p>
+  </div>`;
+}
+
 /** The other ways to go for the same work: what each other priority would pick. */
 function renderOthers(pick: Pick | null, others: { priority: string; pick: Pick | null }[], req: RecommendationRequest, lang: Lang): string {
   const c = t(lang);
@@ -465,6 +524,8 @@ export function homePage(opts: {
   go?: PlanComparison | null;
   /** The everyday pick of each other priority, for the same work. */
   others?: { priority: string; pick: Pick | null }[];
+  /** Monthly cost of the everyday pick at each update, for the chosen work. */
+  history?: { at: string; usd: number }[];
 }): string {
   const { lang, rec, snapshot, request, changes } = opts;
   const go = opts.go ?? null;
@@ -488,6 +549,7 @@ export function homePage(opts: {
         <section class="card board__card">
           <h2 class="board__title">${esc(c.home.providerPrices(modelName(everyday.model.displayName)))}</h2>
           ${renderComparison(everyday, 'everyday', lang, request.privacy ?? false)}
+          ${renderHistory(opts.history ?? [], c.tasks[request.task] ?? SCENARIOS[request.task].label, lang)}
         </section>
       </div>` : ''}
       ${renderPick(rec?.hard ?? null, 'hard', changes.hard, lang, c.home.noHard, snapshot?.opencodeVersion ?? null, request, go)}
