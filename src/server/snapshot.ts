@@ -3,6 +3,7 @@ import { stat } from 'node:fs/promises';
 import { PATHS } from '../config.js';
 import { loadCurrent, loadStatus, type RunStatus } from '../pipeline/store.js';
 import type { Snapshot } from '../types.js';
+import { HISTORY_PATH, loadHistory, type PriceHistory } from '../pipeline/history.js';
 
 let cached: Snapshot | null = null;
 let cachedMtime = 0;
@@ -34,4 +35,21 @@ export async function currentStatus(): Promise<RunStatus | null> {
     return null;
   }
   return cachedStatus;
+}
+
+let cachedHistory: PriceHistory | null = null;
+let historyMtime = 0;
+
+/** The price history index; null until the first update after this feature writes it. */
+export async function currentHistory(): Promise<PriceHistory | null> {
+  try {
+    const { mtimeMs } = await stat(HISTORY_PATH);
+    if (mtimeMs !== historyMtime) {
+      cachedHistory = await loadHistory();
+      historyMtime = mtimeMs;
+    }
+  } catch {
+    return null;
+  }
+  return cachedHistory;
 }

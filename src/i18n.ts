@@ -115,6 +115,11 @@ export interface Catalog {
     noOtherOptions: string;
     providerPrices: (model: string) => string;
     perMonthShort: string;
+    historyTitle: string;
+    historyRanges: Record<'30d' | '3m' | '1y', string>;
+    historyRangeLabel: string;
+    historyNote: (task: string) => string;
+    historySummary: (from: string, to: string, low: string, high: string, last: string) => string;
     comparison: (provider: string | null, delta: string, cheaper: boolean) => string;
     answer: (model: string, price: string) => string;
     answerNone: string;
@@ -357,6 +362,11 @@ const it: Catalog = {
     noOtherOptions: 'Con le altre priorità la scelta è la stessa.',
     providerPrices: (m) => `Prezzi dei provider per ${m}`,
     perMonthShort: 'al mese',
+    historyTitle: 'Costo al mese nel tempo',
+    historyRanges: { '30d': '30G', '3m': '3M', '1y': '1A' },
+    historyRangeLabel: 'Periodo',
+    historyNote: (t) => `Per «${t}», dal provider più economico che avremmo consigliato a ogni aggiornamento.`,
+    historySummary: (f, to, lo, hi, last) => `Dal ${f} al ${to} il costo al mese è andato da ${lo} a ${hi}; ultimo valore ${last}.`,
     comparison: (p, d, cheaper) =>
       `Confronto con il <strong>prezzo più basso monitorato</strong> per il modello che hai indicato${p ? ` (${p})` : ''}, non con quello che paghi tu: <strong>${d} al mese in ${cheaper ? 'meno' : 'più'}</strong> sugli stessi consumi.`,
     answer: (m, p) => `Oggi usa ${m}, ${p} al mese.`,
@@ -683,6 +693,11 @@ const en: Catalog = {
     noOtherOptions: 'The other priorities pick the same model.',
     providerPrices: (m) => `Provider prices for ${m}`,
     perMonthShort: 'a month',
+    historyTitle: 'Monthly cost over time',
+    historyRanges: { '30d': '30D', '3m': '3M', '1y': '1Y' },
+    historyRangeLabel: 'Range',
+    historyNote: (t) => `For "${t}", at the cheapest provider we would have recommended at each update.`,
+    historySummary: (f, to, lo, hi, last) => `From ${f} to ${to} the monthly cost ranged from ${lo} to ${hi}; latest ${last}.`,
     comparison: (p, d, cheaper) =>
       `Compared with the <strong>lowest price we track</strong> for the model you named${p ? ` (${p})` : ''}, not with what you actually pay: <strong>${d} per month ${cheaper ? 'less' : 'more'}</strong> on the same usage.`,
     answer: (m, p) => `Today use ${m}, ${p} per month.`,
