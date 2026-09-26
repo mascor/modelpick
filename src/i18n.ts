@@ -137,7 +137,17 @@ export interface Catalog {
   };
   priorities: Record<string, string>;
   tasks: Record<string, string>;
-  usability: { hub: string; hubNote: string; direct: string; reseller: (p: string) => string; unknown: string };
+  usability: {
+    hub: string;
+    hubNote: string;
+    direct: string;
+    reseller: (p: string) => string;
+    unknown: string;
+    /** Name of a provider's service tier, shown next to the provider. */
+    tier: Record<'flex' | 'priority', string>;
+    /** What the tier means for the buyer. */
+    tierNote: Record<'flex' | 'priority', (p: string) => string>;
+  };
   reasons: Record<ReasonCode, string>;
   engine: {
     everydayReason: (value: string, metric: string, budget: string, price: string) => string;
@@ -372,6 +382,13 @@ const it: Catalog = {
     direct: 'diretto',
     reseller: (p) => `account ${p}`,
     unknown: 'provider non identificato',
+    tier: { flex: 'Flex', priority: 'Priority' },
+    tierNote: {
+      flex: (p) =>
+        `Prezzo del livello Flex di ${p}: costa la metà dello standard, ma le richieste passano dopo quelle standard e, nei momenti di carico, possono essere lente o rifiutate (errore 429 o 503) invece di passare al prezzo pieno.`,
+      priority: (p) =>
+        `Prezzo del livello Priority di ${p}: costa più dello standard in cambio di risposte servite per prime nei momenti di carico.`,
+    },
   },
   reasons: {
     'no-tools': 'il modello non supporta gli strumenti',
@@ -670,6 +687,13 @@ const en: Catalog = {
     direct: 'direct',
     reseller: (p) => `${p} account`,
     unknown: 'unidentified provider',
+    tier: { flex: 'Flex', priority: 'Priority' },
+    tierNote: {
+      flex: (p) =>
+        `Price of ${p}'s Flex tier: half the standard price, but requests are served after standard ones and, under load, may be slow or refused (error 429 or 503) rather than moved to the full price.`,
+      priority: (p) =>
+        `Price of ${p}'s Priority tier: more than standard, in exchange for being served first under load.`,
+    },
   },
   reasons: {
     'no-tools': 'the model does not support tool calling',

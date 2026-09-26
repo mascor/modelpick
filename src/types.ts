@@ -76,6 +76,11 @@ export interface Offer {
   providerDocUrl: string | null;
   /** Slug the broker uses to route to this provider, when it can be pinned. */
   routingSlug: string | null;
+  /**
+   * Set when the endpoint is a service tier of the provider: "flex" costs less
+   * but is served last and may be refused under load, "priority" costs more.
+   */
+  serviceTier?: 'flex' | 'priority' | null;
   /** The provider/model string OpenCode addresses this offer with. */
   opencodeId?: string | null;
   /** True when OpenCode actually accepts that id. Unverified offers are never recommended. */
