@@ -528,3 +528,8 @@ pre.code {
   }
   .step .button { flex: 1 1 100%; width: 100%; justify-content: center; }
 }
+
+/* While a new choice loads, the old answer fades so it is not read as the new one. */
+main[aria-busy="true"] .results, main[aria-busy="true"] .answer__line { opacity: 0.45; }
+main .results, main .answer__line { transition: opacity 0.15s ease; }
+@media (prefers-reduced-motion: reduce) { main .results, main .answer__line { transition: none; } }
