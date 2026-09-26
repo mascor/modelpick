@@ -114,6 +114,21 @@ export async function fetchCatalogue(observedAt: string): Promise<OpenRouterCata
   return { models, agentCapableKeys, pathByKey, deprecated };
 }
 
+/** Service tiers OpenRouter exposes as endpoint suffixes: same model, another price and priority. */
+const SERVICE_TIERS = new Set(['flex', 'priority']);
+
+/**
+ * How to pin one endpoint in provider.order. The whole tag is needed: a base
+ * slug ("google-ai-studio") matches every endpoint of that provider, and
+ * OpenRouter then bills the standard tier, not the "/flex" one we quoted at
+ * half the price. The suffix may be a tier, a region or a quantization.
+ */
+export function endpointRouting(tag: string | null | undefined): { routingSlug: string | null; serviceTier: 'flex' | 'priority' | null } {
+  if (!tag) return { routingSlug: null, serviceTier: null };
+  const last = tag.split('/').slice(1).pop();
+  return { routingSlug: tag, serviceTier: last && SERVICE_TIERS.has(last) ? (last as 'flex' | 'priority') : null };
+}
+
 /**
  * One offer per provider endpoint. Quantizations are kept apart: an fp8 route
  * and a bf16 route of the same model are different products.
@@ -172,9 +187,7 @@ export async function fetchOffers(
         remoteModelId: r.value.path,
         apiKeyEnv: 'OPENROUTER_API_KEY',
         providerDocUrl: null,
-        // "gmicloud/fp8" -> "gmicloud": the slug OpenRouter accepts in
-        // provider.order, without which the request is routed elsewhere.
-        routingSlug: ep.tag ? ep.tag.split('/')[0]! : null,
+        ...endpointRouting(ep.tag),
         sourceId: 'openrouter',
         sourceUrl: `https://openrouter.ai/${r.value.path}/providers`,
         observedAt,

@@ -181,7 +181,7 @@ function renderComparison(pick: Pick, role: string, lang: Lang, privacy = false)
     const link = signupUrl(o.offer);
     return `<tr${chosen ? ' class="chosen"' : ''}>
       <td>
-        <strong>${esc(o.offer.providerName)}</strong>
+        <strong>${esc(o.offer.providerName)}</strong>${o.offer.serviceTier ? ` <span class="label label--info" title="${esc(c.usability.tierNote[o.offer.serviceTier](o.offer.providerName))}">${esc(c.usability.tier[o.offer.serviceTier])}</span>` : ''}
         <span class="meta">${esc(usabilityLabel(o.usability, o.offer, lang))}</span>
       </td>
       <td class="num nowrap"><strong>${esc(usd(o.cost.totalUsd, lang))}</strong></td>
@@ -279,6 +279,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
     ${pick.cost.unquantifiedFees.length ? `<p class="alert">${esc(c.home.incompleteEstimate)}</p>` : ''}
     ${change?.moved ? `<p class="pick__change pick__change--moved">${esc(change.text)}</p>` : ''}
     <p class="pick__why">${esc(pick.reason)}</p>
+    ${pick.offer.serviceTier ? `<p class="alert">${esc(c.usability.tierNote[pick.offer.serviceTier](pick.offer.providerName))}</p>` : ''}
     ${goHint ? `<p class="pick__plan"><a href="${esc(pagePath(lang, 'go'))}?task=${esc(request.task)}">${esc(goHint)}</a></p>` : ''}
     ${pick.alternative ? `<p class="pick__alternative">${esc(c.home.alternative(modelName(pick.alternative.name), `${formatScore(pick.alternative.score, pick.quality.metric)}${pick.alternative.provisional ? ` (${c.home.provisionalShort})` : ''}`, usd(pick.alternative.totalUsd, lang)))}</p>` : ''}
     <details class="details details--actions">
