@@ -102,6 +102,19 @@ export interface Catalog {
     noHard: string;
     workType: string;
     priority: string;
+    workQuestion: string;
+    priorityQuestion: string;
+    usageTitle: string;
+    usageIntro: (task: string) => string;
+    usageCustom: string;
+    usageRows: { input: string; output: string; cacheRead: string; cacheWrite: string };
+    usageMore: string;
+    otherOptions: string;
+    otherPriority: (priority: string) => string;
+    closeAlternative: string;
+    noOtherOptions: string;
+    providerPrices: (model: string) => string;
+    perMonthShort: string;
     comparison: (provider: string | null, delta: string, cheaper: boolean) => string;
     answer: (model: string, price: string) => string;
     answerNone: string;
@@ -137,6 +150,8 @@ export interface Catalog {
   };
   priorities: Record<string, string>;
   tasks: Record<string, string>;
+  /** One line under each kind of work, in the finder. */
+  taskNotes: Record<string, string>;
   usability: {
     hub: string;
     hubNote: string;
@@ -329,6 +344,19 @@ const it: Catalog = {
     noHard: 'Nessun modello risolve abbastanza più problemi da giustificarne un secondo.',
     workType: 'Tipo di lavoro',
     priority: 'Cosa conta di più',
+    workQuestion: 'Su cosa lavori?',
+    priorityQuestion: 'Cosa conta di più?',
+    usageTitle: 'Ipotesi di consumo',
+    usageIntro: (t) => `Token al mese stimati per uno sviluppatore che usa un agente ogni giorno per «${t}»:`,
+    usageCustom: 'Consumi indicati da te nella richiesta:',
+    usageRows: { input: 'Input', output: 'Output', cacheRead: 'Lettura cache', cacheWrite: 'Scrittura cache' },
+    usageMore: 'Come sono stimati',
+    otherOptions: 'Altre opzioni',
+    otherPriority: (p) => `Se conta di più «${p}»`,
+    closeAlternative: 'Alternativa molto vicina',
+    noOtherOptions: 'Con le altre priorità la scelta è la stessa.',
+    providerPrices: (m) => `Prezzi dei provider per ${m}`,
+    perMonthShort: 'al mese',
     comparison: (p, d, cheaper) =>
       `Confronto con il <strong>prezzo più basso monitorato</strong> per il modello che hai indicato${p ? ` (${p})` : ''}, non con quello che paghi tu: <strong>${d} al mese in ${cheaper ? 'meno' : 'più'}</strong> sugli stessi consumi.`,
     answer: (m, p) => `Oggi usa ${m}, ${p} al mese.`,
@@ -375,6 +403,13 @@ const it: Catalog = {
     'new-features': 'Nuove funzionalità',
     refactoring: 'Refactoring',
     analysis: 'Analisi di un progetto',
+  },
+  taskNotes: {
+    'small-changes': 'Ritocchi mirati su file già noti.',
+    bug: 'Trovare la causa, correggere, far passare i test.',
+    'new-features': 'Codice nuovo su più file, con i test.',
+    refactoring: 'Riorganizzare il codice senza cambiarne il comportamento.',
+    analysis: 'Leggere e spiegare un repository.',
   },
   usability: {
     hub: 'via OpenRouter',
@@ -635,6 +670,19 @@ const en: Catalog = {
     noHard: 'No model solves enough additional problems to justify a second one.',
     workType: 'Kind of work',
     priority: 'What matters most',
+    workQuestion: 'What are you working on?',
+    priorityQuestion: 'What matters most?',
+    usageTitle: 'Usage assumptions',
+    usageIntro: (t) => `Estimated tokens a month for one developer using an agent every day for "${t}":`,
+    usageCustom: 'Usage you supplied in the request:',
+    usageRows: { input: 'Input', output: 'Output', cacheRead: 'Cache read', cacheWrite: 'Cache write' },
+    usageMore: 'How they are estimated',
+    otherOptions: 'Other options',
+    otherPriority: (p) => `If "${p}" matters most`,
+    closeAlternative: 'Very close alternative',
+    noOtherOptions: 'The other priorities pick the same model.',
+    providerPrices: (m) => `Provider prices for ${m}`,
+    perMonthShort: 'a month',
     comparison: (p, d, cheaper) =>
       `Compared with the <strong>lowest price we track</strong> for the model you named${p ? ` (${p})` : ''}, not with what you actually pay: <strong>${d} per month ${cheaper ? 'less' : 'more'}</strong> on the same usage.`,
     answer: (m, p) => `Today use ${m}, ${p} per month.`,
@@ -680,6 +728,13 @@ const en: Catalog = {
     'new-features': 'New features',
     refactoring: 'Refactoring',
     analysis: 'Understanding a codebase',
+  },
+  taskNotes: {
+    'small-changes': 'Targeted tweaks to files you already know.',
+    bug: 'Find the cause, fix it, get the tests passing.',
+    'new-features': 'New code across several files, with tests.',
+    refactoring: 'Restructure code without changing what it does.',
+    analysis: 'Read and explain a repository.',
   },
   usability: {
     hub: 'via OpenRouter',
