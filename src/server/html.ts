@@ -253,7 +253,11 @@ function renderDetails(pick: Pick, lang: Lang, opencodeVersion: string | null): 
   </details>`;
 }
 
-function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change | null, lang: Lang, empty: string, opencodeVersion: string | null, request: RecommendationRequest, go: PlanComparison | null = null): string {
+/**
+ * @param providersApart true when the provider table is shown in its own card
+ *        next to this one, so the card does not repeat it.
+ */
+function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change | null, lang: Lang, empty: string, opencodeVersion: string | null, request: RecommendationRequest, go: PlanComparison | null = null, providersApart = false): string {
   const c = t(lang);
   // Only when the fee alone covers this month of work and costs less than the pick.
   const planRow = pick ? go?.rows.find((r) => r.modelKey === pick.model.key && !r.blocker && r.month) : undefined;
@@ -269,7 +273,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
   }
   const conf = configFor(pick.offer, lang, pick.quality.effort, request.privacy ?? false);
   const link = signupUrl(pick.offer);
-  return `<article class="card pick pick--${role}" id="${esc(role)}">
+  return `<article class="card pick pick--${role}${role === 'everyday' ? ' pick--featured' : ''}" id="${esc(role)}">
     <p class="pick__role">${esc(title)}</p>
     <h3 class="pick__model">${esc(modelName(pick.model.displayName))}</h3>
     <p class="pick__summary">${esc(c.home.perMonth('\u0000')).replace('\u0000', `<strong class="pick__price">${esc(usd(pick.cost.totalUsd, lang))}</strong>`)}</p>
@@ -281,7 +285,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
     <p class="pick__why">${esc(pick.reason)}</p>
     ${pick.offer.serviceTier ? `<p class="alert">${esc(c.usability.tierNote[pick.offer.serviceTier](pick.offer.providerName))}</p>` : ''}
     ${goHint ? `<p class="pick__plan"><a href="${esc(pagePath(lang, 'go'))}?task=${esc(request.task)}">${esc(goHint)}</a></p>` : ''}
-    ${pick.alternative ? `<p class="pick__alternative">${esc(c.home.alternative(modelName(pick.alternative.name), `${formatScore(pick.alternative.score, pick.quality.metric)}${pick.alternative.provisional ? ` (${c.home.provisionalShort})` : ''}`, usd(pick.alternative.totalUsd, lang)))}</p>` : ''}
+    ${pick.alternative && !providersApart ? `<p class="pick__alternative">${esc(c.home.alternative(modelName(pick.alternative.name), `${formatScore(pick.alternative.score, pick.quality.metric)}${pick.alternative.provisional ? ` (${c.home.provisionalShort})` : ''}`, usd(pick.alternative.totalUsd, lang)))}</p>` : ''}
     <details class="details details--actions">
       <summary>${esc(c.home.detailsFor(modelName(pick.model.displayName)))}</summary>
       <div class="details__body">
@@ -326,7 +330,7 @@ function renderPick(pick: Pick | null, role: 'everyday' | 'hard', change: Change
     </ol>
     ${conf.pinNote && !conf.config ? `<p class="steps__note">${esc(conf.pinNote)}</p>` : ''}
     ${conf.config && conf.pinNote ? `<p class="steps__privacy">${esc(request.privacy ? c.home.privacyOn(accountName(pick.offer), pick.offer.providerName) : c.home.privacyOff(accountName(pick.offer)))} <a href="${esc(withParams(request, lang, { privacy: request.privacy ? '0' : '1' }))}#${esc(role)}">${esc(request.privacy ? c.home.privacyDisable : c.home.privacyEnable)}</a></p>` : ''}
-    ${renderComparison(pick, role, lang, request.privacy ?? false)}
+    ${providersApart ? '' : renderComparison(pick, role, lang, request.privacy ?? false)}
     ${renderDetails(pick, lang, opencodeVersion)}
       </div>
     </details>
@@ -374,27 +378,82 @@ const withParams = (req: RecommendationRequest, lang: Lang, overrides: Record<st
   return `${pagePath(lang, 'home')}?${q.toString()}`;
 };
 
-/** The answer first: what to use today, what it costs, and how the two compare. */
-function renderAnswer(rec: Recommendation | null, snapshot: Snapshot | null, req: RecommendationRequest, lang: Lang): string {
+/** Line icons for the kinds of work: decoration only, the name says it all. */
+const TASK_ICONS: Record<string, string> = {
+  'small-changes': '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
+  bug: '<rect x="7" y="8" width="10" height="12" rx="5"/><path d="M12 8v12M4 13h3M17 13h3M5 8l2.5 2M19 8l-2.5 2M5 19l2.5-2M19 19l-2.5-2M9 5l1.5 2M15 5l-1.5 2"/>',
+  'new-features': '<circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/>',
+  refactoring: '<path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/>',
+  analysis: '<path d="M3 5.5C5.5 4.5 8.5 4.5 12 6.5c3.5-2 6.5-2 9-1V19c-2.5-1-5.5-1-9 1-3.5-2-6.5-2-9-1V5.5z"/><path d="M12 6.5V20"/>',
+};
+const icon = (paths: string) =>
+  `<svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+
+/**
+ * The model finder: what you work on, what matters most, and the usage the
+ * prices assume. Every choice is a link, so it works without JavaScript.
+ */
+function renderFinder(rec: Recommendation | null, snapshot: Snapshot | null, req: RecommendationRequest, lang: Lang): string {
   const c = t(lang);
   const time = snapshot ? new Date(snapshot.generatedAt).toLocaleTimeString(lang === 'en' ? 'en-GB' : 'it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' }) : '';
-  return `<section class="answer">
-  <div class="container">
-    <h1 class="answer__title">${esc(c.home.title)}</h1>
+  const mix = rec?.mix ?? SCENARIOS[req.task].monthly;
+  const taskName = c.tasks[req.task] ?? SCENARIOS[req.task].label;
+  return `<aside class="card finder">
+    <h1 class="finder__title">${esc(c.home.title)}</h1>
     ${rec?.everyday
       ? `<p class="answer__line">${esc(c.home.answer(modelName(rec.everyday.model.displayName), usd(rec.everyday.cost.totalUsd, lang)))}</p>`
       : `<p class="answer__line">${esc(c.home.answerNone)}</p>`}
     <p class="answer__date">${snapshot ? esc(c.home.updatedAt(time)) : esc(c.home.noData)}</p>
-    <div class="choices">
-      <span class="choices__label">${esc(c.home.priority)}</span>
-      ${PRIORITIES.map((p) => `<a class="choice${p === req.priority ? ' choice--active' : ''}" href="${esc(withParams(req, lang, { priority: p }))}"${p === req.priority ? ' aria-current="true"' : ''}>${esc(c.priorities[p] ?? p)}</a>`).join('')}
-    </div>
-    <div class="choices">
-      <span class="choices__label">${esc(c.home.workType)}</span>
-      ${TASK_IDS.map((t2) => `<a class="choice${t2 === req.task ? ' choice--active' : ''}" href="${esc(withParams(req, lang, { task: t2 }))}"${t2 === req.task ? ' aria-current="true"' : ''}>${esc(c.tasks[t2] ?? SCENARIOS[t2].label)}</a>`).join('')}
-    </div>
-  </div>
-</section>`;
+    <h2 class="finder__question" id="q-task">${esc(c.home.workQuestion)}</h2>
+    <nav class="tasks" aria-labelledby="q-task">
+      ${TASK_IDS.map((id) => `<a class="choice task${id === req.task ? ' choice--active' : ''}" href="${esc(withParams(req, lang, { task: id }))}"${id === req.task ? ' aria-current="true"' : ''}>
+        ${icon(TASK_ICONS[id] ?? '')}
+        <span class="task__text"><span class="task__name">${esc(c.tasks[id] ?? SCENARIOS[id].label)}</span><span class="task__note">${esc(c.taskNotes[id] ?? '')}</span></span>
+        <span class="task__mark" aria-hidden="true"></span>
+      </a>`).join('')}
+    </nav>
+    <h2 class="finder__question" id="q-priority">${esc(c.home.priorityQuestion)}</h2>
+    <nav class="segmented" aria-labelledby="q-priority">
+      ${PRIORITIES.map((p) => `<a class="choice segment${p === req.priority ? ' choice--active' : ''}" href="${esc(withParams(req, lang, { priority: p }))}"${p === req.priority ? ' aria-current="true"' : ''}>${esc(c.priorities[p] ?? p)}</a>`).join('')}
+    </nav>
+    <details class="details usage">
+      <summary>${esc(c.home.usageTitle)}</summary>
+      <div class="details__body">
+        <p class="meta">${esc(rec?.usingCustomUsage ? c.home.usageCustom : c.home.usageIntro(taskName))}</p>
+        <dl class="usage__rows">
+          ${(['input', 'output', 'cacheRead', 'cacheWrite'] as const).map((k) => `<div><dt>${esc(c.home.usageRows[k])}</dt><dd>${esc(tokens(mix[k], lang))}</dd></div>`).join('')}
+        </dl>
+        <p class="meta"><a href="${esc(pagePath(lang, 'method'))}">${esc(c.home.usageMore)}</a></p>
+      </div>
+    </details>
+  </aside>`;
+}
+
+/** The other ways to go for the same work: what each other priority would pick. */
+function renderOthers(pick: Pick | null, others: { priority: string; pick: Pick | null }[], req: RecommendationRequest, lang: Lang): string {
+  const c = t(lang);
+  const seen = new Set(pick ? [pick.model.key] : []);
+  const items: string[] = [];
+  if (pick?.alternative) {
+    items.push(`<li class="option">
+      <span class="option__text"><span class="option__name">${esc(modelName(pick.alternative.name))}</span><span class="meta">${esc(c.home.closeAlternative)} · Coding Index ${esc(formatScore(pick.alternative.score, pick.quality.metric))}</span></span>
+      <span class="option__price"><strong>${esc(usd(pick.alternative.totalUsd, lang))}</strong><span class="meta">${esc(c.home.perMonthShort)}</span></span>
+    </li>`);
+  }
+  for (const o of others) {
+    if (!o.pick || seen.has(o.pick.model.key)) continue;
+    seen.add(o.pick.model.key);
+    items.push(`<li class="option">
+      <a class="option__link" data-swap href="${esc(withParams(req, lang, { priority: o.priority }))}">
+        <span class="option__text"><span class="option__name">${esc(modelName(o.pick.model.displayName))}</span><span class="meta">${esc(c.home.otherPriority(c.priorities[o.priority] ?? o.priority))} · Coding Index ${esc(formatScore(o.pick.quality.value, o.pick.quality.metric))}</span></span>
+        <span class="option__price"><strong>${esc(usd(o.pick.cost.totalUsd, lang))}</strong><span class="meta">${esc(c.home.perMonthShort)}</span></span>
+      </a>
+    </li>`);
+  }
+  return `<section class="card board__card">
+    <h2 class="board__title">${esc(c.home.otherOptions)}</h2>
+    ${items.length ? `<ul class="options">${items.join('')}</ul>` : `<p class="meta">${esc(c.home.noOtherOptions)}</p>`}
+  </section>`;
 }
 
 export function homePage(opts: {
@@ -404,27 +463,36 @@ export function homePage(opts: {
   request: RecommendationRequest;
   changes: { everyday: Change | null; hard: Change | null };
   go?: PlanComparison | null;
+  /** The everyday pick of each other priority, for the same work. */
+  others?: { priority: string; pick: Pick | null }[];
 }): string {
   const { lang, rec, snapshot, request, changes } = opts;
   const go = opts.go ?? null;
   const c = t(lang);
   const stale = rec?.method.snapshotStale ?? false;
 
+  const everyday = rec?.everyday ?? null;
   const body = `
-${renderAnswer(rec, snapshot, request, lang)}
-
-<section class="section">
-  <div class="container">
-    ${!snapshot ? `<div class="notice notice--error">${esc(c.home.noData)}</div>` : ''}
-    ${stale ? `<div class="notice">${esc(c.home.stale)}</div>` : ''}
-    ${rec?.notes.map((n) => `<div class="notice">${esc(n)}</div>`).join('') ?? ''}
-    ${rec?.replacements.map((r) => `<p class="alert">${esc(c.home.replaced(modelName(r.retiredName), modelName(r.successorName)))}</p>`).join('') ?? ''}
-    ${renderCurrentModel(rec, lang)}
-    <div class="results">
-      ${renderPick(rec?.everyday ?? null, 'everyday', changes.everyday, lang, c.home.noEveryday, snapshot?.opencodeVersion ?? null, request, go)}
+<section class="dashboard">
+  <div class="container dashboard__grid">
+    ${renderFinder(rec, snapshot, request, lang)}
+    <div class="board">
+      ${!snapshot ? `<div class="notice notice--error">${esc(c.home.noData)}</div>` : ''}
+      ${stale ? `<div class="notice">${esc(c.home.stale)}</div>` : ''}
+      ${rec?.notes.map((n) => `<div class="notice">${esc(n)}</div>`).join('') ?? ''}
+      ${rec?.replacements.map((r) => `<p class="alert">${esc(c.home.replaced(modelName(r.retiredName), modelName(r.successorName)))}</p>`).join('') ?? ''}
+      ${renderCurrentModel(rec, lang)}
+      ${renderPick(everyday, 'everyday', changes.everyday, lang, c.home.noEveryday, snapshot?.opencodeVersion ?? null, request, go, true)}
+      ${everyday ? `<div class="board__row">
+        ${renderOthers(everyday, opts.others ?? [], request, lang)}
+        <section class="card board__card">
+          <h2 class="board__title">${esc(c.home.providerPrices(modelName(everyday.model.displayName)))}</h2>
+          ${renderComparison(everyday, 'everyday', lang, request.privacy ?? false)}
+        </section>
+      </div>` : ''}
       ${renderPick(rec?.hard ?? null, 'hard', changes.hard, lang, c.home.noHard, snapshot?.opencodeVersion ?? null, request, go)}
+      ${go ? `<p class="plan-link"><a href="${esc(pagePath(lang, 'go'))}?task=${esc(request.task)}">${esc(c.go.homeLink)} →</a></p>` : ''}
     </div>
-    ${go ? `<p class="plan-link"><a href="${esc(pagePath(lang, 'go'))}?task=${esc(request.task)}">${esc(c.go.homeLink)} →</a></p>` : ''}
   </div>
 </section>
 `;

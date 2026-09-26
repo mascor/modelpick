@@ -131,8 +131,13 @@ export async function buildServer() {
     app.get(paths.home, { onRequest: negotiate(lang, 'home') }, async (req, reply) => {
       const { snapshot, request, rec, changes } = await compute(req.query as Query, lang);
       const go = snapshot ? comparePlan(snapshot, 'opencode-go', request) : null;
+      // What the other priorities would pick for the same work: the alternatives
+      // the reader can switch to, each one a real recommendation.
+      const others = snapshot
+        ? PRIORITIES.filter((p) => p !== request.priority).map((priority) => ({ priority, pick: recommend(snapshot, { ...request, priority }).everyday }))
+        : [];
       reply.type('text/html; charset=utf-8');
-      return homePage({ lang, rec, snapshot, request, changes, go });
+      return homePage({ lang, rec, snapshot, request, changes, go, others });
     });
     app.get(paths.go, { onRequest: negotiate(lang, 'go') }, async (req, reply) => {
       const snapshot = await currentSnapshot();

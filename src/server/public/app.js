@@ -90,13 +90,13 @@ const show = async (url, push) => {
 };
 
 document.addEventListener('click', (event) => {
-  const link = event.target.closest('a.choice');
+  const link = event.target.closest('a.choice, a[data-swap]');
   if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   const url = new URL(link.href, location.href);
   if (url.origin !== location.origin || url.pathname !== location.pathname) return;
   event.preventDefault();
   // Immediate feedback: the new choice is highlighted before the answer arrives.
-  for (const sibling of link.parentElement.querySelectorAll('.choice')) {
+  if (link.classList.contains('choice')) for (const sibling of link.parentElement.querySelectorAll('.choice')) {
     const on = sibling === link;
     sibling.classList.toggle('choice--active', on);
     if (on) sibling.setAttribute('aria-current', 'true'); else sibling.removeAttribute('aria-current');
@@ -106,7 +106,7 @@ document.addEventListener('click', (event) => {
 
 // Warm the cache when a choice is about to be clicked.
 const warm = (event) => {
-  const link = event.target.closest?.('a.choice');
+  const link = event.target.closest?.('a.choice, a[data-swap]');
   if (!link || link.classList.contains('choice--active')) return;
   const url = new URL(link.href, location.href);
   if (url.origin === location.origin && url.pathname === location.pathname) load(url.pathname + url.search).catch(() => {});
